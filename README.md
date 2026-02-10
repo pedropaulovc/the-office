@@ -71,6 +71,9 @@ npm install
 # Run database migrations
 npx drizzle-kit push
 
+# Enable git hooks
+git config --local core.hooksPath .githooks
+
 # Start dev server
 npm run dev
 ```
