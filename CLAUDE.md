@@ -51,11 +51,10 @@ The frontend is a complete, read-only Slack clone with 16 Office characters, 7 c
 ```mermaid
 graph TD
     M1[M1: Database Foundation] --> M2[M2: Observability & Agent Core]
-    M1 --> M3[M3: API Layer & SSE]
+    M1 --> M3[M3: API Layer, SSE & Frontend Polish]
     M2 --> M3
-    M3 --> M4[M4: Frontend Integration]
-    M2 --> M5[M5: Agent Interactions & Scheduling]
-    M4 --> M5
+    M3 --> M5[M5: Agent Interactions & Scheduling]
+    M2 --> M5
     M1 --> M6[M6: Character Personalities]
     M6 --> M5
 ```
@@ -66,8 +65,7 @@ graph TD
 |-----------|---------|------|
 | M1: Database Foundation | S-1.0 – S-1.8 | `spec/plan/milestone-1-database-foundation.md` |
 | M2: Observability & Agent Core | S-2.0 – S-2.5 | `spec/plan/milestone-2-observability-agent-core.md` |
-| M3: API Layer & SSE | S-3.0 – S-3.1 | `spec/plan/milestone-3-api-layer-sse.md` |
-| M4: Frontend Polish | S-4.0 – S-4.1 | `spec/plan/milestone-4-frontend-polish.md` |
+| M3: API Layer, SSE & Frontend Polish | S-3.0 – S-3.2 | `spec/plan/milestone-3-api-layer-sse.md` |
 | M5: Advanced Interactions & Scheduling | S-5.0 – S-5.3 | `spec/plan/milestone-5-advanced-interactions.md` |
 | M6: Character Personalities | S-6.0 – S-6.1 | `spec/plan/milestone-6-character-personalities.md` |
 
