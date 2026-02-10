@@ -38,6 +38,56 @@ There are multiple instances of Claude Code running in parallel. Each one has mu
 ## Key Specs
 
 - Full capability spec: `spec/functional/agent-platform.md`
+- Implementation plan: `spec/plan/` (one file per milestone)
+
+## Implementation Plan
+
+The frontend is a complete, read-only Slack clone with 16 Office characters, 7 channels, 8 DM conversations, and ~160 mock messages. All data is static in `src/data/`. The entire backend needs to be built from scratch: database, agent orchestration via Claude Agent SDK, MCP tools, API routes, SSE real-time streaming, and frontend wiring.
+
+**Goal**: Bring the Office characters to life as autonomous AI agents that respond to messages, talk to each other, and evolve their own memories — all visible in the existing Slack-like UI.
+
+### Milestone Dependency Graph
+
+```mermaid
+graph TD
+    M1[M1: Database Foundation] --> M2[M2: Observability & Agent Core]
+    M1 --> M3[M3: API Layer, SSE & Frontend Polish]
+    M2 --> M3
+    M3 --> M4[M4: Agent Interactions & Scheduling]
+    M2 --> M4
+    M1 --> M5[M5: Character Personalities]
+    M5 --> M4
+```
+
+### Milestones
+
+| Milestone | Stories | Spec |
+|-----------|---------|------|
+| M1: Database Foundation | S-1.0 – S-1.8 | `spec/plan/milestone-1-database-foundation.md` |
+| M2: Observability & Agent Core | S-2.0 – S-2.5 | `spec/plan/milestone-2-observability-agent-core.md` |
+| M3: API Layer, SSE & Frontend Polish | S-3.0 – S-3.2 | `spec/plan/milestone-3-api-layer-sse.md` |
+| M4: Advanced Interactions & Scheduling | S-4.0 – S-4.3 | `spec/plan/milestone-4-advanced-interactions.md` |
+| M5: Character Personalities | S-5.0 – S-5.1 | `spec/plan/milestone-5-character-personalities.md` |
+
+### Horizontal Requirements
+
+- Each story = one pull request, implemented and merged independently
+- Each schema story = one DB migration, tested and validated
+- Testing is mandatory: unit tests + integration tests + 1-2 E2E tests for user-facing features
+- Every story must be demoable with a live demo before claiming completion
+- Telemetry is mandatory from M2 onward (Sentry traces/spans/logs)
+
+### Risks & Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| Claude Agent SDK API differs from spec pseudocode | Inspect actual SDK exports after install in S-1.0; adapt orchestrator accordingly |
+| Agent responses too slow for good UX | SSE typing indicators give immediate feedback; maxTurns=5 limits processing |
+| Runaway agent costs | maxBudgetUsd per invocation, chain depth limit, scheduler rate limit |
+| Agent-to-agent infinite loops | MAX_CHAIN_DEPTH=3 hard limit in orchestrator |
+| No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
+| Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |
+| All channel members responding creates too many agents | Sequential processing with delays (S-4.1) makes it feel natural; `do_nothing` tool lets agents opt out |
 
 ## Feature-First Directory Structure
 
