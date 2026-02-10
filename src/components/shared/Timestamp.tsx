@@ -1,4 +1,4 @@
-import { formatMessageTime } from '@/lib/formatTime';
+import { formatMessageTime } from '@/utils/format-time';
 
 interface TimestampProps {
   isoString: string;

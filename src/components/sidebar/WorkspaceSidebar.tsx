@@ -29,7 +29,7 @@ export default function WorkspaceSidebar() {
         return (
           <button
             key={uid}
-            onClick={() => switchUser(uid)}
+            onClick={() => { switchUser(uid); }}
             className={`relative h-9 w-9 shrink-0 rounded-lg transition-all ${
               isActive
                 ? 'ring-2 ring-slack-sidebar-text-active'

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { getMessagesForChannel } from '@/data/messages';
-import { formatDateDivider } from '@/lib/formatTime';
+import { formatDateDivider } from '@/utils/format-time';
 import MessageGroup from './MessageGroup';
 import type { Message } from '@/types';
 
@@ -18,20 +18,20 @@ function groupMessages(msgs: Message[]): { date: string; groups: MessageGroupDat
   for (const msg of msgs) {
     const dateKey = new Date(msg.timestamp).toDateString();
     const last = byDate[byDate.length - 1];
-    if (last && last.date === dateKey) {
+    if (last?.date === dateKey) {
       last.messages.push(msg);
     } else {
       byDate.push({ date: dateKey, messages: [msg] });
     }
   }
 
-  return byDate.map(({ date, messages: dayMsgs }) => {
+  return byDate.map(({ messages: dayMsgs }) => {
     const groups: MessageGroupData[] = [];
 
     for (const msg of dayMsgs) {
       const lastGroup = groups[groups.length - 1];
-      if (lastGroup && lastGroup.userId === msg.userId) {
-        const lastMsg = lastGroup.messages[lastGroup.messages.length - 1];
+      const lastMsg = lastGroup?.messages[lastGroup.messages.length - 1];
+      if (lastGroup && lastMsg && lastGroup.userId === msg.userId) {
         const timeDiff = new Date(msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime();
         if (timeDiff < 5 * 60 * 1000) {
           lastGroup.messages.push(msg);
@@ -41,7 +41,10 @@ function groupMessages(msgs: Message[]): { date: string; groups: MessageGroupDat
       groups.push({ userId: msg.userId, messages: [msg] });
     }
 
-    return { date: dayMsgs[0].timestamp, groups };
+    const firstMsg = dayMsgs[0];
+    // dayMsgs always has at least one element since byDate entries are created with messages
+    if (!firstMsg) throw new Error("Invariant: empty day group");
+    return { date: firstMsg.timestamp, groups };
   });
 }
 

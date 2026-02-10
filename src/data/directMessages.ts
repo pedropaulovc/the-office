@@ -19,5 +19,8 @@ export function getDmsForUser(userId: string): DirectMessage[] {
 }
 
 export function getDmOtherParticipant(dm: DirectMessage, currentUserId: string): string {
-  return dm.participantIds.find(id => id !== currentUserId) ?? dm.participantIds[0];
+  const other = dm.participantIds.find(id => id !== currentUserId);
+  // DMs always have at least one participant
+  if (!other) throw new Error("Invariant: DM has no other participant");
+  return other;
 }

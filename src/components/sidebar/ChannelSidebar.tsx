@@ -97,7 +97,7 @@ function ChannelItem({ channel }: { channel: Channel }) {
 
   return (
     <button
-      onClick={() => navigateTo({ kind: 'channel', id: channel.id })}
+      onClick={() => { navigateTo({ kind: 'channel', id: channel.id }); }}
       className={`flex w-full items-center gap-1.5 rounded-md mx-2 px-2 py-1 text-sm transition-colors ${
         isActive
           ? 'bg-slack-channel-active text-slack-sidebar-text-active font-semibold'
@@ -137,7 +137,7 @@ function DmItem({ dm }: { dm: DirectMessage }) {
 
   return (
     <button
-      onClick={() => navigateTo({ kind: 'dm', id: dm.id })}
+      onClick={() => { navigateTo({ kind: 'dm', id: dm.id }); }}
       className={`flex w-full items-center gap-2 rounded-md mx-2 px-2 py-1 text-sm transition-colors ${
         isActive
           ? 'bg-slack-channel-active text-slack-sidebar-text-active font-semibold'

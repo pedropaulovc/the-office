@@ -5,7 +5,7 @@ import { useApp } from '@/context/AppContext';
 interface ThreadPreviewProps {
   messageId: string;
   replyCount: number;
-  participantIds?: string[];
+  participantIds?: string[] | undefined;
 }
 
 export default function ThreadPreview({ messageId, replyCount }: ThreadPreviewProps) {
@@ -13,7 +13,7 @@ export default function ThreadPreview({ messageId, replyCount }: ThreadPreviewPr
 
   return (
     <button
-      onClick={() => openThread(messageId)}
+      onClick={() => { openThread(messageId); }}
       className="flex items-center gap-1 mt-1 text-xs text-slack-link hover:underline"
     >
       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
