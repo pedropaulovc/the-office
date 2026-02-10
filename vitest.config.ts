@@ -19,10 +19,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["json", "json-summary", "html"],
+      include: ["src/utils/**", "src/features/**"],
       exclude: [
         "node_modules/",
         "e2e/",
         "**/*.d.ts",
+        "**/*.test.{ts,tsx}",
         "**/index.ts",
       ],
       thresholds: {
