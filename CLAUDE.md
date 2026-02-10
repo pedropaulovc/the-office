@@ -53,10 +53,10 @@ graph TD
     M1[M1: Database Foundation] --> M2[M2: Observability & Agent Core]
     M1 --> M3[M3: API Layer, SSE & Frontend Polish]
     M2 --> M3
-    M3 --> M5[M5: Agent Interactions & Scheduling]
-    M2 --> M5
-    M1 --> M6[M6: Character Personalities]
-    M6 --> M5
+    M3 --> M4[M4: Agent Interactions & Scheduling]
+    M2 --> M4
+    M1 --> M5[M5: Character Personalities]
+    M5 --> M4
 ```
 
 ### Milestones
@@ -66,8 +66,8 @@ graph TD
 | M1: Database Foundation | S-1.0 – S-1.8 | `spec/plan/milestone-1-database-foundation.md` |
 | M2: Observability & Agent Core | S-2.0 – S-2.5 | `spec/plan/milestone-2-observability-agent-core.md` |
 | M3: API Layer, SSE & Frontend Polish | S-3.0 – S-3.2 | `spec/plan/milestone-3-api-layer-sse.md` |
-| M5: Advanced Interactions & Scheduling | S-5.0 – S-5.3 | `spec/plan/milestone-5-advanced-interactions.md` |
-| M6: Character Personalities | S-6.0 – S-6.1 | `spec/plan/milestone-6-character-personalities.md` |
+| M4: Advanced Interactions & Scheduling | S-4.0 – S-4.3 | `spec/plan/milestone-4-advanced-interactions.md` |
+| M5: Character Personalities | S-5.0 – S-5.1 | `spec/plan/milestone-5-character-personalities.md` |
 
 ### Horizontal Requirements
 
@@ -87,7 +87,7 @@ graph TD
 | Agent-to-agent infinite loops | MAX_CHAIN_DEPTH=3 hard limit in orchestrator |
 | No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
 | Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |
-| All channel members responding creates too many agents | Sequential processing with delays (S-5.1) makes it feel natural; `do_nothing` tool lets agents opt out |
+| All channel members responding creates too many agents | Sequential processing with delays (S-4.1) makes it feel natural; `do_nothing` tool lets agents opt out |
 
 ## Feature-First Directory Structure
 
