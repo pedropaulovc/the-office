@@ -49,7 +49,7 @@ Claude Agent SDK (foundation)
 
 | Layer | Technology | Package | Purpose |
 |-------|-----------|---------|---------|
-| **Framework** | Next.js 15 | `next` | App Router, API routes, SSE streaming |
+| **Framework** | Next.js 16 | `next` | App Router, API routes, SSE streaming |
 | **Deployment** | Vercel | - | Hosting frontend + API routes |
 
 No auth. Simple Slack-like UI: channels, DMs, message threads, reactions. Frontend is a separate concern — this plan focuses on the backend service layer.

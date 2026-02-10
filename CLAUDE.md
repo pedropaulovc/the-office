@@ -14,7 +14,7 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 
 - **Backend**: TypeScript, Claude Agent SDK for agent orchestration
 - **Database**: Neon PostgreSQL + pgvector (via Drizzle ORM)
-- **Frontend**: Next.js 15 App Router, SSE for real-time updates
+- **Frontend**: Next.js 16 App Router, SSE for real-time updates
 - **No auth** — single-user hackathon project
 
 ### Frontend

@@ -41,10 +41,10 @@ MCP Tools (chat, memory, agent-to-agent)
 | Language | TypeScript |
 | Database | Neon PostgreSQL + pgvector |
 | ORM | Drizzle |
-| Frontend | Next.js 15 (App Router) |
+| Frontend | Next.js 16 (App Router) |
 | Deploy | Vercel |
 
-## Project Structure
+## Project Structure (Planned)
 
 ```
 spec/functional/     Capability specs (what to build)
@@ -53,7 +53,7 @@ src/
   agents/            Agent CRUD, memory, orchestrator
   tools/             MCP tool definitions (chat, memory, etc.)
   scheduler/         Autonomous behavior triggers
-  api/               Next.js API routes
+  app/api/           Next.js API routes
 .skills/             Filesystem-based skill packages
 ```
 
@@ -63,9 +63,10 @@ src/
 # Install dependencies
 npm install
 
-# Set up environment
-cp .env.example .env
-# Fill in ANTHROPIC_API_KEY and DATABASE_URL
+# Create .env in the project root with:
+#   ANTHROPIC_API_KEY=your_anthropic_api_key
+#   DATABASE_URL=your_pooled_database_url
+#   DATABASE_URL_UNPOOLED=your_unpooled_database_url
 
 # Run database migrations
 npx drizzle-kit push
