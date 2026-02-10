@@ -60,6 +60,4 @@ export interface ThreadPanel {
   parentMessageId: string | null;
 }
 
-export interface UnreadCounts {
-  [userId: string]: { [channelOrDmId: string]: number };
-}
+export type UnreadCounts = Record<string, Record<string, number>>;
