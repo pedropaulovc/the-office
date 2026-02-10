@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Workspace sidebar (darkest) */
+  --color-slack-workspace-bg: oklch(0.28 0.08 290);
+  /* Channel sidebar */
+  --color-slack-aubergine: oklch(0.35 0.08 290);
+  --color-slack-aubergine-light: oklch(0.40 0.08 290);
+  --color-slack-aubergine-hover: oklch(0.37 0.08 290);
+  /* Sidebar text */
+  --color-slack-sidebar-text: oklch(0.85 0.01 290);
+  --color-slack-sidebar-text-active: oklch(1 0 0);
+  --color-slack-sidebar-hover: oklch(0.37 0.08 290);
+  /* Active channel */
+  --color-slack-channel-active: oklch(0.70 0.18 320);
+  /* Presence */
+  --color-slack-presence-online: oklch(0.65 0.16 160);
+  --color-slack-presence-away: oklch(0.78 0.15 75);
+  /* Unread */
+  --color-slack-unread: oklch(0.55 0.22 25);
+  /* Links */
+  --color-slack-link: oklch(0.68 0.14 230);
+  /* Message area */
+  --color-slack-message-hover: oklch(0.98 0.003 260);
+  --color-slack-compose-border: oklch(0.84 0.01 260);
+  --color-slack-reaction-bg: oklch(0.96 0.02 250);
+  --color-slack-reaction-border: oklch(0.88 0.04 250);
+  --color-slack-thread-border: oklch(0.88 0.005 260);
+  /* Borders */
+  --color-border: oklch(0.93 0.005 260);
+  --color-muted: oklch(0.96 0.005 260);
+  --color-muted-foreground: oklch(0.55 0.01 260);
+
+  --font-lato: 'Lato', sans-serif;
+}
+
+body {
+  font-family: var(--font-lato);
+  background: #FFFFFF;
+  color: #1D1C1D;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #C1C1C1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A1A1A1;
+}
