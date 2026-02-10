@@ -40,6 +40,12 @@ export const threads: Record<string, ThreadReply[]> = {
     { id: 'ann-1-r2', parentMessageId: 'ann-1', userId: 'kevin', text: "Stanley and I are forming an alliance to be first in line.", timestamp: t(3, 9, 10), reactions: [] },
   ],
 
+  // Petty cash discrepancy thread (#accounting acc-5)
+  'acc-5': [
+    { id: 'acc-5-r1', parentMessageId: 'acc-5', userId: 'kevin', text: "I may have accidentally used the petty cash for the vending machine. But in my defense, those pretzels were really good.", timestamp: t(1, 10, 10), reactions: [] },
+    { id: 'acc-5-r2', parentMessageId: 'acc-5', userId: 'angela', text: "Kevin, that is NOT what petty cash is for. I'm adding this to your file.", timestamp: t(1, 10, 12), reactions: [] },
+  ],
+
   // Creed's turtle thread (#random ran-2)
   'ran-2': [
     { id: 'ran-2-r1', parentMessageId: 'ran-2', userId: 'jim', text: "Creed, you can't just claim a random turtle.", timestamp: t(2, 13, 5), reactions: [] },

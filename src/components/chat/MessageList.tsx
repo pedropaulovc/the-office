@@ -53,7 +53,7 @@ export default function MessageList() {
   const grouped = useMemo(() => groupMessages(messages), [messages]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+    bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [channelId]);
 
   if (messages.length === 0) {

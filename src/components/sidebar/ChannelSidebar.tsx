@@ -52,7 +52,17 @@ export default function ChannelSidebar() {
           >
             {getInitials(currentUser.displayName)}
           </div>
-          <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full bg-slack-presence-online border-2 border-slack-aubergine" />
+          <span
+            className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-slack-aubergine"
+            style={{
+              backgroundColor:
+                currentUser.presence === 'active'
+                  ? 'oklch(0.65 0.16 160)'
+                  : currentUser.presence === 'away'
+                  ? 'oklch(0.78 0.15 75)'
+                  : 'oklch(0.55 0.01 260)',
+            }}
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-slack-sidebar-text-active text-sm font-medium truncate">

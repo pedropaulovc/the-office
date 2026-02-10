@@ -80,8 +80,8 @@ function ToolbarBtn({ icon }: { icon: string }) {
   };
 
   return (
-    <span className="p-1.5 text-muted-foreground rounded hover:bg-muted transition-colors cursor-not-allowed opacity-50">
+    <button type="button" disabled aria-label={icon} className="p-1.5 text-muted-foreground rounded hover:bg-muted transition-colors cursor-not-allowed opacity-50">
       {icons[icon]}
-    </span>
+    </button>
   );
 }
