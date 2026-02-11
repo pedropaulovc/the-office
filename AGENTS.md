@@ -11,8 +11,11 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 - `npm run dev` / `npm run build` / `npm run lint` / `npm run typecheck`
 - `npm run test` / `npm run test:coverage` / `npm run test:e2e` / `npm run test:all`
 - `npm run db:push` — push schema to Neon (dev)
+- `npm run db:seed` — seed all tables from mock data (idempotent)
 - `npm run db:generate` — generate migration files
 - `npm run db:migrate` — run migrations (production)
+
+**Environment setup:** The `.env.local` file (with `DATABASE_URL_UNPOOLED` and other secrets) is NOT checked into git. It is auto-created by `npm run dev`, which pulls env vars from Vercel. If `db:push`, `db:seed`, or other DB commands fail with an empty URL, run `npm run dev` first to generate `.env.local`.
 
 **Troubleshooting:** If any `npm run` command fails, the very first thing to try is `npm install`.
 
@@ -29,7 +32,7 @@ Read-only Slack clone (The Office theme). Next.js App Router, Tailwind v4, TypeS
 
 **Layout:** `WorkspaceSidebar (68px) | ChannelSidebar (240px) | ChatPanel (flex-1) | ThreadPanel (360px, conditional)` — orchestrated by `WorkspaceShell`.
 
-**Data:** All mock data in `src/data/` — static arrays, no API. 16 Office characters, all switchable. Channels can be `public` or `private` (private filtered by `memberIds`). Messages use `t(daysAgo, hour, min)` for relative timestamps.
+**Data:** All data flows from Neon PostgreSQL via API routes to the frontend. `src/db/seed.ts` populates the DB with 16 Office characters, 7 channels, 8 DM conversations, ~130 messages, and memory blocks. `src/data/` retains only `users.ts` (user constants shared by seed + frontend) and `unreads.ts` (static unread counts). Channels can be `public`, `private`, or `dm` (private filtered by `memberIds`). Messages use `t(daysAgo, hour, min)` for relative timestamps in the seed script.
 
 **Styling:** Tailwind v4 custom tokens in `globals.css` (`@theme inline`). All colors use `slack-*` prefix. `@/*` maps to `./src/*`.
 
