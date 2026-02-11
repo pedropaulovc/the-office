@@ -13,7 +13,6 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 - `npm run db:push` — push schema to Neon (dev)
 - `npm run db:generate` — generate migration files
 - `npm run db:migrate` — run migrations (production)
-- `npm run db:seed` — seed database with mock data
 
 **Troubleshooting:** If any `npm run` command fails, the very first thing to try is `npm install`.
 
