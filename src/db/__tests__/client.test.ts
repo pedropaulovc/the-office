@@ -37,12 +37,18 @@ describe("db/client", () => {
     expect(mockNeon).toHaveBeenCalledWith(testUrl);
   });
 
-  it("calls neon() with empty string when env var is missing", async () => {
+  it("uses placeholder client when neon() throws on empty URL", async () => {
+    mockNeon.mockImplementation(() => {
+      throw new Error("No database connection string");
+    });
     vi.stubEnv("DATABASE_URL_UNPOOLED", "");
 
     await import("../client");
 
-    expect(mockNeon).toHaveBeenCalledWith("");
+    // drizzle() still called with a placeholder function
+    expect(mockDrizzle).toHaveBeenCalledTimes(1);
+    const calls = mockDrizzle.mock.calls as unknown as [{ client: unknown }][];
+    expect(typeof calls[0]?.[0]?.client).toBe("function");
   });
 
   it("calls drizzle() with the neon client and schema", async () => {

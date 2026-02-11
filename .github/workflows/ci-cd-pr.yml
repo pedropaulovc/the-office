@@ -135,9 +135,43 @@ jobs:
           json-summary-compare-path: ${{ steps.download-coverage-baseline.outcome == 'success' && 'coverage-baseline/coverage-summary.json' || '' }}
           threshold-icons: "{0: '🔴', 70: '🟡', 75: '🔵', 85: '🟢'}"
 
-  e2e-tests:
+  wait-for-vercel:
     needs: [resolve-ref]
     if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
+    runs-on: ubuntu-slim
+    outputs:
+      preview_url: ${{ steps.wait.outputs.preview_url }}
+    steps:
+      - name: Wait for Vercel preview deployment
+        id: wait
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ needs.resolve-ref.outputs.ref || github.event.pull_request.head.sha }}"
+          REPO="${{ github.repository }}"
+          echo "Waiting for Vercel deployment for commit $SHA..."
+          for i in $(seq 1 60); do
+            DEPLOY_ID=$(gh api "repos/$REPO/deployments?sha=$SHA&environment=Preview&per_page=1" \
+              --jq '.[0].id // empty' 2>/dev/null || true)
+            if [ -n "$DEPLOY_ID" ]; then
+              RESULT=$(gh api "repos/$REPO/deployments/$DEPLOY_ID/statuses" \
+                --jq '.[0] | select(.state == "success") | .environment_url' 2>/dev/null || true)
+              if [ -n "$RESULT" ]; then
+                echo "preview_url=$RESULT" >> "$GITHUB_OUTPUT"
+                echo "Preview ready: $RESULT"
+                exit 0
+              fi
+            fi
+            echo "Attempt $i/60 — waiting 5s..."
+            sleep 5
+          done
+          echo "::error::Vercel deployment not ready after 5 minutes"
+          exit 1
+
+  e2e-tests:
+    needs: [resolve-ref, wait-for-vercel]
+    if: always() && (needs.wait-for-vercel.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -161,8 +195,10 @@ jobs:
         timeout-minutes: 1
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E tests against Vercel preview
         timeout-minutes: 3
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.wait-for-vercel.outputs.preview_url }}
         run: npm run test:e2e
 
   capture-iteration:
