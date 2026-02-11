@@ -35,13 +35,13 @@ Exit criteria: create a dummy API route and a button in the UI. When the user cl
 | File | Change |
 |------|--------|
 | `next.config.ts` | Wrap with `withSentryConfig()` |
-| `CLAUDE.md` | Add section: "Telemetry is VITAL. All agent invocations, tool calls, and API requests must emit Sentry traces, logs, and metrics." |
+| `AGENTS.md` | Add section: "Telemetry is VITAL. All agent invocations, tool calls, and API requests must emit Sentry traces, logs, and metrics." |
 
 ### Acceptance Criteria
 - [ ] [AC-2.0.1] `@sentry/nextjs` configured for both client and server
 - [ ] [AC-2.0.2] Dummy button in UI triggers an API call that creates a correlated frontend+backend trace
 - [ ] [AC-2.0.3] Sentry MCP query confirms events appear with all 3 telemetry types (traces, logs, metrics)
-- [ ] [AC-2.0.4] CLAUDE.md updated to document telemetry as a project requirement
+- [ ] [AC-2.0.4] AGENTS.md updated to document telemetry as a project requirement
 - [ ] [AC-2.0.5] Unit tests for telemetry helper functions
 
 ### Demo

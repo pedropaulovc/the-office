@@ -7,10 +7,10 @@ The frontend is a complete, read-only Slack clone with 16 Office characters, 7 c
 **Goal**: Bring the Office characters to life as autonomous AI agents that respond to messages, talk to each other, and evolve their own memories — all visible in the existing Slack-like UI.
 
 **Horizontal Requirements** (all milestones):
-- Follow CLAUDE.md conventions: strict TypeScript, `type` over `interface`, named exports, kebab-case files
+- Follow AGENTS.md conventions: strict TypeScript, `type` over `interface`, named exports, kebab-case files
 - Validate at system boundaries with Zod
 - `npm run test:all` must pass after each story
-- **Testing is mandatory**: each story must include unit tests, integration tests where applicable, and 1-2 E2E tests for user-facing features. Vitest + Playwright are already installed. Update CLAUDE.md to document the test framework.
+- **Testing is mandatory**: each story must include unit tests, integration tests where applicable, and 1-2 E2E tests for user-facing features. Vitest + Playwright are already installed. Update AGENTS.md to document the test framework.
 - **Every story must be demoable**: the implementer must show a live demo before claiming completion. Include any necessary frontend or backend shims to make this possible. Add cleanup tasks in later stories for shims.
 - **Each story = one pull request**: stories are implemented and merged independently.
 - **Each schema story = one DB migration**: every schema story produces a Drizzle migration that is tested and validated. The schema must be queryable via PostgreSQL after the migration runs.

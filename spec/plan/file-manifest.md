@@ -91,7 +91,7 @@ e2e/snapshots/baseline/
 ```
 package.json                              — add dependencies + scripts
 next.config.ts                            — wrap with withSentryConfig()
-CLAUDE.md                                 — add telemetry + testing requirements
+AGENTS.md                                 — add telemetry + testing requirements
 src/components/chat/ComposeBox.tsx         — enable message input
 src/components/chat/MessageList.tsx        — switch to API data
 src/components/chat/ChatPanel.tsx          — consume DataContext + typing indicator
