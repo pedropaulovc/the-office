@@ -10,7 +10,9 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 
 - `npm run dev` / `npm run build` / `npm run lint` / `npm run typecheck`
 - `npm run test` / `npm run test:coverage` / `npm run test:e2e` / `npm run test:all`
-- `npx drizzle-kit push` — push schema to database
+- `npm run db:push` — push schema to Neon (dev)
+- `npm run db:generate` — generate migration files
+- `npm run db:migrate` — run migrations (production)
 
 **Troubleshooting:** If any `npm run` command fails, the very first thing to try is `npm install`.
 

@@ -1,6 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
+const previewUrl = process.env.PLAYWRIGHT_BASE_URL;
+
+// Remote preview deployments have network latency + cold starts
+const timeout = previewUrl ? 15000 : 5000;
+const actionTimeout = previewUrl ? 5000 : 2000;
+const expectTimeout = previewUrl ? 5000 : 2000;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -8,15 +14,15 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: 0,
-  timeout: 5000,
+  timeout,
   expect: {
-    timeout: 2000,
+    timeout: expectTimeout,
   },
   reporter: "html",
   use: {
-    baseURL: `http://localhost:${process.env.E2E_PORT}`,
+    baseURL: previewUrl ?? `http://localhost:${process.env.E2E_PORT}`,
     trace: "retain-on-failure",
-    actionTimeout: 2000,
+    actionTimeout,
   },
   projects: [
     {
@@ -26,10 +32,15 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: "npm run build && npm run start -- -p 0",
-    wait: { stdout: /localhost:(?<E2E_PORT>\d+)/ },
-    reuseExistingServer: !isCI,
-    timeout: 180_000,
-  },
+  // Skip local webServer when running against an external preview URL
+  ...(previewUrl
+    ? {}
+    : {
+        webServer: {
+          command: "npm run build && npm run start -- -p 0",
+          wait: { stdout: /localhost:(?<E2E_PORT>\d+)/ },
+          reuseExistingServer: !isCI,
+          timeout: 180_000,
+        },
+      }),
 });
