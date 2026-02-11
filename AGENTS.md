@@ -139,7 +139,6 @@ src/
 ### TypeScript
 
 - Strict mode. No `any` unless absolutely unavoidable. Use `unknown` if unsure, but prefer defined types.
-- Use `type` over `interface` for object shapes (consistency with Drizzle inferred types).
 - Prefer named exports over default exports.
 - File naming: `kebab-case.ts` for modules, `PascalCase.tsx` for React components.
 - **Keep Codebase Pristine**: This is an unlaunched greenfield project with NO backwards compatibility concerns. Aggressively delete unused code, dead imports, and stale abstractions. Never leave compatibility shims, re-exports, or commented-out code behind.
