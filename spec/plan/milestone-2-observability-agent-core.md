@@ -104,7 +104,7 @@ This ensures agents never process messages concurrently — they handle them one
 
 ### Acceptance Criteria
 - [ ] [AC-2.2.1] `enqueueRun()` creates a `runs` row with status `created` and returns the run ID
-- [ ] [AC-2.2.2] `claimNextRun()` atomically transitions the oldest `created` run to `running` (e.g., `UPDATE runs SET status = 'running' WHERE id IN (SELECT id FROM runs WHERE agent_id = $1 AND status = 'created' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`)
+- [ ] [AC-2.2.2] `claimNextRun()` atomically transitions the oldest `created` run to `running`, only if no run is already `running` for that agent (e.g., `UPDATE runs SET status = 'running' WHERE id IN (SELECT id FROM runs WHERE agent_id = $1 AND status = 'created' AND NOT EXISTS (SELECT 1 FROM runs r2 WHERE r2.agent_id = $1 AND r2.status = 'running') ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`)
 - [ ] [AC-2.2.3] Only one run per agent can be `running` at a time (enforced by query, not unique constraint)
 - [ ] [AC-2.2.4] `processNextRun()` calls `claimNextRun()` then invokes the orchestrator (stub for now — real orchestrator in S-2.3)
 - [ ] [AC-2.2.5] After a run completes, automatically check and process the next queued run
@@ -226,7 +226,7 @@ As a developer, I want all 6 agent tools implemented as MCP tools so agents can 
 | File | Purpose |
 |------|---------|
 | `src/tools/registry.ts` | `getTools(agentId)` — returns tool array for an agent |
-| `src/tools/send-message.ts` | Post message to any channel or DM conversation |
+| `src/tools/send-message.ts` | Post message to any channel (public, private, or DM) |
 | `src/tools/react-to-message.ts` | Add emoji reaction |
 | `src/tools/do-nothing.ts` | Explicitly choose silence |
 | `src/tools/update-memory.ts` | Update own core memory block |

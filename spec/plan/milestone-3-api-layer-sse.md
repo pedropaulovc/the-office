@@ -77,7 +77,7 @@ As a developer, I want a POST endpoint that receives a user message, stores it, 
 6. Return the stored message (201)
 
 ### Acceptance Criteria
-- [ ] [AC-3.1.1] POST body validated with Zod: `{ channelId?, dmConversationId?, parentMessageId?, userId, text }`
+- [ ] [AC-3.1.1] POST body validated with Zod: `{ channelId, parentMessageId?, userId, text }`
 - [ ] [AC-3.1.2] Human message stored in DB before agent invocation
 - [ ] [AC-3.1.3] SSE broadcast of new message happens immediately
 - [ ] [AC-3.1.4] Agent runs enqueued via mailbox (non-blocking — POST returns before agents respond)

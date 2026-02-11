@@ -18,7 +18,7 @@ Agents can also have custom labels beyond these three.
 
 ### Shared Blocks
 
-Some blocks can be shared across multiple agents (e.g., `office_news` — announcements everyone knows about). Shared blocks are attached via a join table.
+Some blocks can be shared across multiple agents (e.g., `office_news` — announcements everyone knows about). The block's `agent_id` is the **owner/creator**. Other agents access it via `shared_block_links` (a join table). If the owner agent is deleted, the block and all its links are cascade-deleted.
 
 ### Data Model
 

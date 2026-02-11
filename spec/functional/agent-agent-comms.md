@@ -6,7 +6,7 @@ Uses the messaging data model defined in [user-agent-comms.md](user-agent-comms.
 
 ## 1:1 DM Chains
 
-When Agent A sends a DM to Agent B (via `send_message` with a DM conversation ID), a run is automatically enqueued for Agent B to respond.
+When Agent A sends a DM to Agent B (via `send_message` with a DM channel ID, e.g. `'dm-dwight-michael'`), a run is automatically enqueued for Agent B to respond.
 
 ### Chain Depth
 
@@ -44,11 +44,11 @@ Sequential processing with delays makes conversations feel organic.
 
 ## Conversation History
 
-Both 1:1 and group communication use the same context window: the last 20 messages from the relevant channel or DM conversation. This is assembled by the prompt builder (see [runtime.md](runtime.md)).
+Both 1:1 and group communication use the same context window: the last 20 messages from the relevant channel (public, private, or DM). This is assembled by the prompt builder (see [runtime.md](runtime.md)).
 
 ## Related
 
 - **User–Agent Comms**: [user-agent-comms.md](user-agent-comms.md) — messaging data model, SSE infrastructure
 - **Runtime**: [runtime.md](runtime.md) — orchestrator, mailbox, agent resolver
-- **Tools**: [tools.md](tools.md) — `send_message` to a DM triggers chain, `do_nothing` for opting out
+- **Tools**: [tools.md](tools.md) — `send_message` to a DM channel triggers chain, `do_nothing` for opting out
 - **Implementation**: `spec/plan/milestone-4-advanced-interactions.md` (S-4.0, S-4.1)

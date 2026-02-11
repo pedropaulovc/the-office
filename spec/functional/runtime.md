@@ -45,7 +45,7 @@ The core invocation logic. Called by the mailbox when a run is claimed.
 
 1. Load agent config from DB
 2. Load core memory blocks
-3. Fetch last 20 messages from the associated channel/DM
+3. Fetch last 20 messages from the associated channel
 4. Build system prompt via prompt builder
 5. Create in-process MCP server via `createSdkMcpServer()` with all agent tools
 6. Broadcast `agent_typing` SSE event
@@ -75,7 +75,7 @@ Determines which agents should receive a given message and get runs enqueued.
 |-------------|---------------|
 | Channel message | All members of the channel, excluding sender |
 | Private channel message | Only channel members (e.g., #accounting → Kevin, Oscar, Angela), excluding sender |
-| DM message | The other participant |
+| DM channel message | The other participant (from `channel_members` where `kind = 'dm'`) |
 | Thread reply | Original message author + previous thread participants |
 
 The sender is never included in the target agents.
@@ -94,8 +94,7 @@ runs
                       -- 'created' | 'running' | 'completed' | 'failed' | 'cancelled'
   stop_reason         text
   trigger_message_id  uuid            -- the chat message that triggered this run
-  channel_id          text            -- context channel (for prompt builder)
-  dm_conversation_id  text            -- context DM (for prompt builder)
+  channel_id          text            -- context channel or DM channel (for prompt builder)
   created_at          timestamptz NOT NULL DEFAULT now()
   started_at          timestamptz
   completed_at        timestamptz
