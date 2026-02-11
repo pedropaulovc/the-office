@@ -1,15 +1,17 @@
 'use client';
 
 import { useApp } from '@/context/AppContext';
+import { useData } from '@/context/useData';
 import { channels } from '@/data/channels';
 import { getDmsForUser, getDmOtherParticipant } from '@/data/directMessages';
-import { getUser, getInitials } from '@/data/users';
+import { getInitials } from '@/utils/get-initials';
 import { getUnreadCount } from '@/data/unreads';
 import type { Channel, DirectMessage } from '@/types';
 
 export default function ChannelSidebar() {
   const { currentUserId } = useApp();
-  const currentUser = getUser(currentUserId);
+  const { getAgent } = useData();
+  const currentUser = getAgent(currentUserId);
   const dms = getDmsForUser(currentUserId);
 
   return (
@@ -129,8 +131,9 @@ function ChannelItem({ channel }: { channel: Channel }) {
 
 function DmItem({ dm }: { dm: DirectMessage }) {
   const { currentUserId, activeView, navigateTo } = useApp();
+  const { getAgent } = useData();
   const otherId = getDmOtherParticipant(dm, currentUserId);
-  const other = getUser(otherId);
+  const other = getAgent(otherId);
   const isActive = activeView.kind === 'dm' && activeView.id === dm.id;
   const unread = getUnreadCount(currentUserId, dm.id);
   const initials = getInitials(other.displayName);

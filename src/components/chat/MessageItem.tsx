@@ -1,6 +1,7 @@
 'use client';
 
-import { getUser, getInitials } from '@/data/users';
+import { useData } from '@/context/useData';
+import { getInitials } from '@/utils/get-initials';
 import Timestamp from '@/components/shared/Timestamp';
 import MessageReactions from './MessageReactions';
 import ThreadPreview from './ThreadPreview';
@@ -13,7 +14,8 @@ interface MessageItemProps {
 }
 
 export default function MessageItem({ message, showHeader, isThread = false }: MessageItemProps) {
-  const user = getUser(message.userId);
+  const { getAgent } = useData();
+  const user = getAgent(message.userId);
   const initials = getInitials(user.displayName);
 
   return (
