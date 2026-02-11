@@ -47,7 +47,7 @@ describe("mailbox", () => {
       createMockRun({ status: "completed" }),
     );
 
-    const executor = vi.fn<(r: Run) => Promise<void>>().mockResolvedValue(undefined);
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockResolvedValue(undefined);
 
     const { processNextRun } = await import("../mailbox");
     await processNextRun("michael", executor);
@@ -79,7 +79,7 @@ describe("mailbox", () => {
       createMockRun({ status: "failed" }),
     );
 
-    const executor = vi.fn<(r: Run) => Promise<void>>().mockRejectedValue(
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockRejectedValue(
       new Error("boom"),
     );
 
@@ -104,7 +104,7 @@ describe("mailbox", () => {
       createMockRun({ status: "completed" }),
     );
 
-    const executor = vi.fn<(r: Run) => Promise<void>>().mockResolvedValue(undefined);
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockResolvedValue(undefined);
 
     const { processNextRun } = await import("../mailbox");
     await processNextRun("michael", executor);
@@ -124,13 +124,59 @@ describe("mailbox", () => {
       createMockRun({ status: "completed" }),
     );
 
-    const customExecutor = vi.fn<(r: Run) => Promise<void>>().mockResolvedValue(undefined);
+    const customExecutor = vi.fn<(r: Run) => Promise<undefined>>().mockResolvedValue(undefined);
 
     const { processNextRun } = await import("../mailbox");
     await processNextRun("michael", customExecutor);
 
     expect(customExecutor).toHaveBeenCalledTimes(1);
     expect(customExecutor).toHaveBeenCalledWith(run);
+  });
+
+  it("executor returning RunResult uses returned metadata in status update", async () => {
+    const run = createMockRun({ status: "running" });
+    mockClaimNextRun
+      .mockResolvedValueOnce(run)
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "completed" }),
+    );
+
+    const executor = vi.fn().mockResolvedValue({
+      status: "completed",
+      stopReason: "end_turn",
+      tokenUsage: { inputTokens: 100, outputTokens: 50 },
+    });
+
+    const { processNextRun } = await import("../mailbox");
+    await processNextRun("michael", executor);
+
+    expect(mockUpdateRunStatus).toHaveBeenCalledWith(run.id, {
+      status: "completed",
+      stopReason: "end_turn",
+      tokenUsage: { inputTokens: 100, outputTokens: 50 },
+    });
+  });
+
+  it("executor returning undefined uses default completed/end_turn", async () => {
+    const run = createMockRun({ status: "running" });
+    mockClaimNextRun
+      .mockResolvedValueOnce(run)
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "completed" }),
+    );
+
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockResolvedValue(undefined);
+
+    const { processNextRun } = await import("../mailbox");
+    await processNextRun("michael", executor);
+
+    expect(mockUpdateRunStatus).toHaveBeenCalledWith(run.id, {
+      status: "completed",
+      stopReason: "end_turn",
+      tokenUsage: undefined,
+    });
   });
 
   it("getAgentQueue returns pending and running runs", async () => {

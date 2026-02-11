@@ -278,4 +278,108 @@ describe("runs queries", () => {
 
     expect(result.run).toBeUndefined();
   });
+
+  // --- Run Steps ---
+
+  it("createRunStep inserts and returns the step", async () => {
+    const step: RunStep = {
+      id: "step-1",
+      runId: "run-1",
+      stepNumber: 1,
+      status: "running",
+      modelId: "claude-sonnet-4-5-20250929",
+      tokenUsage: null,
+      createdAt: new Date("2025-01-01"),
+      completedAt: null,
+    };
+    mockDb.insert.mockReturnValue(mockChain([step]));
+
+    const { createRunStep } = await import("../runs");
+    const result = await createRunStep({
+      runId: "run-1",
+      stepNumber: 1,
+      modelId: "claude-sonnet-4-5-20250929",
+    });
+
+    expect(result).toEqual(step);
+    expect(mockDb.insert).toHaveBeenCalled();
+  });
+
+  it("createRunStep throws when insert returns no rows", async () => {
+    mockDb.insert.mockReturnValue(mockChain([]));
+
+    const { createRunStep } = await import("../runs");
+    await expect(
+      createRunStep({ runId: "run-1", stepNumber: 1, modelId: "model" }),
+    ).rejects.toThrow("Insert returned no rows");
+  });
+
+  it("updateRunStep updates status and sets completedAt for terminal", async () => {
+    const step: RunStep = {
+      id: "step-1",
+      runId: "run-1",
+      stepNumber: 1,
+      status: "completed",
+      modelId: "claude-sonnet-4-5-20250929",
+      tokenUsage: null,
+      createdAt: new Date("2025-01-01"),
+      completedAt: new Date("2025-01-01"),
+    };
+    mockDb.update.mockReturnValue(mockChain([step]));
+
+    const { updateRunStep } = await import("../runs");
+    const result = await updateRunStep("step-1", { status: "completed" });
+
+    expect(result?.status).toBe("completed");
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+
+  it("updateRunStep returns undefined for missing step", async () => {
+    mockDb.update.mockReturnValue(mockChain([]));
+
+    const { updateRunStep } = await import("../runs");
+    const result = await updateRunStep("nonexistent", { status: "failed" });
+
+    expect(result).toBeUndefined();
+  });
+
+  // --- Run Messages ---
+
+  it("createRunMessage inserts and returns the message", async () => {
+    const msg: RunMessage = {
+      id: "msg-1",
+      runId: "run-1",
+      stepId: "step-1",
+      messageType: "assistant_message",
+      content: "Hello!",
+      toolName: null,
+      toolInput: null,
+      createdAt: new Date("2025-01-01"),
+    };
+    mockDb.insert.mockReturnValue(mockChain([msg]));
+
+    const { createRunMessage } = await import("../runs");
+    const result = await createRunMessage({
+      runId: "run-1",
+      stepId: "step-1",
+      messageType: "assistant_message",
+      content: "Hello!",
+    });
+
+    expect(result).toEqual(msg);
+    expect(mockDb.insert).toHaveBeenCalled();
+  });
+
+  it("createRunMessage throws when insert returns no rows", async () => {
+    mockDb.insert.mockReturnValue(mockChain([]));
+
+    const { createRunMessage } = await import("../runs");
+    await expect(
+      createRunMessage({
+        runId: "run-1",
+        messageType: "system_message",
+        content: "init",
+      }),
+    ).rejects.toThrow("Insert returned no rows");
+  });
 });

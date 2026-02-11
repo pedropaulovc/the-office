@@ -7,7 +7,9 @@ import {
   type Run,
   type NewRun,
   type RunStep,
+  type NewRunStep,
   type RunMessage,
+  type NewRunMessage,
 } from "@/db/schema";
 import { withSpan } from "@/lib/telemetry";
 
@@ -183,6 +185,43 @@ export function cancelRun(
     });
     return { run: updated };
   });
+}
+
+// --- Run Steps ---
+
+export async function createRunStep(data: NewRunStep): Promise<RunStep> {
+  const rows = await db.insert(runSteps).values(data).returning();
+  const created = rows[0];
+  if (!created) throw new Error("Insert returned no rows");
+  return created;
+}
+
+export async function updateRunStep(
+  id: string,
+  data: { status?: RunStep["status"]; tokenUsage?: RunStep["tokenUsage"] },
+): Promise<RunStep | undefined> {
+  const sets: Record<string, unknown> = {};
+  if (data.status !== undefined) sets.status = data.status;
+  if (data.tokenUsage !== undefined) sets.tokenUsage = data.tokenUsage;
+  if (data.status === "completed" || data.status === "failed") {
+    sets.completedAt = sql`now()`;
+  }
+
+  const rows = await db
+    .update(runSteps)
+    .set(sets)
+    .where(eq(runSteps.id, id))
+    .returning();
+  return rows[0];
+}
+
+// --- Run Messages ---
+
+export async function createRunMessage(data: NewRunMessage): Promise<RunMessage> {
+  const rows = await db.insert(runMessages).values(data).returning();
+  const created = rows[0];
+  if (!created) throw new Error("Insert returned no rows");
+  return created;
 }
 
 /** Maps a raw snake_case row from db.execute() to a camelCase Run type. */
