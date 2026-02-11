@@ -1,0 +1,225 @@
+name: CI/CD Pull Request
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to run workflow on'
+        required: true
+        type: number
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-ref:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-slim
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - name: Resolve PR head ref
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} --jq '.head.sha')
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  lint:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout repository
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
+
+      - name: Setup Node.js
+        timeout-minutes: 1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        timeout-minutes: 2
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
+
+      - name: Run linter
+        timeout-minutes: 2
+        run: npx eslint . --quiet --max-warnings 0
+
+  typecheck:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout repository
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
+
+      - name: Setup Node.js
+        timeout-minutes: 1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        timeout-minutes: 2
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
+
+      - name: Run typecheck
+        timeout-minutes: 2
+        run: npm run typecheck
+
+  unit-tests:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
+
+      - name: Setup Node.js
+        timeout-minutes: 1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        timeout-minutes: 2
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
+
+      - name: Run unit tests with coverage
+        timeout-minutes: 2
+        run: npm run test:coverage
+
+      - name: Download base coverage
+        if: always()
+        id: download-coverage-baseline
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci-cd-main.yml
+          branch: main
+          name: coverage-baseline
+          path: coverage-baseline
+        continue-on-error: true
+
+      - name: Coverage report with delta
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          file-coverage-mode: changes
+          pr-number: ${{ env.PR_NUMBER }}
+          json-summary-compare-path: ${{ steps.download-coverage-baseline.outcome == 'success' && 'coverage-baseline/coverage-summary.json' || '' }}
+          threshold-icons: "{0: '🔴', 70: '🟡', 75: '🔵', 85: '🟢'}"
+
+  e2e-tests:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
+
+      - name: Setup Node.js
+        timeout-minutes: 1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        timeout-minutes: 2
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
+
+      - name: Install Playwright browsers
+        timeout-minutes: 1
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        timeout-minutes: 3
+        run: npm run test:e2e
+
+  capture-iteration:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Capture PR iteration
+        id: capture
+        uses: pedropaulovc/codjiflo-action@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ env.PR_NUMBER }}
+
+      - name: Upload iteration artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: codjiflo-pr-${{ env.PR_NUMBER }}-${{ github.run_id }}
+          path: codjiflo-data/
+          retention-days: 90
+
+      - name: Update PR comment with artifact ID
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_ID="${{ steps.upload.outputs.artifact-id }}"
+          ITERATION_COUNT="${{ steps.capture.outputs.iteration-count }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+          # Create comment body
+          BODY="<!-- codjiflo-data -->
+          ### CodjiFlo Iteration Tracking
+
+          **Iterations captured**: ${ITERATION_COUNT}
+          **Last updated**: ${TIMESTAMP}
+          **Artifact**: \`${ARTIFACT_ID}\`
+          **Run ID**: ${{ github.run_id }}
+
+          ---
+          <details>
+          <summary>What is this?</summary>
+
+          This comment is automatically updated by the [CodjiFlo GitHub Action](https://github.com/pedropaulovc/codjiflo-action) to enable force-push resilient code review with iteration tracking.
+
+          The artifact referenced above contains iteration data that the CodjiFlo frontend uses to:
+          - Track code changes across force-pushes
+          - Enable comment persistence across code modifications
+          - Allow comparison between any two iterations
+
+          </details>"
+
+          # Find existing comment or create new one
+          COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments --jq '.[] | select(.body | contains("<!-- codjiflo-data -->")) | .id')
+          if [ -n "$COMMENT_ID" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID -X PATCH -f body="$BODY"
+          else
+            gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments -f body="$BODY"
+          fi
