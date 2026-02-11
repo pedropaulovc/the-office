@@ -23,12 +23,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-ref:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-slim
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - name: Resolve PR head ref
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} --jq '.head.sha')
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
   lint:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
     runs-on: ubuntu-slim
     steps:
       - name: Checkout repository
         timeout-minutes: 1
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
 
       - name: Setup Node.js
         timeout-minutes: 1
@@ -39,18 +57,22 @@ jobs:
 
       - name: Install dependencies
         timeout-minutes: 2
-        run: for i in 1 2 3; do npm ci && break || sleep 15; done
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
 
       - name: Run linter
         timeout-minutes: 2
         run: npx eslint . --quiet --max-warnings 0
 
   typecheck:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
     runs-on: ubuntu-slim
     steps:
       - name: Checkout repository
         timeout-minutes: 1
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
 
       - name: Setup Node.js
         timeout-minutes: 1
@@ -61,18 +83,22 @@ jobs:
 
       - name: Install dependencies
         timeout-minutes: 2
-        run: for i in 1 2 3; do npm ci && break || sleep 15; done
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
 
       - name: Run typecheck
         timeout-minutes: 2
         run: npm run typecheck
 
   unit-tests:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         timeout-minutes: 1
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
 
       - name: Setup Node.js
         timeout-minutes: 1
@@ -83,7 +109,7 @@ jobs:
 
       - name: Install dependencies
         timeout-minutes: 2
-        run: for i in 1 2 3; do npm ci && break || sleep 15; done
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
 
       - name: Run unit tests with coverage
         timeout-minutes: 2
@@ -110,11 +136,15 @@ jobs:
           threshold-icons: "{0: '🔴', 70: '🟡', 75: '🔵', 85: '🟢'}"
 
   e2e-tests:
+    needs: [resolve-ref]
+    if: always() && (needs.resolve-ref.result == 'success' || needs.resolve-ref.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         timeout-minutes: 1
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
 
       - name: Setup Node.js
         timeout-minutes: 1
@@ -125,7 +155,7 @@ jobs:
 
       - name: Install dependencies
         timeout-minutes: 2
-        run: for i in 1 2 3; do npm ci && break || sleep 15; done
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
 
       - name: Install Playwright browsers
         timeout-minutes: 1
