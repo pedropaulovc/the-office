@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
+import type { ChannelView } from '@/db/queries/messages';
 import { DataContext, type AgentView } from './data-context-def';
 
 function toAgentView(agent: Agent): AgentView {
@@ -29,9 +30,11 @@ const FALLBACK_AGENT: AgentView = {
 
 export function DataProvider({
   initialAgents,
+  initialChannels,
   children,
 }: {
   initialAgents: Agent[];
+  initialChannels: ChannelView[];
   children: ReactNode;
 }) {
   const agents = useMemo(
@@ -54,9 +57,46 @@ export function DataProvider({
     [agentMap],
   );
 
+  const channelMap = useMemo(() => {
+    const map = new Map<string, ChannelView>();
+    for (const ch of initialChannels) {
+      map.set(ch.id, ch);
+    }
+    return map;
+  }, [initialChannels]);
+
+  const getChannel = useMemo(
+    () => (id: string): ChannelView | undefined => channelMap.get(id),
+    [channelMap],
+  );
+
+  const getDmsForUser = useMemo(
+    () => (userId: string): ChannelView[] =>
+      initialChannels.filter(
+        (ch) => ch.kind === 'dm' && ch.memberIds.includes(userId),
+      ),
+    [initialChannels],
+  );
+
+  const getDmOtherParticipant = useMemo(
+    () => (dm: ChannelView, currentUserId: string): string => {
+      const other = dm.memberIds.find((id) => id !== currentUserId);
+      if (!other) throw new Error('Invariant: DM has no other participant');
+      return other;
+    },
+    [],
+  );
+
   const value = useMemo(
-    () => ({ agents, getAgent }),
-    [agents, getAgent],
+    () => ({
+      agents,
+      getAgent,
+      channels: initialChannels,
+      getChannel,
+      getDmsForUser,
+      getDmOtherParticipant,
+    }),
+    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant],
   );
 
   return (

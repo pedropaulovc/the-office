@@ -7,7 +7,7 @@ import ChatPanel from '@/components/chat/ChatPanel';
 import ThreadPanel from '@/components/thread/ThreadPanel';
 
 export default function WorkspaceShell() {
-  const { threadPanel } = useApp();
+  const { threadPanel, activeView } = useApp();
   const isThreadOpen = threadPanel.state === 'open';
 
   return (
@@ -16,7 +16,7 @@ export default function WorkspaceShell() {
       <ChannelSidebar />
       <ChatPanel />
       {isThreadOpen && threadPanel.parentMessageId && (
-        <ThreadPanel parentMessageId={threadPanel.parentMessageId} />
+        <ThreadPanel parentMessageId={threadPanel.parentMessageId} channelId={activeView.id} />
       )}
     </div>
   );

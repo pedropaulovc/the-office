@@ -2,15 +2,13 @@
 
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
-import { channels } from '@/data/channels';
-import { getDmsForUser, getDmOtherParticipant } from '@/data/directMessages';
 import { getInitials } from '@/utils/get-initials';
 import { getUnreadCount } from '@/data/unreads';
-import type { Channel, DirectMessage } from '@/types';
+import type { ChannelView } from '@/db/queries/messages';
 
 export default function ChannelSidebar() {
   const { currentUserId } = useApp();
-  const { getAgent } = useData();
+  const { channels, getDmsForUser, getAgent } = useData();
   const currentUser = getAgent(currentUserId);
   const dms = getDmsForUser(currentUserId);
 
@@ -31,7 +29,7 @@ export default function ChannelSidebar() {
         {/* Channels section */}
         <SectionHeader title="Channels" />
         {channels
-          .filter(ch => ch.kind === 'public' || ch.memberIds.includes(currentUserId))
+          .filter(ch => ch.kind !== 'dm' && (ch.kind === 'public' || ch.memberIds.includes(currentUserId)))
           .map(ch => (
             <ChannelItem key={ch.id} channel={ch} />
           ))}
@@ -92,7 +90,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function ChannelItem({ channel }: { channel: Channel }) {
+function ChannelItem({ channel }: { channel: ChannelView }) {
   const { currentUserId, activeView, navigateTo } = useApp();
   const isActive = activeView.kind === 'channel' && activeView.id === channel.id;
   const unread = getUnreadCount(currentUserId, channel.id);
@@ -129,9 +127,9 @@ function ChannelItem({ channel }: { channel: Channel }) {
   );
 }
 
-function DmItem({ dm }: { dm: DirectMessage }) {
+function DmItem({ dm }: { dm: ChannelView }) {
   const { currentUserId, activeView, navigateTo } = useApp();
-  const { getAgent } = useData();
+  const { getAgent, getDmOtherParticipant } = useData();
   const otherId = getDmOtherParticipant(dm, currentUserId);
   const other = getAgent(otherId);
   const isActive = activeView.kind === 'dm' && activeView.id === dm.id;

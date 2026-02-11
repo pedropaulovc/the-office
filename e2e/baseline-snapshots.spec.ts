@@ -13,30 +13,30 @@ test.describe("baseline snapshots", () => {
           - img
         - img
         - text: Channels
-        - button "general":
-          - img
-          - text: ""
-        - button "sales 3":
-          - img
-          - text: ""
-        - button "party-planning 5":
-          - img
-          - text: ""
         - button "announcements":
           - img
           - text: ""
-        - button "random 2":
+        - button "general":
           - img
           - text: ""
         - button "management 2":
           - img
           - text: ""
+        - button "party-planning 5":
+          - img
+          - text: ""
+        - button "random 2":
+          - img
+          - text: ""
+        - button "sales 3":
+          - img
+          - text: ""
         - img
         - text: Direct Messages
-        - button "JH Jim Halpert"
         - button "DS Dwight Schrute"
-        - button "TF Toby Flenderson 1"
+        - button "JH Jim Halpert"
         - button "RH Ryan Howard"
+        - button "TF Toby Flenderson 1"
         - text: MS Michael Scott Regional Manager
     `);
 
@@ -132,22 +132,22 @@ test.describe("baseline snapshots", () => {
           - img
         - img
         - text: Channels
-        - button "general 1":
-          - img
-          - text: ""
-        - button "sales":
-          - img
-          - text: ""
-        - button "party-planning 3":
+        - button "accounting":
           - img
           - text: ""
         - button "announcements":
           - img
           - text: ""
+        - button "general 1":
+          - img
+          - text: ""
+        - button "party-planning 3":
+          - img
+          - text: ""
         - button "random":
           - img
           - text: ""
-        - button "accounting":
+        - button "sales":
           - img
           - text: ""
         - img
@@ -290,30 +290,30 @@ test.describe("baseline snapshots", () => {
           - img
         - img
         - text: Channels
-        - button "general":
-          - img
-          - text: ""
-        - button "sales":
-          - img
-          - text: ""
-        - button "party-planning":
-          - img
-          - text: ""
         - button "announcements 2":
           - img
           - text: ""
-        - button "random":
+        - button "general":
           - img
           - text: ""
         - button "management 1":
           - img
           - text: ""
+        - button "party-planning":
+          - img
+          - text: ""
+        - button "random":
+          - img
+          - text: ""
+        - button "sales":
+          - img
+          - text: ""
         - img
         - text: Direct Messages
-        - button "MS Michael Scott"
-        - button "PB Pam Beesly"
-        - button "DS Dwight Schrute 2"
         - button "AB Andy Bernard 1"
+        - button "DS Dwight Schrute 2"
+        - button "PB Pam Beesly"
+        - button "MS Michael Scott"
         - text: JH Jim Halpert Sales Representative
     `);
   });
