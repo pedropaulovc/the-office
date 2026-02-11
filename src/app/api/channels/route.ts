@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { listChannelsWithMembers, createChannel, getChannel } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const CreateChannelSchema = z.object({
   id: z.string().min(1),
@@ -21,14 +21,14 @@ export async function GET(request: Request) {
     const dms = allChannels.filter(
       (ch) => ch.kind === "dm" && ch.memberIds.includes(userId),
     );
-    return NextResponse.json(dms);
+    return jsonResponse(dms);
   }
 
   if (kind) {
-    return NextResponse.json(allChannels.filter((ch) => ch.kind === kind));
+    return jsonResponse(allChannels.filter((ch) => ch.kind === kind));
   }
 
-  return NextResponse.json(allChannels);
+  return jsonResponse(allChannels);
 }
 
 export async function POST(request: Request) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const parsed = CreateChannelSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   if (parsed.data.kind === "dm") {
     if (parsed.data.memberIds?.length !== 2) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: "DM channels require exactly 2 memberIds" },
         { status: 400 },
       );
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const existing = await getChannel(parsed.data.id);
   if (existing) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: `Channel with id '${parsed.data.id}' already exists` },
       { status: 409 },
     );
@@ -61,5 +61,5 @@ export async function POST(request: Request) {
 
   const { memberIds, ...rest } = parsed.data;
   const channel = await createChannel({ ...rest, memberIds: memberIds ?? [] });
-  return NextResponse.json(channel, { status: 201 });
+  return jsonResponse(channel, { status: 201 });
 }

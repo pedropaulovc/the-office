@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getAgent, listArchivalPassages, createArchivalPassage } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const CreatePassageSchema = z.object({
   content: z.string().min(1),
@@ -14,13 +14,13 @@ export async function GET(request: Request, context: RouteContext) {
   const agent = await getAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
   const url = new URL(request.url);
   const query = url.searchParams.get("q") ?? undefined;
   const passages = await listArchivalPassages(agentId, query);
-  return NextResponse.json(passages);
+  return jsonResponse(passages);
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -28,14 +28,14 @@ export async function POST(request: Request, context: RouteContext) {
   const agent = await getAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
   const body: unknown = await request.json();
   const parsed = CreatePassageSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -46,5 +46,5 @@ export async function POST(request: Request, context: RouteContext) {
     content: parsed.data.content,
     tags: parsed.data.tags,
   });
-  return NextResponse.json(passage, { status: 201 });
+  return jsonResponse(passage, { status: 201 });
 }

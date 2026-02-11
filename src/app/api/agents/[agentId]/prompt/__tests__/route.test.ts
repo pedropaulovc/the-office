@@ -50,6 +50,7 @@ vi.mock("@/db/queries", () => ({
 
 vi.mock("@sentry/nextjs", () => ({
   startSpan: (_opts: unknown, cb: () => unknown) => cb(),
+  getActiveSpan: () => undefined,
 }));
 
 describe("GET /api/agents/[agentId]/prompt", () => {

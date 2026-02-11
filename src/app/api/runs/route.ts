@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { listRuns } from "@/db/queries";
 import { enqueueRun } from "@/agents/mailbox";
+import { jsonResponse } from "@/lib/api-response";
 
 const VALID_STATUSES = [
   "created",
@@ -24,14 +24,14 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
   }
 
   const runs = await listRuns(parsed.data);
-  return NextResponse.json(runs);
+  return jsonResponse(runs);
 }
 
 const CreateRunSchema = z.object({
@@ -46,12 +46,12 @@ export async function POST(request: Request) {
   const parsed = CreateRunSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
   }
 
   const run = await enqueueRun(parsed.data);
-  return NextResponse.json(run, { status: 201 });
+  return jsonResponse(run, { status: 201 });
 }

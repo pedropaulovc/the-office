@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { getRunWithSteps } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 interface RouteContext {
   params: Promise<{ runId: string }>;
@@ -10,8 +10,8 @@ export async function GET(_request: Request, context: RouteContext) {
   const run = await getRunWithSteps(runId);
 
   if (!run) {
-    return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    return jsonResponse({ error: "Run not found" }, { status: 404 });
   }
 
-  return NextResponse.json(run);
+  return jsonResponse(run);
 }
