@@ -149,14 +149,14 @@ archival_passages
 **Note**: Embedding column (`vector(1536)`) and HNSW index are deferred — archival search uses keyword matching for MVP.
 
 ### Acceptance Criteria
-- [ ] [AC-1.3.1] Three tables defined: `memory_blocks`, `shared_block_links`, `archival_passages`
-- [ ] [AC-1.3.2] `memory_blocks` has composite index on `(agent_id, label)`
-- [ ] [AC-1.3.3] Foreign keys cascade on delete
-- [ ] [AC-1.3.4] No embedding/pgvector column yet (deferred)
-- [ ] [AC-1.3.5] Migration generated and applied — all three tables queryable via pg
-- [ ] [AC-1.3.6] Memory block CRUD API: GET list, PUT upsert by label, DELETE by label
-- [ ] [AC-1.3.7] Archival passage API: GET with keyword search (`?q=`), POST create, DELETE
-- [ ] [AC-1.3.8] Memory routes nested under `/api/agents/[agentId]/memory` and `/api/agents/[agentId]/archival`
+- [x] [AC-1.3.1] Three tables defined: `memory_blocks`, `shared_block_links`, `archival_passages`
+- [x] [AC-1.3.2] `memory_blocks` has composite index on `(agent_id, label)`
+- [x] [AC-1.3.3] Foreign keys cascade on delete
+- [x] [AC-1.3.4] No embedding/pgvector column yet (deferred)
+- [x] [AC-1.3.5] Migration generated and applied — all three tables queryable via pg
+- [x] [AC-1.3.6] Memory block CRUD API: GET list, PUT upsert by label, DELETE by label
+- [x] [AC-1.3.7] Archival passage API: GET with keyword search (`?q=`), POST create, DELETE
+- [x] [AC-1.3.8] Memory routes nested under `/api/agents/[agentId]/memory` and `/api/agents/[agentId]/archival`
 
 ### Demo
 1. Run migration — tables created
@@ -229,21 +229,21 @@ reactions
 ```
 
 ### Acceptance Criteria
-- [ ] [AC-1.4.1] Single `messages` table handles channel messages, DMs, and thread replies via `channel_id` FK
-- [ ] [AC-1.4.2] DMs modeled as channels with `kind = 'dm'` and exactly 2 members in `channel_members`
-- [ ] [AC-1.4.3] Thread replies use `parent_message_id` referencing another message
-- [ ] [AC-1.4.4] All IDs match existing frontend data formats (text for channels/users, uuid for messages)
-- [ ] [AC-1.4.5] Migration generated and applied — all four tables queryable via pg
-- [ ] [AC-1.4.6] API routes return data matching existing frontend types (`Message`, `Channel`, `DirectMessage`, `ThreadReply`)
-- [ ] [AC-1.4.7] `getChannelMessages()` returns messages with computed `threadReplyCount` and aggregated `reactions`
-- [ ] [AC-1.4.8] Frontend renders channels, messages, DMs, and threads from DB via API
-- [ ] [AC-1.4.9] Channel switching fetches messages for the new channel
-- [ ] [AC-1.4.10] Thread panel fetches replies from API
-- [ ] [AC-1.4.11] Private channels only visible to members
-- [ ] [AC-1.4.12] Full channel CRUD: GET list, GET single (with members), POST create, PATCH update, DELETE (cascades)
-- [ ] [AC-1.4.13] Channel members API: GET list, POST add, DELETE remove — nested under `/api/channels/[channelId]/members`
-- [ ] [AC-1.4.14] POST channel with `kind='dm'` enforces exactly 2 `memberIds` and `dm-{name1}-{name2}` ID convention
-- [ ] [AC-1.4.15] No separate `/api/dms` routes — DMs are channels with `kind='dm'`, queried via `GET /api/channels?kind=dm&userId=...`
+- [x] [AC-1.4.1] Single `messages` table handles channel messages, DMs, and thread replies via `channel_id` FK
+- [x] [AC-1.4.2] DMs modeled as channels with `kind = 'dm'` and exactly 2 members in `channel_members`
+- [x] [AC-1.4.3] Thread replies use `parent_message_id` referencing another message
+- [x] [AC-1.4.4] All IDs match existing frontend data formats (text for channels/users, uuid for messages)
+- [x] [AC-1.4.5] Migration generated and applied — all four tables queryable via pg
+- [x] [AC-1.4.6] API routes return data matching existing frontend types (`Message`, `Channel`, `DirectMessage`, `ThreadReply`)
+- [x] [AC-1.4.7] `getChannelMessages()` returns messages with computed `threadReplyCount` and aggregated `reactions`
+- [x] [AC-1.4.8] Frontend renders channels, messages, DMs, and threads from DB via API
+- [x] [AC-1.4.9] Channel switching fetches messages for the new channel
+- [x] [AC-1.4.10] Thread panel fetches replies from API
+- [x] [AC-1.4.11] Private channels only visible to members
+- [x] [AC-1.4.12] Full channel CRUD: GET list, GET single (with members), POST create, PATCH update, DELETE (cascades)
+- [x] [AC-1.4.13] Channel members API: GET list, POST add, DELETE remove — nested under `/api/channels/[channelId]/members`
+- [x] [AC-1.4.14] POST channel with `kind='dm'` enforces exactly 2 `memberIds` and `dm-{name1}-{name2}` ID convention
+- [x] [AC-1.4.15] No separate `/api/dms` routes — DMs are channels with `kind='dm'`, queried via `GET /api/channels?kind=dm&userId=...`
 
 ### Demo
 1. Run migration — all five tables created
@@ -275,9 +275,9 @@ scheduled_messages
 ```
 
 ### Acceptance Criteria
-- [ ] [AC-1.5.1] `scheduled_messages` table with status enum (`pending`, `fired`, `cancelled`)
-- [ ] [AC-1.5.2] FK to agents, optional target channel (supports both regular and DM channels)
-- [ ] [AC-1.5.3] Migration generated and applied — table queryable via pg
+- [x] [AC-1.5.1] `scheduled_messages` table with status enum (`pending`, `fired`, `cancelled`)
+- [x] [AC-1.5.2] FK to agents, optional target channel (supports both regular and DM channels)
+- [x] [AC-1.5.3] Migration generated and applied — table queryable via pg
 
 ### Demo
 1. Run migration — table created
@@ -349,14 +349,14 @@ run_messages
 ```
 
 ### Acceptance Criteria
-- [ ] [AC-1.6.1] Three tables defined: `runs`, `run_steps`, `run_messages`
-- [ ] [AC-1.6.2] `runs.status` tracks the full lifecycle: created → running → completed/failed/cancelled
-- [ ] [AC-1.6.3] `run_steps` captures individual LLM call cycles within a run
-- [ ] [AC-1.6.4] `run_messages` captures the full LLM conversation log (system, user, assistant, tool calls/returns)
-- [ ] [AC-1.6.5] `runs.chain_depth` stored for agent-to-agent DM chain tracking
-- [ ] [AC-1.6.6] Foreign keys cascade on delete
-- [ ] [AC-1.6.7] Index on `(agent_id, status)` supports efficient mailbox polling
-- [ ] [AC-1.6.8] Migration generated and applied — all three tables queryable via pg
+- [x] [AC-1.6.1] Three tables defined: `runs`, `run_steps`, `run_messages`
+- [x] [AC-1.6.2] `runs.status` tracks the full lifecycle: created → running → completed/failed/cancelled
+- [x] [AC-1.6.3] `run_steps` captures individual LLM call cycles within a run
+- [x] [AC-1.6.4] `run_messages` captures the full LLM conversation log (system, user, assistant, tool calls/returns)
+- [x] [AC-1.6.5] `runs.chain_depth` stored for agent-to-agent DM chain tracking
+- [x] [AC-1.6.6] Foreign keys cascade on delete
+- [x] [AC-1.6.7] Index on `(agent_id, status)` supports efficient mailbox polling
+- [x] [AC-1.6.8] Migration generated and applied — all three tables queryable via pg
 
 ### Demo
 1. Run migration — tables created
@@ -384,11 +384,11 @@ The seed script:
 6. Seeds mock messages from `src/data/messages.ts` for continuity
 
 ### Acceptance Criteria
-- [ ] [AC-1.7.1] `npx tsx src/db/seed.ts` populates all tables without errors
-- [ ] [AC-1.7.2] Seed is idempotent (uses `ON CONFLICT DO NOTHING` or truncates first)
-- [ ] [AC-1.7.3] Agent IDs match frontend user IDs exactly
-- [ ] [AC-1.7.4] All message timestamps preserved correctly
-- [ ] [AC-1.7.5] Thread reply counts and reactions match original mock data
+- [x] [AC-1.7.1] `npx tsx src/db/seed.ts` populates all tables without errors
+- [x] [AC-1.7.2] Seed is idempotent (uses `ON CONFLICT DO NOTHING` or truncates first)
+- [x] [AC-1.7.3] Agent IDs match frontend user IDs exactly
+- [x] [AC-1.7.4] All message timestamps preserved correctly
+- [x] [AC-1.7.5] Thread reply counts and reactions match original mock data
 
 ### Demo
 Run seed script. Query each table to show data is populated and matches the original mock data.
@@ -403,10 +403,10 @@ As a developer, I want to prove the frontend is visually identical after switchi
 Capture Playwright visual snapshots of the same pages captured in S-1.0 (baseline). Compare them to verify visual parity. The frontend should look identical — same channels, same messages, same users — but now data flows from DB → API → React.
 
 ### Acceptance Criteria
-- [ ] [AC-1.8.1] Playwright snapshots captured for the same views as S-1.0 baseline: #general, #accounting, DM, thread, user switcher
-- [ ] [AC-1.8.2] Snapshots compared against S-1.0 baselines — no visual regressions (within threshold for dynamic elements like timestamps)
-- [ ] [AC-1.8.3] Static data imports (`src/data/users.ts`, `src/data/channels.ts`, `src/data/messages.ts`, `src/data/directMessages.ts`) no longer used by frontend components — all data flows from API
-- [ ] [AC-1.8.4] `npm run build` and `npm run lint` pass
+- [x] [AC-1.8.1] Playwright snapshots captured for the same views as S-1.0 baseline: #general, #accounting, DM, thread, user switcher
+- [x] [AC-1.8.2] Snapshots compared against S-1.0 baselines — no visual regressions (within threshold for dynamic elements like timestamps)
+- [x] [AC-1.8.3] Static data imports (`src/data/users.ts`, `src/data/channels.ts`, `src/data/messages.ts`, `src/data/directMessages.ts`) no longer used by frontend components — all data flows from API
+- [x] [AC-1.8.4] `npm run build` and `npm run lint` pass
 
 ### Demo
 Run Playwright snapshot comparison. Show diff report — all pages match within tolerance.
