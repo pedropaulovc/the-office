@@ -19,7 +19,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["json", "json-summary", "html"],
-      include: ["src/utils/**", "src/features/**"],
+      include: ["src/utils/**", "src/features/**", "src/lib/**", "src/agents/**"],
       exclude: [
         "node_modules/",
         "e2e/",

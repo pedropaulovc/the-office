@@ -269,6 +269,20 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 - **Factories**: Use `src/tests/factories/` for generating test data. Do not manually construct complex objects in tests. This prevents test brittleness when types change.
 - **Example**: `const agent = createMockAgent({ name: 'Michael Scott' });`
 
+## Telemetry
+
+Telemetry is VITAL. All agent invocations, tool calls, and API requests must emit Sentry telemetry from M2 onward:
+
+- **Traces**: Every agent invocation, tool execution, and API route must be wrapped in a Sentry span.
+- **Logs**: Structured logs for agent decisions, tool outcomes, and errors via `Sentry.logger.*`.
+- **Metrics**: Counters for invocations, tool usage, and errors via `Sentry.metrics.*`.
+
+Use the helpers in `src/lib/telemetry.ts`:
+- `withSpan(name, op, fn)` — wrap any function in a traced span
+- `logInfo/logWarn/logError(message, attributes)` — structured logs
+- `countMetric(name, value, attributes)` — counter metrics
+- `distributionMetric(name, value, unit, attributes)` — distribution metrics
+
 ## Acknowledgements
 
 The persona drift evaluation and correction system (M6–M8) is informed by:
