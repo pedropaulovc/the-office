@@ -4,7 +4,6 @@
   },
   "enabledPlugins": {
     "personal@personal-marketplace": true,
-    "playwright-cli@personal-marketplace": true,
-    "sentry@claude-plugins-official": false
+    "playwright-cli@personal-marketplace": true
   }
 }
