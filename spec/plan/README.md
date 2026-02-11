@@ -36,7 +36,7 @@ graph TD
 |-----------|-------------|---------|------|
 | [M1](milestone-1-database-foundation.md) | Database Foundation | S-1.0 through S-1.8 | `milestone-1-database-foundation.md` |
 | [M2](milestone-2-observability-agent-core.md) | Observability & Agent Core | S-2.0 through S-2.5 | `milestone-2-observability-agent-core.md` |
-| [M3](milestone-3-api-layer-sse.md) | API Layer & SSE | S-3.0 through S-3.1 | `milestone-3-api-layer-sse.md` |
+| [M3](milestone-3-api-layer-sse.md) | API Layer, SSE & OpenAPI | S-3.0 through S-3.3 | `milestone-3-api-layer-sse.md` |
 | [M4](milestone-4-frontend-polish.md) | Frontend Polish | S-4.0 through S-4.1 | `milestone-4-frontend-polish.md` |
 | [M5](milestone-5-advanced-interactions.md) | Advanced Agent Interactions & Scheduling | S-5.0 through S-5.3 | `milestone-5-advanced-interactions.md` |
 | [M6](milestone-6-character-personalities.md) | Character Personalities | S-6.0 through S-6.1 | `milestone-6-character-personalities.md` |

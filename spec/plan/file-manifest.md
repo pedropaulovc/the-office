@@ -37,8 +37,7 @@ src/agents/
 
 src/tools/
   registry.ts
-  send-channel-message.ts
-  send-dm.ts
+  send-message.ts
   react-to-message.ts
   do-nothing.ts
   update-memory.ts
@@ -51,6 +50,7 @@ src/messages/
 
 src/api/
   client.ts
+  openapi.ts                        — OpenAPIRegistry + generateDocument()
 
 src/hooks/
   use-sse.ts
@@ -62,18 +62,46 @@ src/components/chat/
   TypingIndicator.tsx
 
 src/app/api/
+  openapi.json/route.ts             — serves generated OpenAPI 3.1 spec
+  docs/route.ts                     — Scalar interactive API explorer
   sse/route.ts
   telemetry-test/route.ts
-  messages/route.ts
-  messages/[messageId]/replies/route.ts
-  channels/route.ts
-  channels/[channelId]/messages/route.ts
-  dms/route.ts
-  dms/[dmId]/messages/route.ts
-  users/route.ts
-  users/[userId]/route.ts
-  scheduled/route.ts
-  scheduled/[id]/route.ts
+  agents/
+    route.ts                        — GET (list), POST (create)
+    [agentId]/
+      route.ts                      — GET, PATCH, DELETE
+      prompt/route.ts               — GET (preview assembled prompt)
+      memory/
+        route.ts                    — GET (list blocks)
+        [label]/route.ts            — PUT (upsert), DELETE
+      archival/
+        route.ts                    — GET (search), POST (create)
+        [passageId]/route.ts        — DELETE
+  channels/
+    route.ts                        — GET (list), POST (create)
+    [channelId]/
+      route.ts                      — GET, PATCH, DELETE
+      messages/route.ts             — GET (list messages)
+      members/
+        route.ts                    — GET (list), POST (add)
+        [userId]/route.ts           — DELETE (remove)
+  messages/
+    route.ts                        — POST (send message)
+    [messageId]/
+      route.ts                      — GET, PATCH, DELETE
+      replies/route.ts              — GET (thread)
+      reactions/route.ts            — POST (add), DELETE (remove)
+  runs/
+    route.ts                        — GET (list)
+    [runId]/
+      route.ts                      — GET (detail with steps+messages)
+      cancel/route.ts               — POST
+  scheduled/
+    route.ts                        — GET (list), POST (create)
+    [id]/route.ts                   — DELETE
+  skills/
+    route.ts                        — GET (list)
+    [name]/route.ts                 — GET (content)
 
 e2e/snapshots/baseline/
 
@@ -89,7 +117,7 @@ e2e/snapshots/baseline/
 ## Existing files to modify
 
 ```
-package.json                              — add dependencies + scripts
+package.json                              — add dependencies + scripts (incl. @asteasolutions/zod-to-openapi, @scalar/nextjs)
 next.config.ts                            — wrap with withSentryConfig()
 AGENTS.md                                 — add telemetry + testing requirements
 src/components/chat/ComposeBox.tsx         — enable message input

@@ -58,16 +58,16 @@ As a developer, I want an agents table and the frontend rendering user data from
 | File | Purpose |
 |------|---------|
 | `src/db/schema/agents.ts` | `agents` table definition |
-| `src/db/queries/agents.ts` | `getAgent()`, `listAgents()` |
-| `src/app/api/users/route.ts` | GET: list all agents/users |
-| `src/app/api/users/[userId]/route.ts` | GET: single agent/user |
-| `src/api/client.ts` | Frontend API client (initial: `fetchUsers()`) |
-| `src/context/DataContext.tsx` | Server data state (initial: users) — fetches on mount, provides data to components |
+| `src/db/queries/agents.ts` | `getAgent()`, `listAgents()`, `createAgent()`, `updateAgent()`, `deleteAgent()` |
+| `src/app/api/agents/route.ts` | GET (list), POST (create) |
+| `src/app/api/agents/[agentId]/route.ts` | GET (single), PATCH (update), DELETE (soft-delete) |
+| `src/api/client.ts` | Frontend API client (initial: `fetchAgents()`) |
+| `src/context/DataContext.tsx` | Server data state (initial: agents) — fetches on mount, provides data to components |
 
 ### Files to modify
 | File | Change |
 |------|--------|
-| Components using `getUser()` from `src/data/users.ts` | Switch to DataContext for user data |
+| Components using `getUser()` from `src/data/users.ts` | Switch to DataContext for agent data |
 
 ### Schema Design
 ```
@@ -92,9 +92,11 @@ agents
 - [ ] [AC-1.2.3] Types exported via `$inferSelect` / `$inferInsert`
 - [ ] [AC-1.2.4] `system_prompt` is a per-agent customizable field (not hardcoded)
 - [ ] [AC-1.2.5] Migration generated and applied — `agents` table queryable via pg
-- [ ] [AC-1.2.6] API routes return data matching existing `User` frontend type
-- [ ] [AC-1.2.7] Frontend components render user data from DB via API (sidebar avatars, message author names, user switcher)
-- [ ] [AC-1.2.8] Seed all 16 agents with placeholder system prompts as part of migration validation
+- [ ] [AC-1.2.6] Full CRUD: GET list, GET single, POST create, PATCH update, DELETE (soft-delete via `is_active = false`)
+- [ ] [AC-1.2.7] API routes served at `/api/agents` (not `/api/users`) — returns all agent fields including `systemPrompt`, `modelId`, etc.
+- [ ] [AC-1.2.8] Frontend components render agent data from DB via API (sidebar avatars, message author names, user switcher)
+- [ ] [AC-1.2.9] Seed all 16 agents with placeholder system prompts as part of migration validation
+- [ ] [AC-1.2.10] POST returns 409 if agent ID already exists; DELETE sets `is_active = false` (preserves data)
 
 ### Demo
 1. Run migration — `agents` table created
@@ -112,6 +114,11 @@ As a developer, I want memory tables so agents can have mutable core memory and 
 | File | Purpose |
 |------|---------|
 | `src/db/schema/memory.ts` | `memory_blocks`, `shared_block_links`, `archival_passages` tables |
+| `src/db/queries/memory.ts` | `listMemoryBlocks()`, `upsertMemoryBlock()`, `deleteMemoryBlock()`, `listArchivalPassages()`, `createArchivalPassage()`, `deleteArchivalPassage()` |
+| `src/app/api/agents/[agentId]/memory/route.ts` | GET (list blocks) |
+| `src/app/api/agents/[agentId]/memory/[label]/route.ts` | PUT (upsert), DELETE |
+| `src/app/api/agents/[agentId]/archival/route.ts` | GET (search), POST (create) |
+| `src/app/api/agents/[agentId]/archival/[passageId]/route.ts` | DELETE |
 
 ### Schema Design
 ```
@@ -147,10 +154,14 @@ archival_passages
 - [ ] [AC-1.3.3] Foreign keys cascade on delete
 - [ ] [AC-1.3.4] No embedding/pgvector column yet (deferred)
 - [ ] [AC-1.3.5] Migration generated and applied — all three tables queryable via pg
+- [ ] [AC-1.3.6] Memory block CRUD API: GET list, PUT upsert by label, DELETE by label
+- [ ] [AC-1.3.7] Archival passage API: GET with keyword search (`?q=`), POST create, DELETE
+- [ ] [AC-1.3.8] Memory routes nested under `/api/agents/[agentId]/memory` and `/api/agents/[agentId]/archival`
 
 ### Demo
 1. Run migration — tables created
-2. Insert sample memory blocks for one agent, query them back
+2. Insert sample memory blocks for one agent, query them back via API
+3. Create an archival passage via POST, search for it via GET with `?q=` param
 
 ---
 
@@ -162,10 +173,13 @@ As a developer, I want a unified messages table and the frontend rendering chann
 | File | Purpose |
 |------|---------|
 | `src/db/schema/messages.ts` | `channels`, `channel_members`, `messages`, `reactions` tables |
-| `src/db/queries/messages.ts` | `getChannelMessages()`, `getThreadReplies()` |
+| `src/db/queries/messages.ts` | `getChannelMessages()`, `getThreadReplies()`, `createChannel()`, `updateChannel()`, `deleteChannel()` |
 | `src/db/queries/index.ts` | Barrel re-export |
-| `src/app/api/channels/route.ts` | GET: list channels |
+| `src/app/api/channels/route.ts` | GET (list), POST (create) |
+| `src/app/api/channels/[channelId]/route.ts` | GET (single with members), PATCH (update), DELETE |
 | `src/app/api/channels/[channelId]/messages/route.ts` | GET: channel messages |
+| `src/app/api/channels/[channelId]/members/route.ts` | GET (list), POST (add member) |
+| `src/app/api/channels/[channelId]/members/[userId]/route.ts` | DELETE (remove member) |
 | `src/app/api/messages/[messageId]/replies/route.ts` | GET: thread replies |
 
 ### Files to modify
@@ -226,6 +240,10 @@ reactions
 - [ ] [AC-1.4.9] Channel switching fetches messages for the new channel
 - [ ] [AC-1.4.10] Thread panel fetches replies from API
 - [ ] [AC-1.4.11] Private channels only visible to members
+- [ ] [AC-1.4.12] Full channel CRUD: GET list, GET single (with members), POST create, PATCH update, DELETE (cascades)
+- [ ] [AC-1.4.13] Channel members API: GET list, POST add, DELETE remove — nested under `/api/channels/[channelId]/members`
+- [ ] [AC-1.4.14] POST channel with `kind='dm'` enforces exactly 2 `memberIds` and `dm-{name1}-{name2}` ID convention
+- [ ] [AC-1.4.15] No separate `/api/dms` routes — DMs are channels with `kind='dm'`, queried via `GET /api/channels?kind=dm&userId=...`
 
 ### Demo
 1. Run migration — all five tables created

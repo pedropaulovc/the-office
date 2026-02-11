@@ -5,7 +5,8 @@
 ```mermaid
 graph TD
     S30[S-3.0 SSE + Frontend wiring] --> S31[S-3.1 POST messages + typing indicators]
-    S31 --> S32[S-3.2 Shim cleanup]
+    S31 --> S32[S-3.2 OpenAPI documentation]
+    S32 --> S33[S-3.3 Shim cleanup]
 ```
 
 ---
@@ -58,7 +59,9 @@ As a developer, I want a POST endpoint that receives a user message, stores it, 
 | File | Purpose |
 |------|---------|
 | `src/app/api/messages/route.ts` | POST: send message → store in DB → broadcast SSE → enqueue agent runs |
-| `src/messages/schemas.ts` | Zod schemas for message validation |
+| `src/app/api/messages/[messageId]/route.ts` | GET (single), PATCH (edit text), DELETE (cascade) |
+| `src/app/api/messages/[messageId]/reactions/route.ts` | POST (add), DELETE (remove) |
+| `src/messages/schemas.ts` | Zod schemas for message and reaction validation |
 | `src/components/chat/TypingIndicator.tsx` | Component showing "{agent name} is typing..." with animated dots |
 
 ### Files to modify
@@ -90,15 +93,44 @@ As a developer, I want a POST endpoint that receives a user message, stores it, 
 - [ ] [AC-3.1.11] Typing indicator disappears on `agent_done`
 - [ ] [AC-3.1.12] Multiple agents typing shown simultaneously
 - [ ] [AC-3.1.13] Agent response appears in the UI via SSE (full loop)
-- [ ] [AC-3.1.14] Unit tests for validation, integration test for POST flow, unit test for TypingIndicator component, E2E test: type message → see agent response
-- [ ] [AC-3.1.15] Sentry trace spans for message creation and agent run enqueuing
+- [ ] [AC-3.1.14] Message CRUD: GET single, PATCH edit (broadcasts `message_updated` SSE), DELETE cascade (broadcasts `message_deleted` SSE)
+- [ ] [AC-3.1.15] Reactions API: POST add (broadcasts `reaction_added`), DELETE remove (broadcasts `reaction_removed`) — at `/api/messages/[messageId]/reactions`
+- [ ] [AC-3.1.16] Unit tests for validation, integration test for POST flow, unit test for TypingIndicator component, E2E test: type message → see agent response
+- [ ] [AC-3.1.17] Sentry trace spans for message creation and agent run enqueuing
 
 ### Demo
 **This is the first full-loop demo.** Type a message in #general as Michael. Watch the typing indicator appear for responding agents, then see the agent's response materialize in the chat. Typing indicator disappears when response arrives. This proves: ComposeBox → POST API → DB → mailbox → orchestrator → Claude SDK → tool → DB → SSE → TypingIndicator → UI.
 
 ---
 
-## [S-3.2] Shim Cleanup
+## [S-3.2] OpenAPI Documentation
+
+As a developer, I want the server to auto-generate an OpenAPI 3.1 spec from Zod schemas so every API route is documented and explorable.
+
+### Files to create
+| File | Purpose |
+|------|---------|
+| `src/api/openapi.ts` | `OpenAPIRegistry` instance + `generateDocument()` helper |
+| `src/app/api/openapi.json/route.ts` | GET: serves the generated OpenAPI 3.1 JSON spec |
+| `src/app/api/docs/route.ts` | GET: serves Scalar interactive API explorer UI |
+
+### Description
+All Zod request/response schemas from API routes are registered with a central `OpenAPIRegistry`. The `/api/openapi.json` endpoint generates the full spec at runtime. `/api/docs` serves a Scalar UI page for interactive exploration.
+
+### Acceptance Criteria
+- [ ] [AC-3.2.1] `@asteasolutions/zod-to-openapi` and `@scalar/nextjs` installed
+- [ ] [AC-3.2.2] Central `OpenAPIRegistry` in `src/api/openapi.ts` with all route schemas registered
+- [ ] [AC-3.2.3] `GET /api/openapi.json` returns a valid OpenAPI 3.1 document
+- [ ] [AC-3.2.4] `GET /api/docs` renders an interactive Scalar API explorer
+- [ ] [AC-3.2.5] All existing routes (agents, memory, archival, channels, messages, reactions, runs, scheduled) appear in the spec with correct request/response schemas
+- [ ] [AC-3.2.6] Spec validates via an OpenAPI validator (no schema errors)
+
+### Demo
+Open `/api/docs` in a browser. Show the full API explorer with all routes, try-it-out for a GET endpoint, and download the OpenAPI JSON.
+
+---
+
+## [S-3.3] Shim Cleanup
 
 As a developer, I want all temporary shims from earlier stories removed.
 
@@ -109,6 +141,6 @@ Review and clean up any temporary code added in M1-M3 to make stories demoable. 
 - Remove any `TODO: cleanup` markers
 
 ### Acceptance Criteria
-- [ ] [AC-3.2.1] No temporary shim code remains
-- [ ] [AC-3.2.2] `npm run build` and `npm run lint` pass
-- [ ] [AC-3.2.3] All existing tests still pass
+- [ ] [AC-3.3.1] No temporary shim code remains
+- [ ] [AC-3.3.2] `npm run build` and `npm run lint` pass
+- [ ] [AC-3.3.3] All existing tests still pass
