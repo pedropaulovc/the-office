@@ -62,6 +62,8 @@ As a developer, I want filesystem-based skills that provide character behavior k
 | File | Purpose |
 |------|---------|
 | `src/agents/skill-loader.ts` | `loadSkill(name)`, `listSkills()` — reads from `.skills/` filesystem |
+| `src/app/api/skills/route.ts` | GET: list available skills |
+| `src/app/api/skills/[name]/route.ts` | GET: get full skill content |
 | `.skills/character-voice/SKILL.md` | Speech patterns and mannerisms guide |
 | `.skills/conflict-resolution/SKILL.md` | How characters handle disagreements |
 | `.skills/meeting-dynamics/SKILL.md` | Conference room interaction patterns |
@@ -74,8 +76,9 @@ As a developer, I want filesystem-based skills that provide character behavior k
 - [ ] [AC-4.2.2] `loadSkill()` reads and returns skill content
 - [ ] [AC-4.2.3] `listSkills()` discovers all skills from `.skills/` directory
 - [ ] [AC-4.2.4] Skills can be injected into agent prompts on demand
-- [ ] [AC-4.2.5] Unit tests for skill loader
-- [ ] [AC-4.2.6] Sentry span for skill loading
+- [ ] [AC-4.2.5] Skills API: `GET /api/skills` (list with name + description), `GET /api/skills/[name]` (full content)
+- [ ] [AC-4.2.6] Unit tests for skill loader
+- [ ] [AC-4.2.7] Sentry span for skill loading
 
 ### Demo
 Show an agent invocation where a skill is loaded into the prompt. Compare response quality with and without the skill.

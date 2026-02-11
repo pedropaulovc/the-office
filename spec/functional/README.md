@@ -117,9 +117,10 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 | 3 | Runtime | [runtime.md](runtime.md) | Orchestrator, mailbox queue, prompt builder, resolver, run tracking, telemetry |
 | 4 | User–Agent Communication | [user-agent-comms.md](user-agent-comms.md) | Messaging infra, POST endpoint, SSE, typing indicators |
 | 5 | Agent–Agent Communication | [agent-agent-comms.md](agent-agent-comms.md) | 1:1 DM chains, group channel responses |
-| 6 | Tools | [tools.md](tools.md) | Tool registry, 7 MCP tools |
+| 6 | Tools | [tools.md](tools.md) | Tool registry, 6 MCP tools |
 | 7 | Skills | [skills.md](skills.md) | Filesystem knowledge system, 6 skills |
 | 8 | Scheduling | [scheduling.md](scheduling.md) | Autonomous triggers, scheduler loop |
+| 9 | REST API | [api.md](api.md) | Full CRUD for all entities, OpenAPI doc, route map |
 
 ## What We Do NOT Build
 
@@ -133,5 +134,4 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 | Provider / Model routing | Claude Agent SDK handles LLM calls |
 | Identity tracking | Single Slack workspace |
 | Batch operations | Sequential is fine for hackathon |
-| OpenAI-compatible / LLM Proxy | Not needed |
 | Admin / Access tokens | Single-user setup |

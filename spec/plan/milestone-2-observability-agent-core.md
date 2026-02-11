@@ -57,6 +57,7 @@ As a developer, I want a prompt builder that assembles character personality + c
 | File | Purpose |
 |------|---------|
 | `src/agents/prompt-builder.ts` | `buildSystemPrompt(agent, memory, recentMessages)` — assembles system prompt |
+| `src/app/api/agents/[agentId]/prompt/route.ts` | GET: preview the fully assembled prompt for an agent (debug/test endpoint) |
 
 ### Description
 Constructs the system prompt by combining:
@@ -77,6 +78,7 @@ The system prompt varies per invocation because it includes conversation history
 - [ ] [AC-2.1.6] `agents.systemPrompt` is the customizable persona — different per agent
 - [ ] [AC-2.1.7] Unit tests for prompt assembly with various block/message combinations
 - [ ] [AC-2.1.8] Sentry span emitted wrapping prompt construction
+- [ ] [AC-2.1.9] `GET /api/agents/[agentId]/prompt?channelId=general` returns the fully assembled prompt with section breakdown (persona, memory blocks, recent messages, tool instructions)
 
 ### Demo
 Call `buildSystemPrompt()` with test data, log the output, show it includes persona + memory + conversation context.
@@ -91,7 +93,10 @@ As a developer, I want each agent to have a mailbox that queues incoming message
 | File | Purpose |
 |------|---------|
 | `src/agents/mailbox.ts` | `enqueueRun(agentId, triggerMessageId, context)`, `processNextRun(agentId)`, `getAgentQueue(agentId)` |
-| `src/db/queries/runs.ts` | `createRun()`, `claimNextRun()`, `updateRunStatus()`, `getRunWithSteps()`, `listRunsForAgent()` |
+| `src/db/queries/runs.ts` | `createRun()`, `claimNextRun()`, `updateRunStatus()`, `getRunWithSteps()`, `listRuns()`, `cancelRun()` |
+| `src/app/api/runs/route.ts` | GET (list runs, filterable by agentId/status) |
+| `src/app/api/runs/[runId]/route.ts` | GET (single run with steps + messages hierarchy) |
+| `src/app/api/runs/[runId]/cancel/route.ts` | POST (cancel a created/running run) |
 
 ### Description
 Each agent has a virtual mailbox backed by the `runs` table. When a message arrives for an agent:
@@ -111,6 +116,8 @@ This ensures agents never process messages concurrently — they handle them one
 - [ ] [AC-2.2.6] Run status transitions logged: created → running → completed/failed
 - [ ] [AC-2.2.7] Unit tests for queue ordering, concurrent prevention, automatic dequeue
 - [ ] [AC-2.2.8] Sentry spans for enqueue and dequeue operations
+- [ ] [AC-2.2.9] Runs API: GET list (filterable by `agentId`, `status`), GET single (returns run + steps + messages hierarchy), POST cancel
+- [ ] [AC-2.2.10] Cancel only works for `created` or `running` status — returns 409 for completed runs
 
 ### Demo
 Enqueue 3 runs for the same agent in rapid succession. Show they process sequentially (run 1 completes, then run 2 starts, then run 3). Show the runs table status transitions.

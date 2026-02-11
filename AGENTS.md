@@ -65,13 +65,13 @@ graph TD
 |-----------|---------|------|
 | M1: Database Foundation | S-1.0 – S-1.8 | `spec/plan/milestone-1-database-foundation.md` |
 | M2: Observability & Agent Core | S-2.0 – S-2.5 | `spec/plan/milestone-2-observability-agent-core.md` |
-| M3: API Layer, SSE & Frontend Polish | S-3.0 – S-3.2 | `spec/plan/milestone-3-api-layer-sse.md` |
+| M3: API Layer, SSE & OpenAPI | S-3.0 – S-3.3 | `spec/plan/milestone-3-api-layer-sse.md` |
 | M4: Advanced Interactions & Scheduling | S-4.0 – S-4.3 | `spec/plan/milestone-4-advanced-interactions.md` |
 | M5: Character Personalities | S-5.0 – S-5.1 | `spec/plan/milestone-5-character-personalities.md` |
 
 ### Horizontal Requirements
 
-- Each story = one pull request, implemented and merged independently
+- Each story = one pull request, implemented and merged independently. Commits must be made on a dedicated feature branch (not the worktree branch). PRs must always target `main`.
 - Each schema story = one DB migration, tested and validated
 - Testing is mandatory: unit tests + integration tests + 1-2 E2E tests for user-facing features
 - Every story must be demoable with a live demo before claiming completion
