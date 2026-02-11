@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { getAgent, listMemoryBlocks, getChannelMessages } from "@/db/queries";
 import { buildSystemPrompt } from "@/agents/prompt-builder";
+import { jsonResponse } from "@/lib/api-response";
 
 interface RouteContext { params: Promise<{ agentId: string }> }
 
@@ -11,7 +11,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   const agent = await getAgent(agentId);
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
   const memoryBlocks = await listMemoryBlocks(agentId);
@@ -28,7 +28,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   const prompt = buildSystemPrompt({ agent, memoryBlocks, recentMessages });
 
-  return NextResponse.json({
+  return jsonResponse({
     agentId,
     channelId: channelId ?? null,
     sections: {

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { listChannelMembers, addChannelMember } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const AddMemberSchema = z.object({
   userId: z.string().min(1),
@@ -11,7 +11,7 @@ interface RouteContext { params: Promise<{ channelId: string }> }
 export async function GET(_request: Request, context: RouteContext) {
   const { channelId } = await context.params;
   const members = await listChannelMembers(channelId);
-  return NextResponse.json(members);
+  return jsonResponse(members);
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -20,12 +20,12 @@ export async function POST(request: Request, context: RouteContext) {
   const parsed = AddMemberSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
   }
 
   const member = await addChannelMember(channelId, parsed.data.userId);
-  return NextResponse.json(member, { status: 201 });
+  return jsonResponse(member, { status: 201 });
 }

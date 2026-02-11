@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { removeChannelMember } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 interface RouteContext { params: Promise<{ channelId: string; userId: string }> }
 
@@ -8,8 +8,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const removed = await removeChannelMember(channelId, userId);
 
   if (!removed) {
-    return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    return jsonResponse({ error: "Member not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ ok: true });
+  return jsonResponse({ ok: true });
 }

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { deleteArchivalPassage } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 interface RouteContext { params: Promise<{ agentId: string; passageId: string }> }
 
@@ -8,8 +8,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const passage = await deleteArchivalPassage(passageId);
 
   if (!passage) {
-    return NextResponse.json({ error: "Passage not found" }, { status: 404 });
+    return jsonResponse({ error: "Passage not found" }, { status: 404 });
   }
 
-  return NextResponse.json(passage);
+  return jsonResponse(passage);
 }

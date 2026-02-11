@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getAgent, upsertMemoryBlock, deleteMemoryBlock } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const UpsertBlockSchema = z.object({
   content: z.string().min(1),
@@ -14,14 +14,14 @@ export async function PUT(request: Request, context: RouteContext) {
   const agent = await getAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
   const body: unknown = await request.json();
   const parsed = UpsertBlockSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -33,7 +33,7 @@ export async function PUT(request: Request, context: RouteContext) {
     content: parsed.data.content,
     isShared: parsed.data.isShared,
   });
-  return NextResponse.json(block);
+  return jsonResponse(block);
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
@@ -41,14 +41,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const agent = await getAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
   const block = await deleteMemoryBlock(agentId, label);
 
   if (!block) {
-    return NextResponse.json({ error: "Memory block not found" }, { status: 404 });
+    return jsonResponse({ error: "Memory block not found" }, { status: 404 });
   }
 
-  return NextResponse.json(block);
+  return jsonResponse(block);
 }

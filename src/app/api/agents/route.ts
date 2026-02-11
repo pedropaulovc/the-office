@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { listAgents, createAgent, getAgent } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const CreateAgentSchema = z.object({
   id: z.string().min(1),
@@ -16,7 +16,7 @@ const CreateAgentSchema = z.object({
 
 export async function GET() {
   const agents = await listAgents();
-  return NextResponse.json(agents);
+  return jsonResponse(agents);
 }
 
 export async function POST(request: Request) {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const parsed = CreateAgentSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
 
   const existing = await getAgent(parsed.data.id);
   if (existing) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: `Agent with id '${parsed.data.id}' already exists` },
       { status: 409 },
     );
   }
 
   const agent = await createAgent(parsed.data);
-  return NextResponse.json(agent, { status: 201 });
+  return jsonResponse(agent, { status: 201 });
 }

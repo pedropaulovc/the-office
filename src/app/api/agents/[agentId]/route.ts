@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getAgent, updateAgent, deleteAgent } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const UpdateAgentSchema = z.object({
   displayName: z.string().min(1).optional(),
@@ -21,10 +21,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const agent = await getAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
-  return NextResponse.json(agent);
+  return jsonResponse(agent);
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parsed = UpdateAgentSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -46,10 +46,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const agent = await updateAgent(agentId, updates);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
-  return NextResponse.json(agent);
+  return jsonResponse(agent);
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
@@ -57,8 +57,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const agent = await deleteAgent(agentId);
 
   if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return jsonResponse({ error: "Agent not found" }, { status: 404 });
   }
 
-  return NextResponse.json(agent);
+  return jsonResponse(agent);
 }

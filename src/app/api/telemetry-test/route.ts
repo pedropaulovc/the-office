@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { jsonResponse } from "@/lib/api-response";
 
 export function GET() {
   return withSpan("telemetry-test", "test.verify", () => {
@@ -10,7 +10,7 @@ export function GET() {
 
     countMetric("telemetry_test.invocations", 1, { endpoint: "telemetry-test" });
 
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       message: "Telemetry test: span + log + metric emitted",
       timestamp: new Date().toISOString(),

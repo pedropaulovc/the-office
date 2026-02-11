@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import {
   getChannel,
@@ -6,6 +5,7 @@ import {
   deleteChannel,
   listChannelMembers,
 } from "@/db/queries";
+import { jsonResponse } from "@/lib/api-response";
 
 const UpdateChannelSchema = z.object({
   name: z.string().min(1).optional(),
@@ -20,11 +20,11 @@ export async function GET(_request: Request, context: RouteContext) {
   const channel = await getChannel(channelId);
 
   if (!channel) {
-    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    return jsonResponse({ error: "Channel not found" }, { status: 404 });
   }
 
   const memberIds = await listChannelMembers(channelId);
-  return NextResponse.json({ ...channel, memberIds });
+  return jsonResponse({ ...channel, memberIds });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parsed = UpdateChannelSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "Validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -45,10 +45,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const channel = await updateChannel(channelId, updates);
 
   if (!channel) {
-    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    return jsonResponse({ error: "Channel not found" }, { status: 404 });
   }
 
-  return NextResponse.json(channel);
+  return jsonResponse(channel);
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
@@ -56,8 +56,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const channel = await deleteChannel(channelId);
 
   if (!channel) {
-    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    return jsonResponse({ error: "Channel not found" }, { status: 404 });
   }
 
-  return NextResponse.json(channel);
+  return jsonResponse(channel);
 }
