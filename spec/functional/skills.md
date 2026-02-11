@@ -29,12 +29,9 @@ Each skill lives at `.skills/{name}/SKILL.md` with:
     └── SKILL.md
 ```
 
-## Skill Loader
+## Skill Loading
 
-- `loadSkill(name)` — reads and returns the skill content from `.skills/{name}/SKILL.md`
-- `listSkills()` — discovers all available skills from the `.skills/` directory
-
-Skills are injected into agent prompts on demand by the prompt builder.
+Skill loading and prompt injection are handled by the Claude Agent SDK. The application is responsible for providing the `.skills/` filesystem structure and (optionally) surfacing skill metadata via API endpoints for UI/debugging.
 
 ## Skill Catalog
 

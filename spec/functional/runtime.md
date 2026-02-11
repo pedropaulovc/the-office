@@ -8,7 +8,9 @@ Assembles the system prompt dynamically per invocation by combining:
 
 1. **Agent persona** — `agents.system_prompt` from DB (the stable character identity)
 2. **Core memory blocks** — rendered as `### {label}\n{content}` sections (see [memory.md](memory.md))
-3. **Last 20 messages** — from the channel/DM the agent is being contacted from, providing conversation context
+3. **Conversation context** — from the channel/DM the agent is being contacted from:
+   - Default: last 20 messages from the channel or DM
+   - Thread replies: if `parent_message_id` is set on the trigger message, include the thread root and its replies (up to last 20 in the thread) instead of general channel traffic
 4. **Tool usage instructions** — tells the agent to use `send_message` to communicate, never raw text
 5. **`do_nothing` option** — explicitly tells the agent it can choose not to respond
 
@@ -95,6 +97,7 @@ runs
   stop_reason         text
   trigger_message_id  uuid            -- the chat message that triggered this run
   channel_id          text            -- context channel or DM channel (for prompt builder)
+  chain_depth         integer NOT NULL DEFAULT 0  -- agent-to-agent DM chain depth
   created_at          timestamptz NOT NULL DEFAULT now()
   started_at          timestamptz
   completed_at        timestamptz

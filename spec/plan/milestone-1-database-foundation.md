@@ -314,6 +314,7 @@ runs
                       -- | 'no_tool_call' | 'invalid_tool_call'
   trigger_message_id  uuid            -- the chat message that triggered this run
   channel_id          text            -- context channel or DM channel (for prompt builder)
+  chain_depth         integer NOT NULL DEFAULT 0  -- agent-to-agent DM chain depth
   created_at          timestamptz NOT NULL DEFAULT now()
   started_at          timestamptz
   completed_at        timestamptz
@@ -352,9 +353,10 @@ run_messages
 - [ ] [AC-1.6.2] `runs.status` tracks the full lifecycle: created → running → completed/failed/cancelled
 - [ ] [AC-1.6.3] `run_steps` captures individual LLM call cycles within a run
 - [ ] [AC-1.6.4] `run_messages` captures the full LLM conversation log (system, user, assistant, tool calls/returns)
-- [ ] [AC-1.6.5] Foreign keys cascade on delete
-- [ ] [AC-1.6.6] Index on `(agent_id, status)` supports efficient mailbox polling
-- [ ] [AC-1.6.7] Migration generated and applied — all three tables queryable via pg
+- [ ] [AC-1.6.5] `runs.chain_depth` stored for agent-to-agent DM chain tracking
+- [ ] [AC-1.6.6] Foreign keys cascade on delete
+- [ ] [AC-1.6.7] Index on `(agent_id, status)` supports efficient mailbox polling
+- [ ] [AC-1.6.8] Migration generated and applied — all three tables queryable via pg
 
 ### Demo
 1. Run migration — tables created

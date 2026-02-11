@@ -53,7 +53,7 @@ The frontend is a complete, read-only Slack clone with 16 Office characters, 7 c
 ```mermaid
 graph TD
     M1[M1: Database Foundation] --> M2[M2: Observability & Agent Core]
-    M1 --> M3[M3: API Layer, SSE & Frontend Polish]
+    M1 --> M3[M3: API Layer, SSE & OpenAPI]
     M2 --> M3
     M3 --> M4[M4: Agent Interactions & Scheduling]
     M2 --> M4
@@ -99,7 +99,7 @@ graph TD
 | Agent-to-agent infinite loops | MAX_CHAIN_DEPTH=3 hard limit in orchestrator |
 | No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
 | Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |
-| All channel members responding creates too many agents | Sequential processing with delays (S-4.1) makes it feel natural; `do_nothing` tool lets agents opt out |
+| All channel members responding creates too many agents | Sequential processing (S-4.1) keeps ordering stable; `do_nothing` tool lets agents opt out |
 | LLM judge scores are non-deterministic | Mock judge mode for CI (pre-recorded scores); live evaluations average multiple samples |
 | Evaluation LLM calls are expensive | Claude Haiku (~$0.00003/check); batch 10 propositions/call; mock judge for CI |
 | Action correction adds latency to messages | Single Haiku call ~200ms; fail-open on 5s timeout; max 2 retries |
@@ -107,29 +107,27 @@ graph TD
 | Anti-convergence nudges reduce persona adherence | Nudges are character-aware; configurable; trade-off is acceptable per TinyTroupe findings |
 | Golden baselines become stale | `--update-baseline` flag to refresh; regression delta (1.0) allows natural LLM variation |
 
-## Feature-First Directory Structure
+## Directory Structure
 
-Use a **Feature-based** folder structure. Do not group by file type (e.g., do NOT put all components in `src/components`). Group by **Domain Feature**.
+The current codebase is organized by top-level domains and infrastructure folders (type-based for the frontend, domain-based for backend). Keep this structure consistent.
 
 **Target Directory Tree**:
 ```text
 src/
-├── api/                # Core API Clients (generic, not feature-specific)
-├── components/         # SHARED, Dumb UI Components
-├── features/           # FUNCTIONAL DOMAINS
-│   ├── agents/         # Agent CRUD, personality, orchestrator
-│   │   ├── components/ # Agent-specific UI
-│   │   ├── hooks/      # Agent-specific logic
-│   │   └── types.ts    # Agent types
-│   ├── memory/         # Memory system (core + archival)
-│   ├── messages/       # Chat messages, channels
-│   ├── evaluation/     # Persona drift measurement, correction, CI harness
-│   ├── scheduler/      # Autonomous behavior triggers
-│   └── tools/          # MCP tool definitions
-├── db/                 # Drizzle schema + migrations
-├── lib/                # Third-party library wrappers
+├── api/                # Core API clients (generic)
+├── app/                # Next.js App Router (pages + API routes)
+├── components/         # UI components
+├── context/            # App/data contexts and hooks
+├── data/               # Static mock data (frontend only)
+├── db/                 # Drizzle schema + migrations + queries
+├── messages/           # SSE registry, messaging utilities
+├── agents/             # Orchestrator, mailbox, resolver, prompt builder
+├── tools/              # MCP tool definitions
+├── scheduler/          # Autonomous scheduling
+├── evaluation/         # Persona drift measurement + correction
+├── lib/                # Third-party wrappers
 ├── utils/              # Pure utility functions
-├── types/              # Global shared types (prefer feature types)
+├── types/              # Shared types
 └── tests/              # Test infrastructure (factories, helpers, mocks)
 ```
 
@@ -257,7 +255,7 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 ### Context Optimization
 
 - **Path Aliases**: Use `@/` for imports (e.g., `import { Button } from '@/components'`) instead of relative paths. This reduces cognitive load when moving files.
-- **Type Definitions**: Look in `src/features/{feature}/types.ts` first. Only check `src/types/` if generic.
+- **Type Definitions**: Look in `src/types/` first. Prefer feature-specific types only when a dedicated domain module exists.
 
 ### Self-Verification
 

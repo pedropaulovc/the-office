@@ -47,6 +47,7 @@ reactions
 - DM channels have exactly 2 members in `channel_members` and use `kind = 'dm'`
 - DM channel IDs follow the convention `dm-{name1}-{name2}` (sorted alphabetically)
 - All IDs match existing frontend data formats (text for channels/users, uuid for messages)
+- For thread replies (`parent_message_id` set), prompt context should use the thread root and its replies rather than general channel traffic (see runtime.md)
 
 ## POST Messages Endpoint
 
@@ -94,7 +95,10 @@ In-memory pub/sub for SSE connections:
 | Event | Payload | Purpose |
 |-------|---------|---------|
 | `message_created` | Full message object | New message in any channel or DM |
+| `message_updated` | Updated message object | Message edited |
+| `message_deleted` | `{ messageId }` | Message deleted |
 | `reaction_added` | Reaction object | Reaction added to a message |
+| `reaction_removed` | `{ messageId, userId, emoji }` | Reaction removed |
 | `agent_typing` | `{ agentId, channelId }` | Agent is processing (show typing indicator) |
 | `agent_done` | `{ agentId, channelId }` | Agent finished processing (stop typing indicator) |
 

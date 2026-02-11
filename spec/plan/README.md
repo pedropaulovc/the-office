@@ -21,13 +21,19 @@ The frontend is a complete, read-only Slack clone with 16 Office characters, 7 c
 ```mermaid
 graph TD
     M1[M1: Database Foundation] --> M2[M2: Observability & Agent Core]
-    M1 --> M3[M3: API Layer & SSE]
+    M1 --> M3[M3: API Layer, SSE & OpenAPI]
     M2 --> M3
-    M3 --> M4[M4: Frontend Integration]
-    M2 --> M5[M5: Agent Interactions & Scheduling]
-    M4 --> M5
-    M1 --> M6[M6: Character Personalities]
-    M6 --> M5
+    M3 --> M4[M4: Advanced Interactions & Scheduling]
+    M2 --> M4
+    M1 --> M5[M5: Character Personalities]
+    M5 --> M4
+    M5 --> M6[M6: Persona Drift Measurement]
+    M2 --> M6
+    M1 --> M6
+    M6 --> M7[M7: Persona Drift Correction]
+    M2 --> M7
+    M6 --> M8[M8: Evaluation Harness]
+    M5 --> M8
 ```
 
 ## Milestones
@@ -37,13 +43,11 @@ graph TD
 | [M1](milestone-1-database-foundation.md) | Database Foundation | S-1.0 through S-1.8 | `milestone-1-database-foundation.md` |
 | [M2](milestone-2-observability-agent-core.md) | Observability & Agent Core | S-2.0 through S-2.5 | `milestone-2-observability-agent-core.md` |
 | [M3](milestone-3-api-layer-sse.md) | API Layer, SSE & OpenAPI | S-3.0 through S-3.3 | `milestone-3-api-layer-sse.md` |
-| [M4](milestone-4-frontend-polish.md) | Frontend Polish | S-4.0 through S-4.1 | `milestone-4-frontend-polish.md` |
-| [M5](milestone-5-advanced-interactions.md) | Advanced Agent Interactions & Scheduling | S-5.0 through S-5.3 | `milestone-5-advanced-interactions.md` |
-| [M6](milestone-6-character-personalities.md) | Character Personalities | S-6.0 through S-6.1 | `milestone-6-character-personalities.md` |
-
-## Complete File Manifest
-
-See [file-manifest.md](file-manifest.md) for the full list of files to create and modify.
+| [M4](milestone-4-advanced-interactions.md) | Advanced Interactions & Scheduling | S-4.0 through S-4.3 | `milestone-4-advanced-interactions.md` |
+| [M5](milestone-5-character-personalities.md) | Character Personalities | S-5.0 through S-5.1 | `milestone-5-character-personalities.md` |
+| [M6](milestone-6-persona-drift-measurement.md) | Persona Drift Measurement | S-6.0 through S-6.5 | `milestone-6-persona-drift-measurement.md` |
+| [M7](milestone-7-persona-drift-correction.md) | Persona Drift Correction | S-7.0 through S-7.3 | `milestone-7-persona-drift-correction.md` |
+| [M8](milestone-8-evaluation-harness.md) | Evaluation Harness | S-8.0 through S-8.3 | `milestone-8-evaluation-harness.md` |
 
 ## Verification
 
