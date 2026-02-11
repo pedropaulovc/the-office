@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Lato } from 'next/font/google';
 import { AppProvider } from '@/context/AppContext';
 import { DataProvider } from '@/context/DataContext';
-import { listAgents, listChannelsWithMembers } from '@/db/queries';
+import { listAgents, listChannelsWithMembers, getAllUnreads } from '@/db/queries';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
 import './globals.css';
@@ -25,17 +25,21 @@ export default async function RootLayout({
 }>) {
   let agents: Agent[];
   let channels: ChannelView[];
+  let unreads: Record<string, Record<string, number>>;
   try {
-    [agents, channels] = await Promise.all([listAgents(), listChannelsWithMembers()]);
+    [agents, channels, unreads] = await Promise.all([
+      listAgents(), listChannelsWithMembers(), getAllUnreads(),
+    ]);
   } catch {
     agents = [];
     channels = [];
+    unreads = {};
   }
 
   return (
     <html lang="en">
       <body className={`${lato.variable} font-[family-name:var(--font-lato)] antialiased`}>
-        <DataProvider initialAgents={agents} initialChannels={channels}>
+        <DataProvider initialAgents={agents} initialChannels={channels} initialUnreads={unreads}>
           <AppProvider>{children}</AppProvider>
         </DataProvider>
       </body>

@@ -410,3 +410,32 @@ Capture Playwright visual snapshots of the same pages captured in S-1.0 (baselin
 
 ### Demo
 Run Playwright snapshot comparison. Show diff report — all pages match within tolerance.
+
+---
+
+## [S-1.9] Unreads — Read-Cursor Schema, API & Frontend Wiring
+
+As a developer, I want unread counts stored in the database using a read-cursor model, replacing static hardcoded data.
+
+### Description
+Migrate unreads from `src/data/unreads.ts` to a `channel_reads` table with `lastReadAt` per user-channel. Unread counts are computed by counting messages after the cursor. Frontend switches from static import to DataContext. API routes for querying and marking channels as read.
+
+### Acceptance Criteria
+- [x] [AC-1.9.1] `channel_reads` table with `user_id`, `channel_id`, `last_read_at` and unique constraint on `(user_id, channel_id)`
+- [x] [AC-1.9.2] `getAllUnreads()` query computes unread counts via JOIN with messages
+- [x] [AC-1.9.3] `getUnreadsByUser(userId)` returns per-channel unread counts for a single user
+- [x] [AC-1.9.4] `markChannelRead(userId, channelId)` upserts `last_read_at = now()`
+- [x] [AC-1.9.5] Seed script populates `channel_reads` with computed cursor timestamps matching original static unread counts
+- [x] [AC-1.9.6] `GET /api/unreads?userId=<id>` returns computed unread counts
+- [x] [AC-1.9.7] `POST /api/unreads/mark-read` marks a channel as read (204 response)
+- [x] [AC-1.9.8] Frontend `DataContext` provides `getUnreadCount()` from DB-computed unreads
+- [x] [AC-1.9.9] `ChannelSidebar` uses `getUnreadCount` from DataContext instead of static import
+- [x] [AC-1.9.10] `src/data/unreads.ts` deleted, `UnreadCounts` type removed from `src/types/index.ts`
+- [x] [AC-1.9.11] E2E baseline snapshots still pass (same unread badge values)
+- [x] [AC-1.9.12] `npm run build`, `npm run lint`, `npm run typecheck` all pass
+
+### Demo
+1. Run `npm run db:push` — `channel_reads` table created
+2. Run `npm run db:seed` — 38 channel reads populated
+3. Show sidebar unread badges match original static data
+4. `grep -r "data/unreads" src/` returns zero results

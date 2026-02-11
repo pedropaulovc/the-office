@@ -272,11 +272,33 @@ const memoryBlockDefs: MemoryBlockDef[] = SWITCHABLE_USER_IDS.flatMap((id) => {
   ];
 });
 
+// --- Unread counts (read cursor targets) ---
+// Each entry means "user X has N unread messages in channel Y"
+
+const unreadTargets: Record<string, Record<string, number>> = {
+  michael: { sales: 3, "party-planning": 5, random: 2, "dm-michael-toby": 1, management: 2 },
+  jim: { general: 4, announcements: 2, "dm-jim-andy": 1, "dm-jim-dwight": 2, management: 1 },
+  dwight: { general: 2, random: 3, "party-planning": 4, "dm-dwight-angela": 1 },
+  pam: { general: 3, "party-planning": 2 },
+  ryan: { random: 1, announcements: 3 },
+  stanley: { sales: 2 },
+  kevin: { general: 1, "party-planning": 3, accounting: 4 },
+  angela: { "party-planning": 1, accounting: 2 },
+  oscar: { general: 2, accounting: 3 },
+  andy: { sales: 1, random: 2 },
+  toby: { general: 5, management: 3 },
+  creed: { random: 1 },
+  kelly: { "party-planning": 2, random: 1 },
+  phyllis: { sales: 1, "party-planning": 3 },
+  meredith: { "party-planning": 1 },
+  darryl: { general: 2, random: 1 },
+};
+
 // --- Seed function ---
 
 async function seed() {
   const { db } = await import("./client");
-  const { agents, channels, channelMembers, messages, reactions, memoryBlocks } = await import("./schema");
+  const { agents, channels, channelMembers, messages, reactions, memoryBlocks, channelReads } = await import("./schema");
   const { sql } = await import("drizzle-orm");
 
   const allChannelDefs = [...channelDefs, ...dmDefs];
@@ -382,6 +404,48 @@ async function seed() {
     .onConflictDoNothing();
   console.log(`  ${memoryBlockDefs.length} memory blocks`);
 
+  // 8. Channel reads — compute read cursors from unreadTargets
+  console.log("Seeding channel reads...");
+  await db.delete(channelReads);
+
+  // Group top-level messages by channel, sorted by createdAt ASC
+  const topLevelByChannel = new Map<string, { createdAt: Date }[]>();
+  for (const def of messageDefs) {
+    const list = topLevelByChannel.get(def.channelId) ?? [];
+    list.push({ createdAt: def.createdAt });
+    topLevelByChannel.set(def.channelId, list);
+  }
+  for (const list of topLevelByChannel.values()) {
+    list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  const readRows: { userId: string; channelId: string; lastReadAt: Date }[] = [];
+  for (const [userId, channelUnreads] of Object.entries(unreadTargets)) {
+    for (const [channelId, unreadCount] of Object.entries(channelUnreads)) {
+      const channelMessages = topLevelByChannel.get(channelId) ?? [];
+      const totalMessages = channelMessages.length;
+
+      let lastReadAt: Date;
+      if (unreadCount >= totalMessages) {
+        // All messages are unread — set cursor to epoch
+        lastReadAt = new Date(0);
+      } else {
+        // cursorIndex = totalMessages - unreadCount - 1
+        const cursorIndex = totalMessages - unreadCount - 1;
+        const cursorMsg = channelMessages[cursorIndex];
+        if (!cursorMsg) throw new Error(`No message at index ${cursorIndex} for ${channelId}`);
+        lastReadAt = cursorMsg.createdAt;
+      }
+
+      readRows.push({ userId, channelId, lastReadAt });
+    }
+  }
+
+  if (readRows.length > 0) {
+    await db.insert(channelReads).values(readRows);
+  }
+  console.log(`  ${readRows.length} channel reads`);
+
   // Summary
   const counts = {
     agents: agentRows.length,
@@ -390,6 +454,7 @@ async function seed() {
     messages: messageDefs.length + threadReplyDefs.length,
     reactions: reactionRows.length,
     memoryBlocks: memoryBlockDefs.length,
+    channelReads: readRows.length,
   };
   console.log("\nSeed complete:", counts);
 

@@ -54,5 +54,3 @@ export interface ThreadPanel {
   state: ThreadPanelState;
   parentMessageId: string | null;
 }
-
-export type UnreadCounts = Record<string, Record<string, number>>;
