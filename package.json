@@ -12,13 +12,23 @@
     "test:watch": "vitest --watch --reporter=dot",
     "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test",
-    "test:all": "npm run lint && npm run typecheck && npm run test:coverage && npm run test:e2e"
+    "test:all": "npm run lint && npm run typecheck && npm run test:coverage && npm run test:e2e",
+    "db:push": "npx drizzle-kit push",
+    "db:seed": "npx tsx src/db/seed.ts",
+    "db:generate": "npx drizzle-kit generate",
+    "db:migrate": "npx drizzle-kit migrate"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.39",
+    "@neondatabase/serverless": "^1.0.2",
+    "@sentry/nextjs": "^10.38.0",
+    "dotenv": "^17.2.4",
+    "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@playwright/test": "npm:@pedropaulovc/playwright-test@1.59.0-next.8",
@@ -32,6 +42,7 @@
     "@vitejs/plugin-react-swc": "^4.2.3",
     "@vitest/coverage-v8": "^4.0.18",
     "cross-env": "^10.1.0",
+    "drizzle-kit": "^0.31.9",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-plugin-playwright": "^2.5.1",
@@ -42,6 +53,7 @@
     "typescript-eslint": "^8.55.0",
     "playwright": "npm:@pedropaulovc/playwright@1.59.0-next.8",
     "playwright-core": "npm:@pedropaulovc/playwright-core@1.59.0-next.8",
+    "vercel": "^50.15.0",
     "vitest": "^4.0.18"
   },
   "overrides": {
