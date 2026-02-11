@@ -18,7 +18,7 @@ As a developer, I want agents to automatically respond when they receive a DM fr
 ### Files to modify
 | File | Change |
 |------|---------|
-| `src/tools/send-dm.ts` | After storing DM, enqueue run for target agent with chain depth tracking |
+| `src/tools/send-message.ts` | After storing DM (channel with `kind = 'dm'`), enqueue run for target agent with chain depth tracking |
 | `src/agents/orchestrator.ts` | Accept optional `chainDepth` param, enforce MAX_CHAIN_DEPTH=3 |
 
 ### Acceptance Criteria

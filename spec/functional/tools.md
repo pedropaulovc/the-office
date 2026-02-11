@@ -10,17 +10,16 @@
 
 ### send_message
 
-Post a message to any channel or DM conversation. Unified interface — mirrors `POST /api/messages`.
+Post a message to any channel or DM.
 
 ```
-send_message(conversationId: string, text: string) → { messageId: string }
+send_message(channelId: string, text: string) → { messageId: string }
 ```
 
-- `conversationId` is a channel ID (e.g. `'general'`) or a DM conversation ID (e.g. `'dm-michael-jim'`)
-- The tool resolves the type by looking up whether the ID exists in `channels` or `dm_conversations`
-- Stores message in DB with `user_id = agentId`, setting `channel_id` or `dm_conversation_id` accordingly
+- `channelId` is any channel ID — public, private, or DM (e.g. `'general'`, `'dm-michael-jim'`)
+- Stores message in DB with `user_id = agentId` and `channel_id = channelId`
 - Broadcasts `message_created` SSE event
-- For DMs: if chain depth < MAX_CHAIN_DEPTH, enqueues a run for the other participant to respond (see [agent-agent-comms.md](agent-agent-comms.md))
+- For DM channels (`kind = 'dm'`): if chain depth < MAX_CHAIN_DEPTH, enqueues a run for the other participant to respond (see [agent-agent-comms.md](agent-agent-comms.md))
 
 ### react_to_message
 
@@ -87,6 +86,6 @@ All 6 tools share these behaviors:
 
 - **Memory**: [memory.md](memory.md) — data model for blocks and passages
 - **User–Agent Comms**: [user-agent-comms.md](user-agent-comms.md) — messaging data model, SSE events
-- **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — `send_message` to a DM conversation triggers DM chains
+- **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — `send_message` to a DM channel triggers DM chains
 - **Runtime**: [runtime.md](runtime.md) — orchestrator creates MCP server with these tools
 - **Implementation**: `spec/plan/milestone-2-observability-agent-core.md` (S-2.5)

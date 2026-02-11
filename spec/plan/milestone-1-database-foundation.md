@@ -161,19 +161,17 @@ As a developer, I want a unified messages table and the frontend rendering chann
 ### Files to create
 | File | Purpose |
 |------|---------|
-| `src/db/schema/messages.ts` | `channels`, `channel_members`, `dm_conversations`, `messages`, `reactions` tables |
-| `src/db/queries/messages.ts` | `getChannelMessages()`, `getDmMessages()`, `getThreadReplies()` |
+| `src/db/schema/messages.ts` | `channels`, `channel_members`, `messages`, `reactions` tables |
+| `src/db/queries/messages.ts` | `getChannelMessages()`, `getThreadReplies()` |
 | `src/db/queries/index.ts` | Barrel re-export |
 | `src/app/api/channels/route.ts` | GET: list channels |
 | `src/app/api/channels/[channelId]/messages/route.ts` | GET: channel messages |
-| `src/app/api/dms/route.ts` | GET: list DMs for user |
-| `src/app/api/dms/[dmId]/messages/route.ts` | GET: DM messages |
 | `src/app/api/messages/[messageId]/replies/route.ts` | GET: thread replies |
 
 ### Files to modify
 | File | Change |
 |------|--------|
-| `src/api/client.ts` | Add `fetchChannels()`, `fetchMessages()`, `fetchDms()`, `fetchThreadReplies()` |
+| `src/api/client.ts` | Add `fetchChannels()`, `fetchMessages()`, `fetchThreadReplies()` |
 | `src/context/DataContext.tsx` | Add channels, messages, DMs state — fetch on mount and view change |
 | `src/components/chat/MessageList.tsx` | Replace `getMessagesForChannel()` with DataContext data |
 | `src/components/sidebar/ChannelSidebar.tsx` | Replace static `channels` import with DataContext |
@@ -181,11 +179,14 @@ As a developer, I want a unified messages table and the frontend rendering chann
 | `src/components/chat/ChatPanel.tsx` | Consume DataContext for messages |
 
 ### Schema Design
+
+DMs are modeled as channels with `kind = 'dm'`. No separate `dm_conversations` table.
+
 ```
 channels
-  id              text PK           -- 'general', 'sales', etc.
+  id              text PK           -- 'general', 'sales', 'dm-michael-jim', etc.
   name            text NOT NULL
-  kind            text NOT NULL     -- enum: 'public' | 'private'
+  kind            text NOT NULL     -- enum: 'public' | 'private' | 'dm'
   topic           text NOT NULL DEFAULT ''
 
 channel_members
@@ -194,22 +195,14 @@ channel_members
   user_id         text NOT NULL
   INDEX(channel_id), INDEX(user_id)
 
-dm_conversations
-  id              text PK           -- 'dm-michael-jim'
-  participant1_id text NOT NULL
-  participant2_id text NOT NULL
-  INDEX(participant1_id, participant2_id)
-
 messages
   id              uuid PK DEFAULT gen_random_uuid()
-  channel_id      text              -- null for DMs
-  dm_conversation_id text           -- null for channels
+  channel_id      text NOT NULL FK(channels.id) ON DELETE CASCADE
   parent_message_id uuid            -- null for top-level; set for thread replies
   user_id         text NOT NULL     -- agent ID or human user ID
   text            text NOT NULL
   created_at      timestamptz NOT NULL DEFAULT now()
   INDEX(channel_id, created_at)
-  INDEX(dm_conversation_id, created_at)
   INDEX(parent_message_id)
 
 reactions
@@ -222,11 +215,11 @@ reactions
 ```
 
 ### Acceptance Criteria
-- [ ] [AC-1.4.1] Single `messages` table handles channel messages, DMs, and thread replies
-- [ ] [AC-1.4.2] `channel_id` and `dm_conversation_id` are mutually exclusive (one null, one set)
+- [ ] [AC-1.4.1] Single `messages` table handles channel messages, DMs, and thread replies via `channel_id` FK
+- [ ] [AC-1.4.2] DMs modeled as channels with `kind = 'dm'` and exactly 2 members in `channel_members`
 - [ ] [AC-1.4.3] Thread replies use `parent_message_id` referencing another message
 - [ ] [AC-1.4.4] All IDs match existing frontend data formats (text for channels/users, uuid for messages)
-- [ ] [AC-1.4.5] Migration generated and applied — all five tables queryable via pg
+- [ ] [AC-1.4.5] Migration generated and applied — all four tables queryable via pg
 - [ ] [AC-1.4.6] API routes return data matching existing frontend types (`Message`, `Channel`, `DirectMessage`, `ThreadReply`)
 - [ ] [AC-1.4.7] `getChannelMessages()` returns messages with computed `threadReplyCount` and aggregated `reactions`
 - [ ] [AC-1.4.8] Frontend renders channels, messages, DMs, and threads from DB via API
@@ -258,15 +251,14 @@ scheduled_messages
   agent_id        text NOT NULL FK(agents.id) ON DELETE CASCADE
   trigger_at      timestamptz NOT NULL
   prompt          text NOT NULL
-  target_channel_id text
-  target_dm_id    text
+  target_channel_id text              -- channel or DM channel
   status          text NOT NULL DEFAULT 'pending'  -- 'pending' | 'fired' | 'cancelled'
   created_at      timestamptz NOT NULL DEFAULT now()
 ```
 
 ### Acceptance Criteria
 - [ ] [AC-1.5.1] `scheduled_messages` table with status enum (`pending`, `fired`, `cancelled`)
-- [ ] [AC-1.5.2] FK to agents, optional target channel/DM
+- [ ] [AC-1.5.2] FK to agents, optional target channel (supports both regular and DM channels)
 - [ ] [AC-1.5.3] Migration generated and applied — table queryable via pg
 
 ### Demo
@@ -303,8 +295,7 @@ runs
                       -- 'end_turn' | 'error' | 'max_steps' | 'max_tokens_exceeded' | 'cancelled'
                       -- | 'no_tool_call' | 'invalid_tool_call'
   trigger_message_id  uuid            -- the chat message that triggered this run
-  channel_id          text            -- context channel (for prompt builder)
-  dm_conversation_id  text            -- context DM (for prompt builder)
+  channel_id          text            -- context channel or DM channel (for prompt builder)
   created_at          timestamptz NOT NULL DEFAULT now()
   started_at          timestamptz
   completed_at        timestamptz
@@ -368,7 +359,7 @@ The seed script:
 1. Inserts 16 agents from `src/data/users.ts` (with placeholder system prompts)
 2. Inserts 7 channels from `src/data/channels.ts`
 3. Inserts channel memberships from `channel.memberIds`
-4. Inserts 8 DM conversations from `src/data/directMessages.ts`
+4. Inserts 8 DM channels (kind='dm') from `src/data/directMessages.ts` with 2 members each
 5. Inserts 3 initial core memory blocks per agent (`personality`, `relationships`, `current_state`) with placeholder content
 6. Seeds mock messages from `src/data/messages.ts` for continuity
 

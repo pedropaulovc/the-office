@@ -10,8 +10,7 @@ scheduled_messages
   agent_id        text NOT NULL FK(agents.id) ON DELETE CASCADE
   trigger_at      timestamptz NOT NULL
   prompt          text NOT NULL       -- what the agent should talk about
-  target_channel_id text              -- where to post (channel)
-  target_dm_id    text                -- where to post (DM)
+  target_channel_id text              -- where to post (channel or DM channel)
   status          text NOT NULL DEFAULT 'pending'  -- 'pending' | 'fired' | 'cancelled'
   created_at      timestamptz NOT NULL DEFAULT now()
 ```

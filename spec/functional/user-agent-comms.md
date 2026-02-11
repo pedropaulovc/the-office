@@ -6,11 +6,13 @@ How humans interact with agents. Covers the messaging data model (canonical — 
 
 This is the canonical definition for all messaging tables. Other spec files reference these tables without re-defining them.
 
+DMs are modeled as channels with `kind = 'dm'`. This eliminates the need for a separate `dm_conversations` table and the mutual-exclusivity constraint on messages — every message has a single `channel_id` FK.
+
 ```
 channels
-  id              text PK           -- 'general', 'sales', etc.
+  id              text PK           -- 'general', 'sales', 'dm-michael-jim', etc.
   name            text NOT NULL
-  kind            text NOT NULL     -- 'public' | 'private'
+  kind            text NOT NULL     -- 'public' | 'private' | 'dm'
   topic           text NOT NULL DEFAULT ''
 
 channel_members
@@ -19,22 +21,14 @@ channel_members
   user_id         text NOT NULL
   INDEX(channel_id), INDEX(user_id)
 
-dm_conversations
-  id              text PK           -- 'dm-michael-jim'
-  participant1_id text NOT NULL
-  participant2_id text NOT NULL
-  INDEX(participant1_id, participant2_id)
-
 messages
   id              uuid PK DEFAULT gen_random_uuid()
-  channel_id      text              -- null for DMs
-  dm_conversation_id text           -- null for channels
+  channel_id      text NOT NULL FK(channels.id) ON DELETE CASCADE
   parent_message_id uuid            -- null for top-level; set for thread replies
   user_id         text NOT NULL     -- agent ID or human user ID
   text            text NOT NULL
   created_at      timestamptz NOT NULL DEFAULT now()
   INDEX(channel_id, created_at)
-  INDEX(dm_conversation_id, created_at)
   INDEX(parent_message_id)
 
 reactions
@@ -48,9 +42,10 @@ reactions
 
 ### Key Constraints
 
-- `channel_id` and `dm_conversation_id` are mutually exclusive (one null, one set)
 - Thread replies use `parent_message_id` referencing another message
-- Private channels are filtered by membership (`channel_members`)
+- Private channels filtered by membership (`channel_members`)
+- DM channels have exactly 2 members in `channel_members` and use `kind = 'dm'`
+- DM channel IDs follow the convention `dm-{name1}-{name2}` (sorted alphabetically)
 - All IDs match existing frontend data formats (text for channels/users, uuid for messages)
 
 ## POST Messages Endpoint
@@ -61,8 +56,7 @@ reactions
 
 ```typescript
 {
-  channelId?: string,         // for channel messages
-  dmConversationId?: string,  // for DMs
+  channelId: string,          // channel or DM channel ID
   parentMessageId?: string,   // for thread replies
   userId: string,             // human user ID
   text: string                // message content
@@ -101,8 +95,8 @@ In-memory pub/sub for SSE connections:
 |-------|---------|---------|
 | `message_created` | Full message object | New message in any channel or DM |
 | `reaction_added` | Reaction object | Reaction added to a message |
-| `agent_typing` | `{ agentId, channelId/dmId }` | Agent is processing (show typing indicator) |
-| `agent_done` | `{ agentId }` | Agent finished processing |
+| `agent_typing` | `{ agentId, channelId }` | Agent is processing (show typing indicator) |
+| `agent_done` | `{ agentId, channelId }` | Agent finished processing (stop typing indicator) |
 
 ### Connection Lifecycle
 
