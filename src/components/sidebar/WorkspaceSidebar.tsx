@@ -3,6 +3,7 @@
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
 import { getInitials } from '@/utils/get-initials';
+import { TelemetryTestButton } from '@/components/debug/TelemetryTestButton';
 
 export default function WorkspaceSidebar() {
   const { currentUserId, switchUser } = useApp();
@@ -60,6 +61,8 @@ export default function WorkspaceSidebar() {
         );
       })}
       </div>
+
+      {process.env.NODE_ENV === "development" && <TelemetryTestButton />}
     </aside>
   );
 }
