@@ -22,6 +22,7 @@ import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
 import {
   logInfo,
+  logWarn,
   logError,
   countMetric,
   distributionMetric,
@@ -97,64 +98,144 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
     const sdkQuery = query({ prompt, options: sdkOptions });
 
-    // 9. Iterate SDK messages
-    let stepNumber = 0;
-    let currentStep: RunStep | null = null;
-    let resultMessage: SDKResultMessage | null = null;
-    let sessionId: string | null = null;
+    // 9. Iterate SDK messages — wrapped in sdk.query span
+    const { stepNumber, resultMessage, sessionId } = await Sentry.startSpan(
+      { name: "sdk.query", op: "ai.agent" },
+      async () => {
+        let stepNum = 0;
+        let currentStep: RunStep | null = null;
+        let result: SDKResultMessage | null = null;
+        let sessId: string | null = null;
 
-    for await (const msg of sdkQuery) {
-      // Extract session_id from any message that has it
-      const extractedId = extractSessionId(msg);
-      if (extractedId) sessionId = extractedId;
+        for await (const msg of sdkQuery) {
+          const extractedId = extractSessionId(msg);
+          if (extractedId) sessId = extractedId;
 
-      if (msg.type === "system" && msg.subtype === "init") {
-        // Record init as system_message
-        await createRunMessage({
-          runId: run.id,
-          stepId: null,
-          messageType: "system_message",
-          content: "[system:init]",
-        });
-        continue;
-      }
+          if (msg.type === "system") {
+            await handleSystemMsg(msg, run.id, run.agentId);
+            continue;
+          }
 
-      if (msg.type === "assistant") {
-        // Close previous step
+          if (msg.type === "assistant") {
+            if (currentStep) {
+              await updateRunStep(currentStep.id, { status: "completed" });
+            }
+            stepNum++;
+            const step = stepNum;
+            currentStep = await Sentry.startSpan(
+              { name: `sdk.turn.${step}`, op: "ai.agent.turn" },
+              async () => {
+                const newStep = await createRunStep({
+                  runId: run.id,
+                  stepNumber: step,
+                  modelId: agent.modelId,
+                });
+
+                const content = extractAssistantContent(msg);
+                await createRunMessage({
+                  runId: run.id,
+                  stepId: newStep.id,
+                  messageType: "assistant_message",
+                  content,
+                });
+
+                for (const toolUse of extractToolUseBlocks(msg)) {
+                  await createRunMessage({
+                    runId: run.id,
+                    stepId: newStep.id,
+                    messageType: "tool_call_message",
+                    content: `[tool_use: ${toolUse.name}]`,
+                    toolName: toolUse.name,
+                    toolInput: toolUse.input as Record<string, unknown>,
+                  });
+                  logInfo("sdk.tool_call", {
+                    runId: run.id,
+                    toolName: toolUse.name,
+                    toolUseId: toolUse.id,
+                    step,
+                  });
+                }
+
+                return newStep;
+              },
+            );
+            continue;
+          }
+
+          if (msg.type === "user") {
+            if ("isReplay" in msg) continue;
+            await createRunMessage({
+              runId: run.id,
+              stepId: currentStep?.id ?? null,
+              messageType: "user_message",
+              content: extractUserContent(msg),
+            });
+            if (msg.tool_use_result != null) {
+              const toolResult =
+                typeof msg.tool_use_result === "string"
+                  ? msg.tool_use_result
+                  : JSON.stringify(msg.tool_use_result);
+              await createRunMessage({
+                runId: run.id,
+                stepId: currentStep?.id ?? null,
+                messageType: "tool_return_message",
+                content: toolResult,
+              });
+            }
+            logInfo("sdk.user_message", { runId: run.id });
+            continue;
+          }
+
+          if (msg.type === "tool_progress") {
+            logInfo("sdk.tool_progress", {
+              runId: run.id,
+              toolName: msg.tool_name,
+              toolUseId: msg.tool_use_id,
+              elapsedSeconds: msg.elapsed_time_seconds,
+            });
+            continue;
+          }
+
+          if (msg.type === "tool_use_summary") {
+            logInfo("sdk.tool_use_summary", {
+              runId: run.id,
+              summary: msg.summary,
+            });
+            continue;
+          }
+
+          if (msg.type === "auth_status") {
+            if (msg.error) {
+              logError("sdk.auth_status", {
+                runId: run.id,
+                isAuthenticating: msg.isAuthenticating,
+                error: msg.error,
+              });
+            } else {
+              logWarn("sdk.auth_status", {
+                runId: run.id,
+                isAuthenticating: msg.isAuthenticating,
+              });
+            }
+            continue;
+          }
+
+          if (msg.type === "result") {
+            result = msg;
+            continue;
+          }
+
+          // stream_event and unknown types: skip silently
+        }
+
+        // Close final step inside the span
         if (currentStep) {
           await updateRunStep(currentStep.id, { status: "completed" });
         }
 
-        // Create new step
-        stepNumber++;
-        currentStep = await createRunStep({
-          runId: run.id,
-          stepNumber,
-          modelId: agent.modelId,
-        });
-
-        // Record assistant message
-        const content = extractAssistantContent(msg);
-        await createRunMessage({
-          runId: run.id,
-          stepId: currentStep.id,
-          messageType: "assistant_message",
-          content,
-        });
-        continue;
-      }
-
-      if (msg.type === "result") {
-        resultMessage = msg;
-        continue;
-      }
-      // All other message types: skip
-    }
-
-    // Close final step
-    if (currentStep) {
-      await updateRunStep(currentStep.id, { status: "completed" });
-    }
+        return { stepNumber: stepNum, resultMessage: result, sessionId: sessId };
+      },
+    );
 
     // 10. Persist session ID
     if (sessionId) {
@@ -184,12 +265,35 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       { agentId: run.agentId },
     );
 
+    // SDK-specific result metrics
+    if (resultMessage) {
+      distributionMetric("sdk.duration_ms", resultMessage.duration_ms, "millisecond", { agentId: run.agentId });
+      distributionMetric("sdk.duration_api_ms", resultMessage.duration_api_ms, "millisecond", { agentId: run.agentId });
+      countMetric("sdk.num_turns", resultMessage.num_turns, { agentId: run.agentId });
+      distributionMetric("sdk.cost_usd", resultMessage.total_cost_usd, "dollar", { agentId: run.agentId });
+
+      if ("errors" in resultMessage && Array.isArray(resultMessage.errors)) {
+        for (const err of resultMessage.errors) {
+          logError("sdk.result.error", { runId: run.id, error: err });
+        }
+      }
+      if (resultMessage.permission_denials.length > 0) {
+        logWarn("sdk.result.permission_denials", {
+          runId: run.id,
+          count: resultMessage.permission_denials.length,
+        });
+      }
+    }
+
     logInfo("executeRun finished", {
       runId: run.id,
       agentId: run.agentId,
       status,
       stopReason,
       steps: stepNumber,
+      durationMs: Date.now() - startTime,
+      numTurns: resultMessage?.num_turns ?? 0,
+      costUsd: resultMessage?.total_cost_usd ?? 0,
     });
 
     return { status, stopReason, tokenUsage };
@@ -219,6 +323,101 @@ function extractSessionId(msg: SDKMessage): string | null {
     return msg.session_id;
   }
   return null;
+}
+
+async function handleSystemMsg(
+  msg: SDKMessage & { type: "system" },
+  runId: string,
+  agentId: string,
+): Promise<void> {
+  if (msg.subtype === "init") {
+    await createRunMessage({
+      runId,
+      stepId: null,
+      messageType: "system_message",
+      content: "[system:init]",
+    });
+    logInfo("sdk.init", {
+      runId,
+      model: msg.model,
+      permissionMode: msg.permissionMode,
+      toolCount: msg.tools.length,
+    });
+    return;
+  }
+
+  if (msg.subtype === "compact_boundary") {
+    logWarn("sdk.compact", {
+      runId,
+      trigger: msg.compact_metadata.trigger,
+      preTokens: msg.compact_metadata.pre_tokens,
+    });
+    countMetric("sdk.compaction", 1, { agentId });
+    return;
+  }
+
+  if (msg.subtype === "status") {
+    logInfo("sdk.status", { runId });
+    return;
+  }
+
+  if (msg.subtype === "hook_started") {
+    logInfo("sdk.hook.started", { runId, hookName: msg.hook_name, hookEvent: msg.hook_event });
+    return;
+  }
+
+  if (msg.subtype === "hook_progress") {
+    logInfo("sdk.hook.progress", { runId, hookName: msg.hook_name });
+    return;
+  }
+
+  if (msg.subtype === "hook_response") {
+    logInfo("sdk.hook.response", { runId, hookName: msg.hook_name, outcome: msg.outcome });
+    return;
+  }
+
+  if (msg.subtype === "task_notification") {
+    logInfo("sdk.task_notification", {
+      runId,
+      taskId: msg.task_id,
+      status: msg.status,
+      summary: msg.summary,
+    });
+    return;
+  }
+
+  // files_persisted — only remaining subtype after all checks above
+  logInfo("sdk.files_persisted", {
+    runId,
+    fileCount: msg.files.length,
+    failedCount: msg.failed.length,
+  });
+}
+
+interface ToolUseBlock {
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+function extractToolUseBlocks(msg: SDKAssistantMessage): ToolUseBlock[] {
+  const message = msg.message as unknown as { content: unknown };
+  const content = message.content;
+  if (!Array.isArray(content)) return [];
+  const blocks: ToolUseBlock[] = [];
+  for (const block of content as { type: string; id?: string; name?: string; input?: unknown }[]) {
+    if (block.type === "tool_use" && block.id && block.name) {
+      blocks.push({ id: block.id, name: block.name, input: block.input });
+    }
+  }
+  return blocks;
+}
+
+function extractUserContent(msg: { message: unknown }): string {
+  const message = msg.message as { content: unknown };
+  const content = message.content;
+  if (typeof content === "string") return content;
+  return JSON.stringify(content);
 }
 
 function extractAssistantContent(msg: SDKAssistantMessage): string {

@@ -3,6 +3,7 @@ import type { Agent } from "@/db/schema";
 import type { SDKMessage, SDKSystemMessage, SDKAssistantMessage, SDKResultSuccess, SDKResultError } from "@anthropic-ai/claude-agent-sdk";
 import { createMockAgent, createMockRun, createMockMemoryBlock } from "@/tests/factories";
 import type { UUID } from "crypto";
+import { logInfo, logWarn, logError, countMetric, distributionMetric } from "@/lib/telemetry";
 
 // --- Mocks ---
 
@@ -181,6 +182,67 @@ function makeErrorResult(subtype: SDKResultError["subtype"]): SDKResultError {
     modelUsage: {},
     permission_denials: [],
     errors: ["something failed"],
+    uuid: MOCK_UUID,
+    session_id: SESSION_ID,
+  };
+}
+
+function makeAssistantMessageWithToolUse(
+  text: string,
+  toolUses: { id: string; name: string; input: unknown }[],
+) {
+  return {
+    type: "assistant" as const,
+    message: {
+      content: [
+        { type: "text", text },
+        ...toolUses.map((t) => ({ type: "tool_use", id: t.id, name: t.name, input: t.input })),
+      ],
+    },
+    parent_tool_use_id: null,
+    uuid: MOCK_UUID,
+    session_id: SESSION_ID,
+  } as unknown as SDKAssistantMessage;
+}
+
+function makeUserMessage(content: string, toolUseResult?: unknown) {
+  return {
+    type: "user" as const,
+    message: { role: "user" as const, content },
+    parent_tool_use_id: null,
+    tool_use_result: toolUseResult,
+    uuid: MOCK_UUID,
+    session_id: SESSION_ID,
+  };
+}
+
+function makeReplayMessage(content: string) {
+  return {
+    type: "user" as const,
+    message: { role: "user" as const, content },
+    parent_tool_use_id: null,
+    isReplay: true as const,
+    uuid: MOCK_UUID,
+    session_id: SESSION_ID,
+  };
+}
+
+function makeCompactBoundaryMessage() {
+  return {
+    type: "system" as const,
+    subtype: "compact_boundary" as const,
+    compact_metadata: { trigger: "auto" as const, pre_tokens: 50000 },
+    uuid: MOCK_UUID,
+    session_id: SESSION_ID,
+  };
+}
+
+function makeAuthStatusMessage(isAuthenticating: boolean, error?: string) {
+  return {
+    type: "auth_status" as const,
+    isAuthenticating,
+    output: [],
+    error,
     uuid: MOCK_UUID,
     session_id: SESSION_ID,
   };
@@ -406,5 +468,202 @@ describe("orchestrator", () => {
 
     expect(mockGetRecentMessages).not.toHaveBeenCalled();
     expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("records tool_use blocks as tool_call_message", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAssistantMessageWithToolUse("Thinking...", [
+        { id: "tu_1", name: "send_message", input: { channelId: "general", text: "Hello!" } },
+      ]),
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageType: "tool_call_message",
+        toolName: "send_message",
+        toolInput: { channelId: "general", text: "Hello!" },
+      }),
+    );
+  });
+
+  it("records user messages as user_message", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAssistantMessage("Hello"),
+      makeUserMessage("tool result text") as unknown as SDKMessage,
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageType: "user_message",
+        content: "tool result text",
+      }),
+    );
+  });
+
+  it("records tool_use_result as tool_return_message", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAssistantMessage("Hello"),
+      makeUserMessage("tool response", { messageId: "msg-1" }) as unknown as SDKMessage,
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageType: "tool_return_message",
+        content: JSON.stringify({ messageId: "msg-1" }),
+      }),
+    );
+  });
+
+  it("skips replay messages", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeReplayMessage("replayed content") as unknown as SDKMessage,
+      makeAssistantMessage("Hello"),
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    const userMsgCalls = mockCreateRunMessage.mock.calls.filter(
+      (call) => (call[0] as { messageType: string }).messageType === "user_message",
+    );
+    expect(userMsgCalls).toHaveLength(0);
+  });
+
+  it("emits logWarn + countMetric for compact_boundary events", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeCompactBoundaryMessage() as unknown as SDKMessage,
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logWarn).toHaveBeenCalledWith(
+      "sdk.compact",
+      expect.objectContaining({ trigger: "auto", preTokens: 50000 }),
+    );
+    expect(countMetric).toHaveBeenCalledWith("sdk.compaction", 1, { agentId: "michael" });
+  });
+
+  it("emits logError for auth_status with error", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAuthStatusMessage(false, "token expired") as unknown as SDKMessage,
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logError).toHaveBeenCalledWith(
+      "sdk.auth_status",
+      expect.objectContaining({ error: "token expired" }),
+    );
+  });
+
+  it("emits logWarn for auth_status without error", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAuthStatusMessage(true) as unknown as SDKMessage,
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logWarn).toHaveBeenCalledWith(
+      "sdk.auth_status",
+      expect.objectContaining({ isAuthenticating: true }),
+    );
+  });
+
+  it("emits SDK-specific result metrics", async () => {
+    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hi"), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(distributionMetric).toHaveBeenCalledWith(
+      "sdk.duration_ms", 1000, "millisecond", expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(distributionMetric).toHaveBeenCalledWith(
+      "sdk.duration_api_ms", 800, "millisecond", expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(countMetric).toHaveBeenCalledWith(
+      "sdk.num_turns", 1, expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(distributionMetric).toHaveBeenCalledWith(
+      "sdk.cost_usd", 0.01, "dollar", expect.objectContaining({ agentId: "michael" }),
+    );
+  });
+
+  it("creates sdk.query and sdk.turn spans", async () => {
+    sdkMessages = [
+      makeInitMessage(),
+      makeAssistantMessage("First"),
+      makeAssistantMessage("Second"),
+      makeSuccessResult(),
+    ];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockStartSpan).toHaveBeenCalledWith(
+      { name: "sdk.query", op: "ai.agent" },
+      expect.any(Function),
+    );
+    expect(mockStartSpan).toHaveBeenCalledWith(
+      { name: "sdk.turn.1", op: "ai.agent.turn" },
+      expect.any(Function),
+    );
+    expect(mockStartSpan).toHaveBeenCalledWith(
+      { name: "sdk.turn.2", op: "ai.agent.turn" },
+      expect.any(Function),
+    );
+  });
+
+  it("emits logInfo for sdk.init with model and tools", async () => {
+    sdkMessages = [makeInitMessage(), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logInfo).toHaveBeenCalledWith(
+      "sdk.init",
+      expect.objectContaining({
+        model: "claude-sonnet-4-5-20250929",
+        permissionMode: "bypassPermissions",
+      }),
+    );
+  });
+
+  it("logs errors from error result messages", async () => {
+    sdkMessages = [makeInitMessage(), makeErrorResult("error_during_execution")];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logError).toHaveBeenCalledWith(
+      "sdk.result.error",
+      expect.objectContaining({ error: "something failed" }),
+    );
   });
 });
