@@ -57,6 +57,13 @@ graph TD
     M2 --> M4
     M1 --> M5[M5: Character Personalities]
     M5 --> M4
+    M5 --> M6[M6: Persona Drift Measurement]
+    M2 --> M6
+    M1 --> M6
+    M6 --> M7[M7: Persona Drift Correction]
+    M2 --> M7
+    M6 --> M8[M8: Evaluation Harness]
+    M5 --> M8
 ```
 
 ### Milestones
@@ -68,6 +75,9 @@ graph TD
 | M3: API Layer, SSE & OpenAPI | S-3.0 – S-3.3 | `spec/plan/milestone-3-api-layer-sse.md` |
 | M4: Advanced Interactions & Scheduling | S-4.0 – S-4.3 | `spec/plan/milestone-4-advanced-interactions.md` |
 | M5: Character Personalities | S-5.0 – S-5.1 | `spec/plan/milestone-5-character-personalities.md` |
+| M6: Persona Drift Measurement | S-6.0 – S-6.5 | `spec/plan/milestone-6-persona-drift-measurement.md` |
+| M7: Persona Drift Correction | S-7.0 – S-7.3 | `spec/plan/milestone-7-persona-drift-correction.md` |
+| M8: Evaluation Harness | S-8.0 – S-8.3 | `spec/plan/milestone-8-evaluation-harness.md` |
 
 ### Horizontal Requirements
 
@@ -88,6 +98,12 @@ graph TD
 | No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
 | Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |
 | All channel members responding creates too many agents | Sequential processing with delays (S-4.1) makes it feel natural; `do_nothing` tool lets agents opt out |
+| LLM judge scores are non-deterministic | Mock judge mode for CI (pre-recorded scores); live evaluations average multiple samples |
+| Evaluation LLM calls are expensive | Claude Haiku (~$0.00003/check); batch 10 propositions/call; mock judge for CI |
+| Action correction adds latency to messages | Single Haiku call ~200ms; fail-open on 5s timeout; max 2 retries |
+| Action correction reduces self-consistency | Expected trade-off per TinyTroupe research; configurable per agent; monitor both metrics |
+| Anti-convergence nudges reduce persona adherence | Nudges are character-aware; configurable; trade-off is acceptable per TinyTroupe findings |
+| Golden baselines become stale | `--update-baseline` flag to refresh; regression delta (1.0) allows natural LLM variation |
 
 ## Feature-First Directory Structure
 
@@ -105,6 +121,7 @@ src/
 │   │   └── types.ts    # Agent types
 │   ├── memory/         # Memory system (core + archival)
 │   ├── messages/       # Chat messages, channels
+│   ├── evaluation/     # Persona drift measurement, correction, CI harness
 │   ├── scheduler/      # Autonomous behavior triggers
 │   └── tools/          # MCP tool definitions
 ├── db/                 # Drizzle schema + migrations
@@ -249,3 +266,11 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 
 - **Factories**: Use `src/tests/factories/` for generating test data. Do not manually construct complex objects in tests. This prevents test brittleness when types change.
 - **Example**: `const agent = createMockAgent({ name: 'Michael Scott' });`
+
+## Acknowledgements
+
+The persona drift evaluation and correction system (M6–M8) is informed by:
+
+> Paulo Salem, Robert Sim, Christopher Olsen, Prerit Saxena, Rafael Barcelos, Yi Ding. **"TinyTroupe: An LLM-powered Multiagent Persona Simulation Toolkit."** Microsoft Corporation, July 2025. arXiv:2507.09788v1. https://github.com/microsoft/tinytroupe
+
+Key concepts adopted from this work: proposition-based evaluation scored by LLM-as-judge (0–9 scale), four evaluation dimensions (persona adherence, self-consistency, fluency, convergence/divergence), action correction gates with fail-open semantics, and anti-convergence interventions for group conversations. The quantitative trade-offs documented in their Table 1 (e.g., action correction improving adherence at the cost of self-consistency) directly informed the configurable-per-agent design of M7.
