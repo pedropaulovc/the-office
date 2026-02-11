@@ -90,4 +90,4 @@ npm run dev
 
 Inspired by [Letta](https://github.com/letta-ai/letta)'s architecture patterns (stateful agents, dual memory, tool registry, skills) — but built entirely from scratch on the Claude Agent SDK. No Letta dependency, no Slack dependency.
 
-See [`spec/functional/agent-platform.md`](spec/functional/agent-platform.md) for the full capability spec.
+See [`spec/functional/`](spec/functional/README.md) for the full capability spec (one file per feature area).

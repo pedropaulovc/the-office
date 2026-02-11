@@ -37,7 +37,7 @@ There are multiple instances of Claude Code running in parallel. Each one has mu
 
 ## Key Specs
 
-- Full capability spec: `spec/functional/agent-platform.md`
+- Full capability spec: `spec/functional/` (one file per feature area — see `spec/functional/README.md` for index)
 - Implementation plan: `spec/plan/` (one file per milestone)
 
 ## Implementation Plan
