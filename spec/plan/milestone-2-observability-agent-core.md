@@ -72,7 +72,7 @@ The system prompt varies per invocation because it includes conversation history
 - [ ] [AC-2.1.1] Function takes agent row + memory blocks + recent messages, returns string
 - [ ] [AC-2.1.2] Each memory block rendered as `### {label}\n{content}`
 - [ ] [AC-2.1.3] Last 20 messages from the channel included as conversation context
-- [ ] [AC-2.1.4] Instructions tell agent to use tools (send_channel_message, send_dm) not raw text
+- [ ] [AC-2.1.4] Instructions tell agent to use `send_message` tool, not raw text
 - [ ] [AC-2.1.5] Instructions include `do_nothing` as an explicit option
 - [ ] [AC-2.1.6] `agents.systemPrompt` is the customizable persona — different per agent
 - [ ] [AC-2.1.7] Unit tests for prompt assembly with various block/message combinations
@@ -159,7 +159,7 @@ for await (const msg of query({
 }
 ```
 
-**Important**: The orchestrator does NOT create chat messages directly. Agents use MCP tools (send_channel_message, send_dm) to speak. This gives agents full control including the option to say nothing. For this story, use a stub tool set — real tools come in S-2.5.
+**Important**: The orchestrator does NOT create chat messages directly. Agents use the `send_message` MCP tool to speak. This gives agents full control including the option to say nothing. For this story, use a stub tool set — real tools come in S-2.5.
 
 ### Files to create (supporting)
 | File | Purpose |
@@ -220,14 +220,13 @@ Call `resolveTargetAgents()` with:
 
 ## [S-2.5] MCP Tool Registry & Tools
 
-As a developer, I want all 7 agent tools implemented as MCP tools so agents can interact with the world.
+As a developer, I want all 6 agent tools implemented as MCP tools so agents can interact with the world.
 
 ### Files to create
 | File | Purpose |
 |------|---------|
 | `src/tools/registry.ts` | `getTools(agentId)` — returns tool array for an agent |
-| `src/tools/send-channel-message.ts` | Post message to a channel |
-| `src/tools/send-dm.ts` | Send DM to another character |
+| `src/tools/send-message.ts` | Post message to any channel or DM conversation |
 | `src/tools/react-to-message.ts` | Add emoji reaction |
 | `src/tools/do-nothing.ts` | Explicitly choose silence |
 | `src/tools/update-memory.ts` | Update own core memory block |
@@ -236,8 +235,7 @@ As a developer, I want all 7 agent tools implemented as MCP tools so agents can 
 
 ### Tool Signatures
 ```
-send_channel_message(channelId: string, text: string) → { messageId }
-send_dm(targetAgentId: string, text: string) → { messageId }
+send_message(conversationId: string, text: string) → { messageId }
 react_to_message(messageId: string, emoji: string) → { success }
 do_nothing() → { action: 'none' }
 update_memory(label: string, content: string) → { success }
@@ -254,9 +252,9 @@ Each tool:
 - Records tool call and return in `run_messages` table
 
 ### Acceptance Criteria
-- [ ] [AC-2.5.1] 7 tool files + 1 registry file in `src/tools/`
+- [ ] [AC-2.5.1] 6 tool files + 1 registry file in `src/tools/`
 - [ ] [AC-2.5.2] Each tool validates inputs with Zod
-- [ ] [AC-2.5.3] `send_channel_message` and `send_dm` create DB rows and broadcast SSE events
+- [ ] [AC-2.5.3] `send_message` creates DB rows (channel or DM) and broadcasts SSE events
 - [ ] [AC-2.5.4] `do_nothing` returns immediately without side effects
 - [ ] [AC-2.5.5] `update_memory` only allows the agent to modify its own blocks
 - [ ] [AC-2.5.6] `search_memory` uses keyword matching (ILIKE) on the agent's own passages
@@ -267,4 +265,4 @@ Each tool:
 - [ ] [AC-2.5.11] Unit tests for each tool handler
 
 ### Demo
-Send a message to an agent via the orchestrator. Show the agent responds using `send_channel_message` tool, the message appears in the DB, `run_messages` shows the tool call/return, and Sentry shows the tool execution span.
+Send a message to an agent via the orchestrator. Show the agent responds using `send_message` tool, the message appears in the DB, `run_messages` shows the tool call/return, and Sentry shows the tool execution span.

@@ -131,5 +131,5 @@ In-memory pub/sub for SSE connections:
 
 - **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — uses the same messaging tables
 - **Runtime**: [runtime.md](runtime.md) — agent resolver and mailbox triggered by POST endpoint
-- **Tools**: [tools.md](tools.md) — `send_channel_message` and `send_dm` create messages + broadcast SSE
+- **Tools**: [tools.md](tools.md) — `send_message` creates messages + broadcasts SSE
 - **Implementation**: `spec/plan/milestone-1-database-foundation.md` (S-1.4), `spec/plan/milestone-3-api-layer-sse.md` (S-3.0, S-3.1)
