@@ -53,6 +53,7 @@
     "typescript-eslint": "^8.55.0",
     "playwright": "npm:@pedropaulovc/playwright@1.59.0-next.8",
     "playwright-core": "npm:@pedropaulovc/playwright-core@1.59.0-next.8",
+    "vercel": "^50.15.0",
     "vitest": "^4.0.18"
   },
   "overrides": {
