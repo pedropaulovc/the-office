@@ -9,7 +9,7 @@ Assembles the system prompt dynamically per invocation by combining:
 1. **Agent persona** — `agents.system_prompt` from DB (the stable character identity)
 2. **Core memory blocks** — rendered as `### {label}\n{content}` sections (see [memory.md](memory.md))
 3. **Last 20 messages** — from the channel/DM the agent is being contacted from, providing conversation context
-4. **Tool usage instructions** — tells the agent to use tools (send_channel_message, send_dm) to communicate, never raw text
+4. **Tool usage instructions** — tells the agent to use `send_message` to communicate, never raw text
 5. **`do_nothing` option** — explicitly tells the agent it can choose not to respond
 
 The persona is stable across invocations. Everything else varies per invocation.
@@ -55,7 +55,7 @@ The core invocation logic. Called by the mailbox when a run is claimed.
 10. Update run status to `completed` (or `failed` on error) with stop reason and token usage
 11. Broadcast `agent_done` SSE event
 
-**The orchestrator does NOT create chat messages directly.** Agents use MCP tools (send_channel_message, send_dm) to speak. This gives agents full control — including the option to say nothing via `do_nothing`.
+**The orchestrator does NOT create chat messages directly.** Agents use the `send_message` MCP tool to speak. This gives agents full control — including the option to say nothing via `do_nothing`.
 
 ### Safety Constraints
 

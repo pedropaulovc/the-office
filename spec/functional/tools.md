@@ -1,6 +1,6 @@
 # Tools
 
-7 MCP tools that agents use to interact with the world. Registered via `createSdkMcpServer()` and scoped per agent.
+6 MCP tools that agents use to interact with the world. Registered via `createSdkMcpServer()` and scoped per agent.
 
 ## Registry
 
@@ -8,28 +8,19 @@
 
 ## Tool Definitions
 
-### send_channel_message
+### send_message
 
-Post a message in a channel.
+Post a message to any channel or DM conversation. Unified interface — mirrors `POST /api/messages`.
 
 ```
-send_channel_message(channelId: string, text: string) → { messageId: string }
+send_message(conversationId: string, text: string) → { messageId: string }
 ```
 
-- Stores message in DB with `user_id = agentId`
+- `conversationId` is a channel ID (e.g. `'general'`) or a DM conversation ID (e.g. `'dm-michael-jim'`)
+- The tool resolves the type by looking up whether the ID exists in `channels` or `dm_conversations`
+- Stores message in DB with `user_id = agentId`, setting `channel_id` or `dm_conversation_id` accordingly
 - Broadcasts `message_created` SSE event
-
-### send_dm
-
-Send a direct message to another character.
-
-```
-send_dm(targetAgentId: string, text: string) → { messageId: string }
-```
-
-- Stores message in DB
-- Broadcasts `message_created` SSE event
-- If chain depth < MAX_CHAIN_DEPTH, enqueues a run for the target agent to respond (see [agent-agent-comms.md](agent-agent-comms.md))
+- For DMs: if chain depth < MAX_CHAIN_DEPTH, enqueues a run for the other participant to respond (see [agent-agent-comms.md](agent-agent-comms.md))
 
 ### react_to_message
 
@@ -86,7 +77,7 @@ store_memory(content: string, tags?: string[]) → { passageId: string }
 
 ## Cross-Cutting Behavior
 
-All 7 tools share these behaviors:
+All 6 tools share these behaviors:
 - **Zod validation** on all inputs at the tool boundary
 - **`agentId` via closure** — the calling agent's identity is bound when the tool set is created
 - **Run message recording** — every tool call and tool return is recorded in `run_messages` as `tool_call_message` / `tool_return_message`
@@ -96,6 +87,6 @@ All 7 tools share these behaviors:
 
 - **Memory**: [memory.md](memory.md) — data model for blocks and passages
 - **User–Agent Comms**: [user-agent-comms.md](user-agent-comms.md) — messaging data model, SSE events
-- **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — `send_dm` triggers DM chains
+- **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — `send_message` to a DM conversation triggers DM chains
 - **Runtime**: [runtime.md](runtime.md) — orchestrator creates MCP server with these tools
 - **Implementation**: `spec/plan/milestone-2-observability-agent-core.md` (S-2.5)
