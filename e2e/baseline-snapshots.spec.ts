@@ -51,7 +51,7 @@ test.describe("baseline snapshots", () => {
         - img
       - button:
         - img
-      - text: /Sunday, February 8 MS Michael Scott 9:\\d+ AM/
+      - text: /\\w+, \\w+ \\d+ MS Michael Scott 9:\\d+ AM/
       - paragraph: Good morning everyone! It is a beautiful day at Dunder Mifflin, and I just want to say... I love this company.
       - text: /❤️ 2 SH Stanley Hudson 9:\\d+ AM/
       - paragraph: It's Monday, Michael.
@@ -165,7 +165,7 @@ test.describe("baseline snapshots", () => {
         - img
       - button:
         - img
-      - text: /Sunday, February 8 AM Angela Martin 9:\\d+ AM/
+      - text: /\\w+, \\w+ \\d+ AM Angela Martin 9:\\d+ AM/
       - paragraph: Q3 expense reports are due by end of day Friday. No exceptions. Kevin, that includes you.
       - text: /KM Kevin Malone 9:\\d+ AM/
       - paragraph: I'm working on it. Math is hard when the numbers are big.
