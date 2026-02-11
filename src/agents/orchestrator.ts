@@ -99,143 +99,156 @@ async function executeRunInner(run: Run): Promise<RunResult> {
     const sdkQuery = query({ prompt, options: sdkOptions });
 
     // 9. Iterate SDK messages — wrapped in sdk.query span
-    const { stepNumber, resultMessage, sessionId } = await Sentry.startSpan(
+    // Use startSpanManual so we get a span reference to re-establish async context
+    // inside the for-await loop (the SDK subprocess breaks Node.js async context).
+    // State object avoids TypeScript narrowing issues — TS can't track
+    // mutations inside withActiveSpan/startSpan callbacks on let variables.
+    const loopState = {
+      stepNum: 0,
+      currentStep: null as RunStep | null,
+      result: null as SDKResultMessage | null,
+      sessId: null as string | null,
+    };
+
+    await Sentry.startSpanManual(
       { name: "sdk.query", op: "ai.agent" },
-      async () => {
-        let stepNum = 0;
-        let currentStep: RunStep | null = null;
-        let result: SDKResultMessage | null = null;
-        let sessId: string | null = null;
+      async (querySpan) => {
 
         for await (const msg of sdkQuery) {
-          const extractedId = extractSessionId(msg);
-          if (extractedId) sessId = extractedId;
+          // Re-establish querySpan as active — the for-await over the SDK subprocess
+          // loses Node.js async context, so child spans/logs would otherwise be orphaned.
+          await Sentry.withActiveSpan(querySpan, async () => {
+            const extractedId = extractSessionId(msg);
+            if (extractedId) loopState.sessId = extractedId;
 
-          if (msg.type === "system") {
-            await handleSystemMsg(msg, run.id, run.agentId);
-            continue;
-          }
-
-          if (msg.type === "assistant") {
-            if (currentStep) {
-              await updateRunStep(currentStep.id, { status: "completed" });
+            if (msg.type === "system") {
+              await handleSystemMsg(msg, run.id, run.agentId);
+              return;
             }
-            stepNum++;
-            const step = stepNum;
-            currentStep = await Sentry.startSpan(
-              { name: `sdk.turn.${step}`, op: "ai.agent.turn" },
-              async () => {
-                const newStep = await createRunStep({
-                  runId: run.id,
-                  stepNumber: step,
-                  modelId: agent.modelId,
-                });
 
-                const content = extractAssistantContent(msg);
-                await createRunMessage({
-                  runId: run.id,
-                  stepId: newStep.id,
-                  messageType: "assistant_message",
-                  content,
-                });
+            if (msg.type === "assistant") {
+              if (loopState.currentStep) {
+                await updateRunStep(loopState.currentStep.id, { status: "completed" });
+              }
+              loopState.stepNum++;
+              const step = loopState.stepNum;
+              loopState.currentStep = await Sentry.startSpan(
+                { name: `sdk.turn.${step}`, op: "ai.agent.turn" },
+                async () => {
+                  const newStep = await createRunStep({
+                    runId: run.id,
+                    stepNumber: step,
+                    modelId: agent.modelId,
+                  });
 
-                for (const toolUse of extractToolUseBlocks(msg)) {
+                  const content = extractAssistantContent(msg);
                   await createRunMessage({
                     runId: run.id,
                     stepId: newStep.id,
-                    messageType: "tool_call_message",
-                    content: `[tool_use: ${toolUse.name}]`,
-                    toolName: toolUse.name,
-                    toolInput: toolUse.input as Record<string, unknown>,
+                    messageType: "assistant_message",
+                    content,
                   });
-                  logInfo("sdk.tool_call", {
-                    runId: run.id,
-                    toolName: toolUse.name,
-                    toolUseId: toolUse.id,
-                    step,
-                  });
-                }
 
-                return newStep;
-              },
-            );
-            continue;
-          }
+                  for (const toolUse of extractToolUseBlocks(msg)) {
+                    await createRunMessage({
+                      runId: run.id,
+                      stepId: newStep.id,
+                      messageType: "tool_call_message",
+                      content: `[tool_use: ${toolUse.name}]`,
+                      toolName: toolUse.name,
+                      toolInput: toolUse.input as Record<string, unknown>,
+                    });
+                    logInfo("sdk.tool_call", {
+                      runId: run.id,
+                      toolName: toolUse.name,
+                      toolUseId: toolUse.id,
+                      step,
+                    });
+                  }
 
-          if (msg.type === "user") {
-            if ("isReplay" in msg) continue;
-            await createRunMessage({
-              runId: run.id,
-              stepId: currentStep?.id ?? null,
-              messageType: "user_message",
-              content: extractUserContent(msg),
-            });
-            if (msg.tool_use_result != null) {
-              const toolResult =
-                typeof msg.tool_use_result === "string"
-                  ? msg.tool_use_result
-                  : JSON.stringify(msg.tool_use_result);
+                  return newStep;
+                },
+              );
+              return;
+            }
+
+            if (msg.type === "user") {
+              if ("isReplay" in msg) return;
               await createRunMessage({
                 runId: run.id,
-                stepId: currentStep?.id ?? null,
-                messageType: "tool_return_message",
-                content: toolResult,
+                stepId: loopState.currentStep?.id ?? null,
+                messageType: "user_message",
+                content: extractUserContent(msg),
               });
+              if (msg.tool_use_result != null) {
+                const toolResult =
+                  typeof msg.tool_use_result === "string"
+                    ? msg.tool_use_result
+                    : JSON.stringify(msg.tool_use_result);
+                await createRunMessage({
+                  runId: run.id,
+                  stepId: loopState.currentStep?.id ?? null,
+                  messageType: "tool_return_message",
+                  content: toolResult,
+                });
+              }
+              logInfo("sdk.user_message", { runId: run.id });
+              return;
             }
-            logInfo("sdk.user_message", { runId: run.id });
-            continue;
-          }
 
-          if (msg.type === "tool_progress") {
-            logInfo("sdk.tool_progress", {
-              runId: run.id,
-              toolName: msg.tool_name,
-              toolUseId: msg.tool_use_id,
-              elapsedSeconds: msg.elapsed_time_seconds,
-            });
-            continue;
-          }
-
-          if (msg.type === "tool_use_summary") {
-            logInfo("sdk.tool_use_summary", {
-              runId: run.id,
-              summary: msg.summary,
-            });
-            continue;
-          }
-
-          if (msg.type === "auth_status") {
-            if (msg.error) {
-              logError("sdk.auth_status", {
+            if (msg.type === "tool_progress") {
+              logInfo("sdk.tool_progress", {
                 runId: run.id,
-                isAuthenticating: msg.isAuthenticating,
-                error: msg.error,
+                toolName: msg.tool_name,
+                toolUseId: msg.tool_use_id,
+                elapsedSeconds: msg.elapsed_time_seconds,
               });
-            } else {
-              logWarn("sdk.auth_status", {
-                runId: run.id,
-                isAuthenticating: msg.isAuthenticating,
-              });
+              return;
             }
-            continue;
-          }
 
-          if (msg.type === "result") {
-            result = msg;
-            continue;
-          }
+            if (msg.type === "tool_use_summary") {
+              logInfo("sdk.tool_use_summary", {
+                runId: run.id,
+                summary: msg.summary,
+              });
+              return;
+            }
 
-          // stream_event and unknown types: skip silently
+            if (msg.type === "auth_status") {
+              if (msg.error) {
+                logError("sdk.auth_status", {
+                  runId: run.id,
+                  isAuthenticating: msg.isAuthenticating,
+                  error: msg.error,
+                });
+              } else {
+                logWarn("sdk.auth_status", {
+                  runId: run.id,
+                  isAuthenticating: msg.isAuthenticating,
+                });
+              }
+              return;
+            }
+
+            if (msg.type === "result") {
+              loopState.result = msg;
+              return;
+            }
+
+            // stream_event and unknown types: skip silently
+          });
         }
 
         // Close final step inside the span
-        if (currentStep) {
-          await updateRunStep(currentStep.id, { status: "completed" });
+        if (loopState.currentStep) {
+          await updateRunStep(loopState.currentStep.id, { status: "completed" });
         }
 
-        return { stepNumber: stepNum, resultMessage: result, sessionId: sessId };
+        querySpan.end();
       },
     );
+
+    const { stepNum: stepNumber, result: resultMessage, sessId: sessionId } = loopState;
 
     // 10. Persist session ID
     if (sessionId) {

@@ -87,10 +87,15 @@ vi.mock("@/agents/sdk-env", () => ({
 }));
 
 const mockStartSpan = vi.fn((_opts: unknown, fn: () => unknown) => fn());
+const mockSpanEnd = vi.fn();
+const mockStartSpanManual = vi.fn((_opts: unknown, fn: (span: unknown) => unknown) => fn({ end: mockSpanEnd }));
+const mockWithActiveSpan = vi.fn((_span: unknown, fn: () => unknown) => fn());
 const mockCaptureException = vi.fn();
 
 vi.mock("@sentry/nextjs", () => ({
   startSpan: (opts: unknown, fn: () => unknown) => mockStartSpan(opts, fn),
+  startSpanManual: (opts: unknown, fn: (span: unknown) => unknown) => mockStartSpanManual(opts, fn),
+  withActiveSpan: (_span: unknown, fn: () => unknown) => mockWithActiveSpan(_span, fn),
   captureException: (err: unknown) => { mockCaptureException(err); },
 }));
 
@@ -265,6 +270,8 @@ describe("orchestrator", () => {
     mockCreateSdkStderrHandler.mockReturnValue(noop);
     mockBuildSystemPrompt.mockReturnValue("test system prompt");
     mockStartSpan.mockImplementation((_opts: unknown, fn: () => unknown) => fn());
+    mockStartSpanManual.mockImplementation((_opts: unknown, fn: (span: unknown) => unknown) => fn({ end: mockSpanEnd }));
+    mockWithActiveSpan.mockImplementation((_span: unknown, fn: () => unknown) => fn());
 
     mockGetAgent.mockResolvedValue(AGENT);
     mockListMemoryBlocks.mockResolvedValue([]);
@@ -626,7 +633,7 @@ describe("orchestrator", () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockStartSpan).toHaveBeenCalledWith(
+    expect(mockStartSpanManual).toHaveBeenCalledWith(
       { name: "sdk.query", op: "ai.agent" },
       expect.any(Function),
     );
