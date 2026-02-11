@@ -29,7 +29,6 @@ When a message is posted in a channel, all member agents receive it (via the age
 ### Ordering Rules
 
 - Agents respond **sequentially**, not in parallel — prevents message ordering issues
-- **Random delay of 1–5 seconds** between agent invocations for natural feel
 - Each agent sees previous agents' responses in their conversation context (last 20 messages includes the earlier responses)
 - Agents can use `do_nothing` to opt out of responding — not every agent needs to speak
 

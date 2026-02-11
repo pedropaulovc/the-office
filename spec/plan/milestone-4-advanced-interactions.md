@@ -40,11 +40,11 @@ As a developer, I want channel messages to trigger multiple agents with natural 
 ### Files to modify
 | File | Change |
 |------|---------|
-| `src/agents/orchestrator.ts` | Process channel agent runs sequentially with random delay (1-5s), each seeing prior responses |
+| `src/agents/orchestrator.ts` | Process channel agent runs sequentially, each seeing prior responses |
 
 ### Acceptance Criteria
 - [ ] [AC-4.1.1] Agents respond one at a time (not in parallel) to avoid message ordering issues
-- [ ] [AC-4.1.2] Random delay (1-5s) between agent invocations for natural feel
+- [ ] [AC-4.1.2] Sequential processing does not add artificial delays
 - [ ] [AC-4.1.3] Each agent sees previous agent responses in their conversation context
 - [ ] [AC-4.1.4] Unit test for sequential ordering logic
 - [ ] [AC-4.1.5] Sentry traces show sequential processing with delays
@@ -56,12 +56,11 @@ Post in #general. Watch 2-3 agents respond one after another with natural delays
 
 ## [S-4.2] Skills System
 
-As a developer, I want filesystem-based skills that provide character behavior knowledge.
+As a developer, I want filesystem-based skills that provide character behavior knowledge, with Claude Agent SDK handling skill loading and injection.
 
 ### Files to create
 | File | Purpose |
 |------|---------|
-| `src/agents/skill-loader.ts` | `loadSkill(name)`, `listSkills()` — reads from `.skills/` filesystem |
 | `src/app/api/skills/route.ts` | GET: list available skills |
 | `src/app/api/skills/[name]/route.ts` | GET: get full skill content |
 | `.skills/character-voice/SKILL.md` | Speech patterns and mannerisms guide |
@@ -73,12 +72,10 @@ As a developer, I want filesystem-based skills that provide character behavior k
 
 ### Acceptance Criteria
 - [ ] [AC-4.2.1] Each skill file has YAML frontmatter (`name`, `description`) + markdown body
-- [ ] [AC-4.2.2] `loadSkill()` reads and returns skill content
-- [ ] [AC-4.2.3] `listSkills()` discovers all skills from `.skills/` directory
-- [ ] [AC-4.2.4] Skills can be injected into agent prompts on demand
-- [ ] [AC-4.2.5] Skills API: `GET /api/skills` (list with name + description), `GET /api/skills/[name]` (full content)
-- [ ] [AC-4.2.6] Unit tests for skill loader
-- [ ] [AC-4.2.7] Sentry span for skill loading
+- [ ] [AC-4.2.2] Skills are loaded and injected into prompts by the Claude Agent SDK
+- [ ] [AC-4.2.3] Skills API: `GET /api/skills` (list with name + description), `GET /api/skills/[name]` (full content)
+- [ ] [AC-4.2.4] Unit tests for skills API filesystem reading
+- [ ] [AC-4.2.5] Sentry span for skill listing and fetch
 
 ### Demo
 Show an agent invocation where a skill is loaded into the prompt. Compare response quality with and without the skill.

@@ -242,7 +242,7 @@ As a developer, I want all 6 agent tools implemented as MCP tools so agents can 
 
 ### Tool Signatures
 ```
-send_message(conversationId: string, text: string) → { messageId }
+send_message(channelId: string, text: string) → { messageId }
 react_to_message(messageId: string, emoji: string) → { success }
 do_nothing() → { action: 'none' }
 update_memory(label: string, content: string) → { success }
