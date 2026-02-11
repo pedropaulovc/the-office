@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { Lato } from 'next/font/google';
 import { AppProvider } from '@/context/AppContext';
+import { DataProvider } from '@/context/DataContext';
+import { listAgents } from '@/db/queries';
+import type { Agent } from '@/db/schema';
 import './globals.css';
 
 const lato = Lato({
@@ -14,15 +17,24 @@ export const metadata: Metadata = {
   description: 'The Office Slack Clone',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let agents: Agent[];
+  try {
+    agents = await listAgents();
+  } catch {
+    agents = [];
+  }
+
   return (
     <html lang="en">
       <body className={`${lato.variable} font-[family-name:var(--font-lato)] antialiased`}>
-        <AppProvider>{children}</AppProvider>
+        <DataProvider initialAgents={agents}>
+          <AppProvider>{children}</AppProvider>
+        </DataProvider>
       </body>
     </html>
   );

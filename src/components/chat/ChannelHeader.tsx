@@ -1,12 +1,14 @@
 'use client';
 
 import { useApp } from '@/context/AppContext';
+import { useData } from '@/context/useData';
 import { getChannel } from '@/data/channels';
 import { directMessages, getDmOtherParticipant } from '@/data/directMessages';
-import { getUser, getInitials } from '@/data/users';
+import { getInitials } from '@/utils/get-initials';
 
 export default function ChannelHeader() {
   const { activeView, currentUserId } = useApp();
+  const { getAgent } = useData();
 
   if (activeView.kind === 'channel') {
     const channel = getChannel(activeView.id);
@@ -55,7 +57,7 @@ export default function ChannelHeader() {
   const dm = directMessages.find(d => d.id === activeView.id);
   if (!dm) return null;
   const otherId = getDmOtherParticipant(dm, currentUserId);
-  const other = getUser(otherId);
+  const other = getAgent(otherId);
   const initials = getInitials(other.displayName);
 
   return (
@@ -70,11 +72,6 @@ export default function ChannelHeader() {
           </div>
         </div>
         <span className="font-bold text-gray-900">{other.displayName}</span>
-        {other.status && (
-          <span className="text-muted-foreground text-sm ml-1 hidden md:inline">
-            — {other.status.emoji} {other.status.text}
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-3 text-muted-foreground">
         <button className="hover:text-gray-900 transition-colors">
