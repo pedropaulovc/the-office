@@ -71,7 +71,7 @@ graph TD
 
 ### Horizontal Requirements
 
-- Each story = one pull request, implemented and merged independently
+- Each story = one pull request, implemented and merged independently. Commits must be made on a dedicated feature branch (not the worktree branch). PRs must always target `main`.
 - Each schema story = one DB migration, tested and validated
 - Testing is mandatory: unit tests + integration tests + 1-2 E2E tests for user-facing features
 - Every story must be demoable with a live demo before claiming completion
