@@ -121,6 +121,7 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 | 7 | Skills | [skills.md](skills.md) | Filesystem knowledge system, 6 skills |
 | 8 | Scheduling | [scheduling.md](scheduling.md) | Autonomous triggers, scheduler loop |
 | 9 | REST API | [api.md](api.md) | Full CRUD for all entities, OpenAPI doc, route map |
+| 10 | Evaluation | [evaluation.md](evaluation.md) | Persona drift measurement, correction, CI harness |
 
 ## What We Do NOT Build
 
