@@ -3,7 +3,6 @@
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
 import { getInitials } from '@/utils/get-initials';
-import { getUnreadCount } from '@/data/unreads';
 import type { ChannelView } from '@/db/queries/messages';
 
 export default function ChannelSidebar() {
@@ -92,6 +91,7 @@ function SectionHeader({ title }: { title: string }) {
 
 function ChannelItem({ channel }: { channel: ChannelView }) {
   const { currentUserId, activeView, navigateTo } = useApp();
+  const { getUnreadCount } = useData();
   const isActive = activeView.kind === 'channel' && activeView.id === channel.id;
   const unread = getUnreadCount(currentUserId, channel.id);
 
@@ -129,7 +129,7 @@ function ChannelItem({ channel }: { channel: ChannelView }) {
 
 function DmItem({ dm }: { dm: ChannelView }) {
   const { currentUserId, activeView, navigateTo } = useApp();
-  const { getAgent, getDmOtherParticipant } = useData();
+  const { getAgent, getDmOtherParticipant, getUnreadCount } = useData();
   const otherId = getDmOtherParticipant(dm, currentUserId);
   const other = getAgent(otherId);
   const isActive = activeView.kind === 'dm' && activeView.id === dm.id;

@@ -14,6 +14,7 @@ export interface DataContextValue {
   getChannel: (id: string) => ChannelView | undefined;
   getDmsForUser: (userId: string) => ChannelView[];
   getDmOtherParticipant: (dm: ChannelView, currentUserId: string) => string;
+  getUnreadCount: (userId: string, channelId: string) => number;
 }
 
 export const DataContext = createContext<DataContextValue | null>(null);

@@ -725,6 +725,49 @@ Cancel a scheduled message. Sets status to `cancelled`.
 
 ---
 
+## Unreads
+
+Read-cursor based unread count tracking.
+
+### `GET /api/unreads`
+
+Get computed unread counts for a user.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `userId` | query, string | **Required.** The user to get unreads for |
+
+**Response 200:**
+
+```json
+{
+  "sales": 3,
+  "party-planning": 5,
+  "random": 2
+}
+```
+
+**Response 400:** `{ "error": "Validation failed", "issues": [...] }`
+
+### `POST /api/unreads/mark-read`
+
+Mark a channel as read for a user. Upserts `last_read_at = now()`.
+
+**Request body:**
+
+```json
+{
+  "userId": "michael",
+  "channelId": "general"
+}
+```
+
+**Response 204:** No content.
+
+**Response 400:** `{ "error": "Validation failed", "issues": [...] }`
+
+---
+
 ## SSE Events
 
 Real-time streaming via `GET /api/sse`. Already specified in [user-agent-comms.md](user-agent-comms.md) — SSE event types listed here for API completeness.
@@ -796,6 +839,9 @@ Summary of every route, grouped by resource.
 | **Skills** | | |
 | GET | `/api/skills` | M4 (S-4.2) |
 | GET | `/api/skills/[name]` | M4 (S-4.2) |
+| **Unreads** | | |
+| GET | `/api/unreads` | M1 (S-1.9) |
+| POST | `/api/unreads/mark-read` | M1 (S-1.9) |
 | **SSE** | | |
 | GET | `/api/sse` | M3 (S-3.0) |
 

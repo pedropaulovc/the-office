@@ -32,7 +32,7 @@ Read-only Slack clone (The Office theme). Next.js App Router, Tailwind v4, TypeS
 
 **Layout:** `WorkspaceSidebar (68px) | ChannelSidebar (240px) | ChatPanel (flex-1) | ThreadPanel (360px, conditional)` — orchestrated by `WorkspaceShell`.
 
-**Data:** All data flows from Neon PostgreSQL via API routes to the frontend. `src/db/seed.ts` populates the DB with 16 Office characters, 7 channels, 8 DM conversations, ~130 messages, and memory blocks. `src/data/` retains only `users.ts` (user constants shared by seed + frontend) and `unreads.ts` (static unread counts). Channels can be `public`, `private`, or `dm` (private filtered by `memberIds`). Messages use `t(daysAgo, hour, min)` for relative timestamps in the seed script.
+**Data:** All data flows from Neon PostgreSQL via API routes to the frontend. `src/db/seed.ts` populates the DB with 16 Office characters, 7 channels, 8 DM conversations, ~130 messages, memory blocks, and read cursors (for computed unread counts). `src/data/` retains only `users.ts` (user constants shared by seed + frontend). Channels can be `public`, `private`, or `dm` (private filtered by `memberIds`). Messages use `t(daysAgo, hour, min)` for relative timestamps in the seed script.
 
 **Styling:** Tailwind v4 custom tokens in `globals.css` (`@theme inline`). All colors use `slack-*` prefix. `@/*` maps to `./src/*`.
 

@@ -31,10 +31,12 @@ const FALLBACK_AGENT: AgentView = {
 export function DataProvider({
   initialAgents,
   initialChannels,
+  initialUnreads,
   children,
 }: {
   initialAgents: Agent[];
   initialChannels: ChannelView[];
+  initialUnreads: Record<string, Record<string, number>>;
   children: ReactNode;
 }) {
   const agents = useMemo(
@@ -87,6 +89,12 @@ export function DataProvider({
     [],
   );
 
+  const getUnreadCount = useMemo(
+    () => (userId: string, channelId: string): number =>
+      initialUnreads[userId]?.[channelId] ?? 0,
+    [initialUnreads],
+  );
+
   const value = useMemo(
     () => ({
       agents,
@@ -95,8 +103,9 @@ export function DataProvider({
       getChannel,
       getDmsForUser,
       getDmOtherParticipant,
+      getUnreadCount,
     }),
-    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant],
+    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount],
   );
 
   return (
