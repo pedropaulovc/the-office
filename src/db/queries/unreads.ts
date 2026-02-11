@@ -66,7 +66,7 @@ export async function getUnreadsByUser(userId: string): Promise<Record<string, n
 export async function markChannelRead(userId: string, channelId: string): Promise<void> {
   await db
     .insert(channelReads)
-    .values({ userId, channelId, lastReadAt: new Date() })
+    .values({ userId, channelId, lastReadAt: sql`now()` })
     .onConflictDoUpdate({
       target: [channelReads.userId, channelReads.channelId],
       set: { lastReadAt: sql`now()` },
