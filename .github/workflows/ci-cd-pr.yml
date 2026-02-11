@@ -195,6 +195,20 @@ jobs:
         timeout-minutes: 1
         run: npx playwright install --with-deps chromium
 
+      - name: Warm up Vercel preview
+        timeout-minutes: 1
+        run: |
+          URL="${{ needs.wait-for-vercel.outputs.preview_url }}"
+          echo "Warming up $URL..."
+          for i in 1 2 3 4 5; do
+            if curl -sf --max-time 10 "$URL" > /dev/null 2>&1; then
+              echo "Preview is warm (attempt $i)"
+              break
+            fi
+            echo "Cold start attempt $i/5..."
+            sleep 3
+          done
+
       - name: Run E2E tests against Vercel preview
         timeout-minutes: 3
         env:
