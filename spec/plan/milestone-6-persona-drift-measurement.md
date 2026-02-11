@@ -45,7 +45,13 @@ propositions:
   - id: michael-wants-to-be-liked
     claim: "{{agent_name}} desperately seeks approval and friendship from coworkers"
     weight: 1.0
+  - id: michael-never-boring
+    claim: "{{agent_name}} gives a dry, factual response with no personality"
+    weight: 0.8
+    inverted: true   # Anti-pattern: high score from LLM = bad. Score is flipped (9 - raw) before aggregation.
 ```
+
+Each proposition supports an optional `inverted` boolean (default `false`). When `inverted: true`, the proposition describes an anti-pattern — something the character should NOT do. The raw LLM judge score is flipped (`9 - raw`) before aggregation so that anti-patterns integrate naturally with the 0–9 "higher is better" scale.
 
 ### Files to create
 
@@ -63,8 +69,9 @@ propositions:
 
 ### Acceptance Criteria
 - [ ] [AC-6.0.1] Two tables defined: `evaluation_runs` (id, agent_id, status, dimensions, window_start, window_end, sample_size, overall_score, token_usage, timestamps), `evaluation_scores` (id, evaluation_run_id, dimension, proposition_id, score 0–9, reasoning, context_snippet)
-- [ ] [AC-6.0.2] Proposition YAML loader reads files from `src/features/evaluation/propositions/`, validates with Zod
+- [ ] [AC-6.0.2] Proposition YAML loader reads files from `src/features/evaluation/propositions/`, validates with Zod, supports optional `inverted` boolean per proposition
 - [ ] [AC-6.0.3] Template variables (`{{agent_name}}`, `{{channel_name}}`) filled at evaluation time from agent/context data
+- [ ] [AC-6.0.3a] Inverted propositions (anti-patterns) have their raw LLM score flipped (`9 - raw`) before aggregation
 - [ ] [AC-6.0.4] `evaluatePropositions()` sends propositions + context to Claude Haiku and parses scores (0–9) + reasoning
 - [ ] [AC-6.0.5] Batch evaluation groups up to 10 propositions per LLM call to minimize cost
 - [ ] [AC-6.0.6] Single LLM judge prompt instructs the model to score each proposition independently and return structured JSON
@@ -222,7 +229,7 @@ The scorer:
 4. Uses the LLM judge to evaluate whether agents are maintaining distinct voices or converging
 5. Measures agreement patterns: how often agents agree vs. disagree or introduce new topics
 
-**Key metric**: If all agents in a channel start scoring similarly on vocabulary metrics and the LLM judge can't distinguish who wrote what, the convergence score is high (bad).
+**Scoring direction**: Like all dimensions, higher = better (0–9). A high score means agents maintain **distinct voices** (low convergence / high divergence). A low score means agents are sounding alike (high convergence). The dimension is named `convergence` but the score represents voice divergence — see the functional spec for full clarification.
 
 ### Files to create
 

@@ -164,7 +164,7 @@ Golden baselines are the "expected" persona quality scores, committed to the rep
 
 **Storage**: One JSON file per agent in `src/features/evaluation/baselines/`. Committed to git, updated via `--update-baseline` flag.
 
-**Regression detection**: A score is a regression if it drops more than a configurable delta (default 1.0 point) below the baseline. Small fluctuations within the delta are acceptable due to LLM non-determinism.
+**Regression detection / source of truth**: During CI and normal harness runs, regression detection and `baselineDelta` are always computed against the repo-committed JSON golden baseline (the file in `src/features/evaluation/baselines/` for that agent). A score is a regression if it drops more than a configurable delta (default 1.0 point) below the baseline. Small fluctuations within the delta are acceptable due to LLM non-determinism. DB-backed baselines created in S-6.5 (`evaluation_runs.is_baseline`) may be used to seed or update these JSON files via the `--update-baseline` CLI flag, but are not read directly by regression checks.
 
 **Baseline format:**
 ```json
@@ -262,10 +262,10 @@ For PRs that do NOT touch these files, the check is skipped (not blocked).
 
 ### Acceptance Criteria
 - [ ] [AC-8.3.1] GitHub Actions workflow triggers on PRs modifying persona-related files
-- [ ] [AC-8.3.2] Workflow runs `npm run eval:run -- --mock-judge --threshold 5.0` in CI
+- [ ] [AC-8.3.2] Workflow runs `npm run eval:run -- --mock-judge` in CI in baseline-regression mode (the `--threshold` flag is ignored when baselines exist)
 - [ ] [AC-8.3.3] Workflow posts a PR comment with evaluation summary (scores table, regressions, pass/fail)
 - [ ] [AC-8.3.4] PR check fails if any regressions exceed the regression delta
-- [ ] [AC-8.3.5] PR check passes if no regressions detected (even if absolute scores are below threshold, as long as they match baseline)
+- [ ] [AC-8.3.5] PR check passes if no regressions are detected; in CI, pass/fail is determined solely by regression against baselines when they exist (absolute thresholds do not cause CI failures)
 - [ ] [AC-8.3.6] Workflow skips cleanly (pass) for PRs that don't touch persona-related files
 - [ ] [AC-8.3.7] CI reporter formats markdown table with per-agent, per-dimension scores and delta from baseline
 - [ ] [AC-8.3.8] Workflow completes in under 60 seconds (mock-judge mode, no LLM calls)

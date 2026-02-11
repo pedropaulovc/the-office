@@ -57,7 +57,7 @@ After the agent generates a `send_message` tool call but before it is committed 
 - [ ] [AC-7.0.3] Messages scoring below threshold are not committed; feedback returned to the agent for retry
 - [ ] [AC-7.0.4] Maximum 2 correction attempts per message; after 2 failures, message is committed regardless
 - [ ] [AC-7.0.5] Correction feedback includes the reasoning and a prompt to stay in character
-- [ ] [AC-7.0.6] `correction_logs` table records every gate invocation with original text, score, reasoning, and outcome (`corrected` | `passed_after_retry` | `forced_through`)
+- [ ] [AC-7.0.6] `correction_logs` table records every gate invocation with original text, score, reasoning, and outcome (`passed` | `corrected` | `passed_after_retry` | `forced_through` | `timeout_passed` — where `timeout_passed` represents the 5-second fail-open behavior in AC-7.0.8)
 - [ ] [AC-7.0.7] Gate is a no-op when disabled (configurable per agent — see S-7.3)
 - [ ] [AC-7.0.8] LLM judge call has a 5-second timeout; on timeout, the message passes through (fail-open)
 - [ ] [AC-7.0.9] Unit tests: gate pass, gate fail with retry, gate fail with forced-through, timeout behavior

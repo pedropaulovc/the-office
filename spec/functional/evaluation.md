@@ -11,7 +11,7 @@ Persona drift measurement, correction, and regression testing. Scores agent beha
 | **Fluency** | Does the agent avoid repetitive/formulaic language? | Algorithmic n-gram overlap + LLM judge for structural variety |
 | **Convergence** | Do agents maintain distinct voices in group conversations? | Vocabulary stats + LLM judge on anonymized messages |
 
-All dimensions scored 0–9 (0 = worst, 9 = best), matching the TinyTroupe evaluation scale.
+All dimensions scored 0–9 (0 = worst, 9 = best), matching the TinyTroupe evaluation scale. For the **Convergence** dimension specifically, higher scores mean agents **better maintain distinct voices** (i.e., less convergence / more divergence in style). Conceptually this is a "voice divergence" score stored under the `convergence` dimension name — treat it as such in aggregation and regression logic.
 
 ## Data Model
 
@@ -60,12 +60,12 @@ correction_logs
   run_id          uuid FK(runs.id) ON DELETE SET NULL
   original_text   text NOT NULL
   corrected_text  text
-  score           real NOT NULL
+  score           real              -- NULL for timeout_pass_through
   threshold       real NOT NULL
-  reasoning       text NOT NULL
+  reasoning       text              -- NULL for timeout_pass_through
   attempt_number  integer NOT NULL
   outcome         text NOT NULL
-                  -- 'corrected' | 'passed_after_retry' | 'forced_through'
+                  -- 'passed' | 'corrected' | 'passed_after_retry' | 'forced_through' | 'timeout_pass_through'
   token_usage     jsonb
   created_at      timestamptz NOT NULL DEFAULT now()
   INDEX(agent_id, created_at)
