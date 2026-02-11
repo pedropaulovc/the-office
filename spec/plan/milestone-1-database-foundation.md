@@ -14,11 +14,11 @@ As a developer, I want all required packages installed and baseline Playwright s
 Install production and dev dependencies. Capture Playwright visual snapshots of all key pages (channel list, message list, DMs, threads, user switcher) BEFORE any frontend changes. These snapshots become the "before" baseline for S-1.8 validation.
 
 ### Acceptance Criteria
-- [ ] [AC-1.0.1] `npm install` adds: `drizzle-orm`, `@neondatabase/serverless`, `zod`, `dotenv`, `@anthropic-ai/claude-agent-sdk`, `@sentry/nextjs`
-- [ ] [AC-1.0.2] `npm install -D` adds: `drizzle-kit`
-- [ ] [AC-1.0.3] `package.json` scripts include `"db:push": "npx drizzle-kit push"`, `"db:seed": "npx tsx src/db/seed.ts"`, `"db:generate": "npx drizzle-kit generate"`, `"db:migrate": "npx drizzle-kit migrate"`
-- [ ] [AC-1.0.4] `npm run build` passes
-- [ ] [AC-1.0.5] Playwright baseline snapshots captured for: #general channel, #accounting channel (private), DM conversation, thread panel, user switcher. Stored in `e2e/snapshots/baseline/`
+- [x] [AC-1.0.1] `npm install` adds: `drizzle-orm`, `@neondatabase/serverless`, `zod`, `dotenv`, `@anthropic-ai/claude-agent-sdk`, `@sentry/nextjs`
+- [x] [AC-1.0.2] `npm install -D` adds: `drizzle-kit`
+- [x] [AC-1.0.3] `package.json` scripts include `"db:push": "npx drizzle-kit push"`, `"db:seed": "npx tsx src/db/seed.ts"`, `"db:generate": "npx drizzle-kit generate"`, `"db:migrate": "npx drizzle-kit migrate"`
+- [x] [AC-1.0.4] `npm run build` passes
+- [x] [AC-1.0.5] Playwright baseline snapshots captured for: #general channel, #accounting channel (private), DM conversation, thread panel, user switcher. Stored in `e2e/snapshots/baseline/`
 
 ### Demo
 Show `npm run build` passes. Show baseline snapshots exist in `e2e/snapshots/baseline/`.
@@ -37,11 +37,11 @@ As a developer, I want a configured database client and baseline migration so th
 | `src/db/schema/index.ts` | Barrel re-export of all schema files |
 
 ### Acceptance Criteria
-- [ ] [AC-1.1.1] `drizzle.config.ts` exists with correct schema path and dialect
-- [ ] [AC-1.1.2] `src/db/client.ts` exports a `db` instance using `@neondatabase/serverless` + `drizzle-orm/neon-http`
-- [ ] [AC-1.1.3] `src/db/schema/index.ts` re-exports all schema modules
-- [ ] [AC-1.1.4] Baseline migration generated and applied successfully — proves DB connection and migration pipeline work
-- [ ] [AC-1.1.5] A simple test script runs `SELECT 1` via the `db` client and succeeds
+- [x] [AC-1.1.1] `drizzle.config.ts` exists with correct schema path and dialect
+- [x] [AC-1.1.2] `src/db/client.ts` exports a `db` instance using `@neondatabase/serverless` + `drizzle-orm/neon-http`
+- [x] [AC-1.1.3] `src/db/schema/index.ts` re-exports all schema modules
+- [x] [AC-1.1.4] Baseline migration generated and applied successfully — proves DB connection and migration pipeline work
+- [x] [AC-1.1.5] A simple test script runs `SELECT 1` via the `db` client and succeeds
 
 ### Demo
 1. Run `npx drizzle-kit generate` — baseline migration created
@@ -87,16 +87,16 @@ agents
 ```
 
 ### Acceptance Criteria
-- [ ] [AC-1.2.1] `agents` table defined with all columns above
-- [ ] [AC-1.2.2] `id` uses text PK matching existing frontend user IDs
-- [ ] [AC-1.2.3] Types exported via `$inferSelect` / `$inferInsert`
-- [ ] [AC-1.2.4] `system_prompt` is a per-agent customizable field (not hardcoded)
-- [ ] [AC-1.2.5] Migration generated and applied — `agents` table queryable via pg
-- [ ] [AC-1.2.6] Full CRUD: GET list, GET single, POST create, PATCH update, DELETE (soft-delete via `is_active = false`)
-- [ ] [AC-1.2.7] API routes served at `/api/agents` (not `/api/users`) — returns all agent fields including `systemPrompt`, `modelId`, etc.
-- [ ] [AC-1.2.8] Frontend components render agent data from DB via API (sidebar avatars, message author names, user switcher)
-- [ ] [AC-1.2.9] Seed all 16 agents with placeholder system prompts as part of migration validation
-- [ ] [AC-1.2.10] POST returns 409 if agent ID already exists; DELETE sets `is_active = false` (preserves data)
+- [x] [AC-1.2.1] `agents` table defined with all columns above
+- [x] [AC-1.2.2] `id` uses text PK matching existing frontend user IDs
+- [x] [AC-1.2.3] Types exported via `$inferSelect` / `$inferInsert`
+- [x] [AC-1.2.4] `system_prompt` is a per-agent customizable field (not hardcoded)
+- [x] [AC-1.2.5] Migration generated and applied — `agents` table queryable via pg
+- [x] [AC-1.2.6] Full CRUD: GET list, GET single, POST create, PATCH update, DELETE (soft-delete via `is_active = false`)
+- [x] [AC-1.2.7] API routes served at `/api/agents` (not `/api/users`) — returns all agent fields including `systemPrompt`, `modelId`, etc.
+- [x] [AC-1.2.8] Frontend components render agent data from DB via API (sidebar avatars, message author names, user switcher)
+- [x] [AC-1.2.9] Seed all 16 agents with placeholder system prompts as part of migration validation
+- [x] [AC-1.2.10] POST returns 409 if agent ID already exists; DELETE sets `is_active = false` (preserves data)
 
 ### Demo
 1. Run migration — `agents` table created
