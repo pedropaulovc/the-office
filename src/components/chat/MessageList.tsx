@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
-import { getMessagesForChannel } from '@/data/messages';
+import { fetchChannelMessages } from '@/api/client';
 import { formatDateDivider } from '@/utils/format-time';
 import MessageGroup from './MessageGroup';
 import type { Message } from '@/types';
@@ -51,13 +51,39 @@ function groupMessages(msgs: Message[]): { date: string; groups: MessageGroupDat
 export default function MessageList() {
   const { activeView } = useApp();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const channelId = activeView.kind === 'channel' ? activeView.id : activeView.id;
-  const messages = useMemo(() => getMessagesForChannel(channelId), [channelId]);
+  const channelId = activeView.id;
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadMessages = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      const data = await fetchChannelMessages(id);
+      setMessages(data);
+    } catch {
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMessages(channelId);
+  }, [channelId, loadMessages]);
+
   const grouped = useMemo(() => groupMessages(messages), [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [channelId]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        Loading messages...
+      </div>
+    );
+  }
 
   if (messages.length === 0) {
     return (

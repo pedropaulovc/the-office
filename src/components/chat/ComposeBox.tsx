@@ -2,19 +2,18 @@
 
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
-import { getChannel } from '@/data/channels';
-import { directMessages, getDmOtherParticipant } from '@/data/directMessages';
 
 export default function ComposeBox() {
   const { activeView, currentUserId } = useApp();
-  const { getAgent } = useData();
+  const { getChannel, getDmsForUser, getDmOtherParticipant, getAgent } = useData();
 
   let placeholder = 'Message is read-only...';
   if (activeView.kind === 'channel') {
     const ch = getChannel(activeView.id);
     if (ch) placeholder = `Message #${ch.name} (read-only)`;
   } else {
-    const dm = directMessages.find(d => d.id === activeView.id);
+    const dms = getDmsForUser(currentUserId);
+    const dm = dms.find(d => d.id === activeView.id);
     if (dm) {
       const other = getAgent(getDmOtherParticipant(dm, currentUserId));
       placeholder = `Message ${other.displayName} (read-only)`;

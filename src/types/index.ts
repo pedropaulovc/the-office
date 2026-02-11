@@ -1,5 +1,5 @@
 export type Presence = 'active' | 'away' | 'offline';
-export type ChannelKind = 'public' | 'private';
+export type ChannelKind = 'public' | 'private' | 'dm';
 export type ViewKind = 'channel' | 'dm';
 export type ThreadPanelState = 'closed' | 'open';
 
@@ -18,11 +18,6 @@ export interface Channel {
   kind: ChannelKind;
   topic: string;
   memberIds: string[];
-}
-
-export interface DirectMessage {
-  id: string;
-  participantIds: string[];
 }
 
 export interface Reaction {

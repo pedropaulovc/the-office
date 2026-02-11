@@ -2,13 +2,11 @@
 
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
-import { getChannel } from '@/data/channels';
-import { directMessages, getDmOtherParticipant } from '@/data/directMessages';
 import { getInitials } from '@/utils/get-initials';
 
 export default function ChannelHeader() {
   const { activeView, currentUserId } = useApp();
-  const { getAgent } = useData();
+  const { getChannel, getDmsForUser, getDmOtherParticipant, getAgent } = useData();
 
   if (activeView.kind === 'channel') {
     const channel = getChannel(activeView.id);
@@ -54,7 +52,8 @@ export default function ChannelHeader() {
   }
 
   // DM header
-  const dm = directMessages.find(d => d.id === activeView.id);
+  const dms = getDmsForUser(currentUserId);
+  const dm = dms.find(d => d.id === activeView.id);
   if (!dm) return null;
   const otherId = getDmOtherParticipant(dm, currentUserId);
   const other = getAgent(otherId);
