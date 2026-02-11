@@ -54,6 +54,17 @@ Claude Agent SDK (foundation)
 
 No auth. Simple Slack-like UI: channels, DMs, message threads, reactions. Frontend is a separate concern — this plan focuses on the backend service layer.
 
+### API Documentation
+
+The server auto-generates an OpenAPI 3.1 spec from Zod schemas (single source of truth for validation and docs):
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/openapi.json` | OpenAPI 3.1 JSON spec |
+| `GET /api/docs` | Scalar API reference UI |
+
+All REST endpoints are tagged (`agents`, `memory`, `messages`, `channels`, `dms`, `runs`, `scheduler`) and include request/response schemas, error codes, and examples. The spec is derived at runtime from the same Zod schemas used for request validation — no manual synchronization needed.
+
 ### How the Pieces Connect
 
 ```
@@ -275,6 +286,96 @@ Same messaging primitives, human as sender.
 
 ---
 
+---
+
+### 9. REST API Surface
+
+Full CRUD for all entities, served as Next.js API routes. Every route validates input with Zod and returns proper HTTP status codes.
+
+#### Agents
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents` | List all agents |
+| POST | `/api/agents` | Create agent |
+| GET | `/api/agents/:agentId` | Get agent (full config incl. system_prompt) |
+| PUT | `/api/agents/:agentId` | Update agent |
+| DELETE | `/api/agents/:agentId` | Delete agent + cascade |
+
+#### Memory (Core Blocks)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents/:agentId/memory` | List all memory blocks |
+| POST | `/api/agents/:agentId/memory` | Create block |
+| GET | `/api/agents/:agentId/memory/:label` | Get block by label |
+| PUT | `/api/agents/:agentId/memory/:label` | Update block content |
+| DELETE | `/api/agents/:agentId/memory/:label` | Delete block |
+| POST | `/api/agents/:agentId/memory/shared` | Create shared block + attach |
+
+#### Memory (Archival Passages)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents/:agentId/passages` | List passages (paginated) |
+| POST | `/api/agents/:agentId/passages` | Store passage |
+| GET | `/api/agents/:agentId/passages/search?q=...` | Search passages |
+| DELETE | `/api/agents/:agentId/passages/:passageId` | Delete passage |
+
+#### Channels
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/channels` | List channels |
+| POST | `/api/channels` | Create channel |
+| GET | `/api/channels/:channelId` | Get channel |
+| PUT | `/api/channels/:channelId` | Update channel |
+| DELETE | `/api/channels/:channelId` | Delete channel |
+| GET | `/api/channels/:channelId/members` | List members |
+| POST | `/api/channels/:channelId/members` | Add member |
+| DELETE | `/api/channels/:channelId/members` | Remove member |
+| GET | `/api/channels/:channelId/messages` | List messages |
+
+#### Messages
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/messages` | Send message (triggers agent runs) |
+| GET | `/api/messages/:messageId` | Get message |
+| DELETE | `/api/messages/:messageId` | Delete message |
+| GET | `/api/messages/:messageId/replies` | Get thread replies |
+| GET | `/api/messages/:messageId/reactions` | List reactions |
+| POST | `/api/messages/:messageId/reactions` | Add reaction |
+| DELETE | `/api/messages/:messageId/reactions` | Remove reaction |
+
+#### DMs
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/dms` | List DM conversations |
+| POST | `/api/dms` | Create DM conversation |
+| GET | `/api/dms/:dmId/messages` | List DM messages |
+
+#### Runs (Observability)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/runs?agentId=&status=&limit=` | List runs (filterable) |
+| GET | `/api/runs/:runId` | Get run with steps + messages |
+
+#### Scheduler
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/scheduled` | List scheduled messages |
+| POST | `/api/scheduled` | Create scheduled message |
+| DELETE | `/api/scheduled/:id` | Cancel scheduled message |
+
+#### SSE
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/sse` | Real-time event stream |
+
+#### Docs
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/openapi.json` | OpenAPI 3.1 spec |
+| GET | `/api/docs` | Scalar API reference UI |
+
+---
+
 ## What We Do NOT Build
 
 | Letta Feature | Why Skip |
@@ -293,7 +394,7 @@ Same messaging primitives, human as sender.
 
 ---
 
-## Summary: 8 Capability Areas
+## Summary: 9 Capability Areas
 
 | # | Capability | Type | Hackathon Purpose |
 |---|-----------|------|-------------------|
@@ -305,6 +406,7 @@ Same messaging primitives, human as sender.
 | 6 | Group Messaging | Custom service | Conference room meetings, channel broadcasts |
 | 7 | User-to-Agent | Custom service | Human interacts with characters via UI |
 | 8 | Message Scheduling | Custom service | Autonomous character behavior |
+| 9 | REST API + OpenAPI | Next.js API routes | Full CRUD for all entities, auto-generated OpenAPI 3.1 spec + Scalar UI |
 
 **Scenarios** are a usage pattern, not a capability: update a shared memory block + send system messages. Covered by capabilities 2 + 5-7.
 

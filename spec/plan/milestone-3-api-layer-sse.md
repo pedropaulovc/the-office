@@ -5,7 +5,8 @@
 ```mermaid
 graph TD
     S30[S-3.0 SSE + Frontend wiring] --> S31[S-3.1 POST messages + typing indicators]
-    S31 --> S32[S-3.2 Shim cleanup]
+    S31 --> S32[S-3.2 REST CRUD APIs + OpenAPI]
+    S32 --> S33[S-3.3 Shim cleanup]
 ```
 
 ---
@@ -98,7 +99,155 @@ As a developer, I want a POST endpoint that receives a user message, stores it, 
 
 ---
 
-## [S-3.2] Shim Cleanup
+## [S-3.2] REST CRUD APIs + OpenAPI Documentation
+
+As a developer, I want full CRUD endpoints for all core entities and an auto-generated OpenAPI spec so the API is browsable and self-documenting.
+
+### Description
+M1 added read-only GET routes for agents and messages. S-3.1 added POST messages. This story fills in the remaining CRUD operations and adds automatic OpenAPI doc generation. The OpenAPI spec is served at `/api/openapi.json` and a Scalar UI at `/api/docs`.
+
+### Files to create
+| File | Purpose |
+|------|---------|
+| `src/app/api/openapi.json/route.ts` | GET: serves generated OpenAPI 3.1 spec |
+| `src/app/api/docs/route.ts` | GET: serves Scalar API reference UI |
+| `src/api/openapi.ts` | OpenAPI spec builder — assembles route metadata into a spec object |
+| `src/app/api/agents/route.ts` | GET: list agents, POST: create agent |
+| `src/app/api/agents/[agentId]/route.ts` | GET: single agent, PUT: update agent, DELETE: delete agent |
+| `src/app/api/agents/[agentId]/memory/route.ts` | GET: list memory blocks, POST: create block |
+| `src/app/api/agents/[agentId]/memory/[label]/route.ts` | GET: get block by label, PUT: update block, DELETE: delete block |
+| `src/app/api/agents/[agentId]/memory/shared/route.ts` | POST: create shared block + attach |
+| `src/app/api/agents/[agentId]/passages/route.ts` | GET: list passages, POST: store passage |
+| `src/app/api/agents/[agentId]/passages/search/route.ts` | GET: search passages (keyword) |
+| `src/app/api/agents/[agentId]/passages/[passageId]/route.ts` | DELETE: delete passage |
+| `src/app/api/channels/route.ts` | *(extend)* POST: create channel |
+| `src/app/api/channels/[channelId]/route.ts` | GET: single channel, PUT: update channel, DELETE: delete channel |
+| `src/app/api/channels/[channelId]/members/route.ts` | GET: list members, POST: add member, DELETE: remove member |
+| `src/app/api/dms/route.ts` | *(extend)* POST: create DM conversation |
+| `src/app/api/runs/route.ts` | GET: list runs (filterable by agent, status) |
+| `src/app/api/runs/[runId]/route.ts` | GET: run details with steps + messages |
+| `src/app/api/messages/[messageId]/route.ts` | GET: single message, DELETE: delete message |
+| `src/app/api/messages/[messageId]/reactions/route.ts` | GET: list reactions, POST: add reaction, DELETE: remove reaction |
+
+### Files to modify
+| File | Change |
+|------|--------|
+| `src/db/queries/agents.ts` | Add `createAgent()`, `updateAgent()`, `deleteAgent()` |
+| `src/db/queries/messages.ts` | Add `getMessage()`, `deleteMessage()`, `createReaction()`, `deleteReaction()` |
+| `src/db/queries/memory.ts` | Add `createBlock()`, `deleteBlock()`, `deletePassage()`, `listPassages()` |
+| `src/db/queries/runs.ts` | Add `listRuns()` with filters |
+| `src/db/queries/channels.ts` | *(new)* `createChannel()`, `updateChannel()`, `deleteChannel()`, `addMember()`, `removeMember()` |
+
+### OpenAPI Spec
+The spec is assembled from Zod schemas that already validate each route's input/output. Use `zod-openapi` to derive the spec at build time.
+
+```
+GET /api/openapi.json         → OpenAPI 3.1 JSON
+GET /api/docs                 → Scalar API reference UI (HTML)
+```
+
+The spec MUST include:
+- All routes with method, path, summary, request/response schemas
+- Zod-derived JSON Schema for request bodies and response payloads
+- Error responses (400, 404, 500)
+- Tag grouping: `agents`, `memory`, `messages`, `channels`, `dms`, `runs`, `scheduler`
+
+### API Summary
+
+#### Agents
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents` | List all agents |
+| POST | `/api/agents` | Create agent |
+| GET | `/api/agents/[agentId]` | Get agent details (includes system_prompt, model config) |
+| PUT | `/api/agents/[agentId]` | Update agent (system_prompt, model_id, max_turns, etc.) |
+| DELETE | `/api/agents/[agentId]` | Delete agent + cascade |
+
+#### Memory (Core Blocks)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents/[agentId]/memory` | List all memory blocks for agent |
+| POST | `/api/agents/[agentId]/memory` | Create new memory block |
+| GET | `/api/agents/[agentId]/memory/[label]` | Get specific block by label |
+| PUT | `/api/agents/[agentId]/memory/[label]` | Update block content |
+| DELETE | `/api/agents/[agentId]/memory/[label]` | Delete block |
+| POST | `/api/agents/[agentId]/memory/shared` | Create shared block + attach to agent |
+
+#### Memory (Archival Passages)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents/[agentId]/passages` | List passages (paginated) |
+| POST | `/api/agents/[agentId]/passages` | Store new passage |
+| GET | `/api/agents/[agentId]/passages/search?q=...` | Search passages (keyword) |
+| DELETE | `/api/agents/[agentId]/passages/[passageId]` | Delete passage |
+
+#### Channels
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/channels` | List channels *(exists from S-1.4)* |
+| POST | `/api/channels` | Create channel |
+| GET | `/api/channels/[channelId]` | Get channel details |
+| PUT | `/api/channels/[channelId]` | Update channel (name, topic, kind) |
+| DELETE | `/api/channels/[channelId]` | Delete channel + cascade |
+| GET | `/api/channels/[channelId]/members` | List members |
+| POST | `/api/channels/[channelId]/members` | Add member |
+| DELETE | `/api/channels/[channelId]/members` | Remove member (body: `{ userId }`) |
+
+#### Messages
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/messages` | Send message *(exists from S-3.1)* |
+| GET | `/api/messages/[messageId]` | Get single message |
+| DELETE | `/api/messages/[messageId]` | Delete message |
+| GET | `/api/messages/[messageId]/reactions` | List reactions |
+| POST | `/api/messages/[messageId]/reactions` | Add reaction |
+| DELETE | `/api/messages/[messageId]/reactions` | Remove reaction (body: `{ userId, emoji }`) |
+
+#### DMs
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/dms` | List DM conversations *(exists from S-1.4)* |
+| POST | `/api/dms` | Create DM conversation |
+
+#### Runs (Observability)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/runs?agentId=&status=&limit=` | List runs (filterable) |
+| GET | `/api/runs/[runId]` | Get run with steps + messages |
+
+#### Scheduler
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/scheduled` | List scheduled *(exists from S-4.3)* |
+| POST | `/api/scheduled` | Create scheduled *(exists from S-4.3)* |
+| DELETE | `/api/scheduled/[id]` | Cancel scheduled *(exists from S-4.3)* |
+
+### Acceptance Criteria
+- [ ] [AC-3.2.1] OpenAPI 3.1 spec served at `/api/openapi.json` with all routes documented
+- [ ] [AC-3.2.2] Scalar API reference UI served at `/api/docs`
+- [ ] [AC-3.2.3] All request/response schemas derived from Zod (single source of truth)
+- [ ] [AC-3.2.4] Agent CRUD: create, read, update, delete with proper validation
+- [ ] [AC-3.2.5] Memory block CRUD: list, create, get by label, update, delete — scoped to agent
+- [ ] [AC-3.2.6] Archival passage CRUD: list (paginated), store, search, delete — scoped to agent
+- [ ] [AC-3.2.7] Channel CRUD: create, update, delete, member management
+- [ ] [AC-3.2.8] Message read + delete; reaction CRUD
+- [ ] [AC-3.2.9] DM conversation creation
+- [ ] [AC-3.2.10] Runs list (filterable by agentId, status) + detail (with nested steps/messages)
+- [ ] [AC-3.2.11] All endpoints return proper HTTP status codes (200, 201, 204, 400, 404, 500)
+- [ ] [AC-3.2.12] Unit tests for each new query function; integration tests for each endpoint
+- [ ] [AC-3.2.13] Sentry spans for all write operations
+
+### Demo
+1. Open `/api/docs` — browse the full API reference
+2. Create an agent via POST, update its system_prompt via PUT, query it back via GET
+3. Create a memory block, update it, list blocks, delete it
+4. Store an archival passage, search for it, delete it
+5. Create a channel, add a member, post a message, add a reaction
+6. List runs for an agent, drill into a specific run to see steps + messages
+
+---
+
+## [S-3.3] Shim Cleanup
 
 As a developer, I want all temporary shims from earlier stories removed.
 
@@ -109,6 +258,6 @@ Review and clean up any temporary code added in M1-M3 to make stories demoable. 
 - Remove any `TODO: cleanup` markers
 
 ### Acceptance Criteria
-- [ ] [AC-3.2.1] No temporary shim code remains
-- [ ] [AC-3.2.2] `npm run build` and `npm run lint` pass
-- [ ] [AC-3.2.3] All existing tests still pass
+- [ ] [AC-3.3.1] No temporary shim code remains
+- [ ] [AC-3.3.2] `npm run build` and `npm run lint` pass
+- [ ] [AC-3.3.3] All existing tests still pass
