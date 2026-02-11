@@ -10,6 +10,8 @@ import {
   type NewChannelMember,
   type DbMessage,
   type NewDbMessage,
+  type DbReaction,
+  type NewDbReaction,
 } from "@/db/schema";
 import type { Message, Reaction, ThreadReply } from "@/types";
 import { withSpan } from "@/lib/telemetry";
@@ -273,6 +275,14 @@ export async function getRecentMessages(channelId: string, limit = 20): Promise<
     .orderBy(desc(messages.createdAt))
     .limit(limit);
   return rows.reverse();
+}
+
+// --- Reactions ---
+
+export async function createReaction(data: NewDbReaction): Promise<DbReaction> {
+  const [row] = await db.insert(reactions).values(data).returning();
+  if (!row) throw new Error("Insert returned no rows");
+  return row;
 }
 
 // --- Helpers ---

@@ -31,8 +31,6 @@ vi.mock("@/agents/prompt-builder", () => ({
   buildSystemPrompt: (...args: unknown[]) => mockBuildSystemPrompt(args[0]) as string,
 }));
 
-const mockCreateSdkMcpServer = vi.fn().mockReturnValue({ type: "sdk", name: "office-tools" });
-
 // SDK message generator that tests control via `sdkMessages`
 let sdkMessages: SDKMessage[] = [];
 
@@ -68,7 +66,12 @@ const mockQuery = vi.fn().mockImplementation(() => createMockQuery());
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: (...args: unknown[]) => mockQuery(args[0]) as ReturnType<typeof createMockQuery>,
-  createSdkMcpServer: (...args: unknown[]) => mockCreateSdkMcpServer(args[0]) as Record<string, unknown>,
+}));
+
+const mockGetToolServer = vi.fn().mockReturnValue({ type: "sdk", name: "office-tools" });
+
+vi.mock("@/tools/registry", () => ({
+  getToolServer: (...args: unknown[]) => mockGetToolServer(...args) as Record<string, unknown>,
 }));
 
 const mockBroadcast = vi.fn();
@@ -265,7 +268,7 @@ describe("orchestrator", () => {
 
     // Re-set mock implementations after clearAllMocks
     mockQuery.mockImplementation(() => createMockQuery());
-    mockCreateSdkMcpServer.mockReturnValue({ type: "sdk", name: "office-tools" });
+    mockGetToolServer.mockReturnValue({ type: "sdk", name: "office-tools" });
     mockBuildSdkEnv.mockReturnValue({ NODE_ENV: "test" });
     mockCreateSdkStderrHandler.mockReturnValue(noop);
     mockBuildSystemPrompt.mockReturnValue("test system prompt");
@@ -314,16 +317,13 @@ describe("orchestrator", () => {
     expect(result.status).toBe("completed");
   });
 
-  it("creates stub MCP server with empty tools", async () => {
+  it("creates MCP server with tools from registry", async () => {
     sdkMessages = [makeInitMessage(), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockCreateSdkMcpServer).toHaveBeenCalledWith({
-      name: "office-tools",
-      tools: [],
-    });
+    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general");
   });
 
   it("passes resume: sessionId when agent has existing session", async () => {

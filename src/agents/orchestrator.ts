@@ -1,7 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import {
   query,
-  createSdkMcpServer,
   type SDKMessage,
   type SDKResultMessage,
   type SDKAssistantMessage,
@@ -18,6 +17,7 @@ import {
 import type { Run, RunStep } from "@/db/schema";
 import { buildSystemPrompt } from "@/agents/prompt-builder";
 import { buildSdkEnv, createSdkStderrHandler } from "@/agents/sdk-env";
+import { getToolServer } from "@/tools/registry";
 import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
 import {
@@ -64,8 +64,8 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       recentMessages,
     });
 
-    // 5. Create stub MCP server
-    const mcpServer = createSdkMcpServer({ name: "office-tools", tools: [] });
+    // 5. Create MCP server with tools
+    const mcpServer = getToolServer(run.agentId, run.id, run.channelId);
 
     // 6. Broadcast agent_typing
     if (run.channelId) {
