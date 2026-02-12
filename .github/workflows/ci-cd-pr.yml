@@ -17,6 +17,7 @@ on:
 
 env:
   PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+  NEON_PROJECT_ID: falling-shape-29696747
 
 concurrency:
   group: pr-${{ github.event.pull_request.number || inputs.pr_number }}
@@ -197,6 +198,47 @@ jobs:
       - name: Install Playwright browsers
         timeout-minutes: 1
         run: npx playwright install --with-deps chromium
+
+      - name: Reseed Neon preview database
+        timeout-minutes: 1
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # Resolve branch name (pull_request event vs workflow_dispatch)
+          BRANCH="$PR_BRANCH"
+          if [ -z "$BRANCH" ]; then
+            BRANCH=$(gh api repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }} --jq '.head.ref')
+          fi
+
+          # Find the Neon preview branch
+          NEON_BRANCH="preview/${BRANCH}"
+          BRANCH_ID=$(curl -sf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches" \
+            | jq -r ".branches[] | select(.name == \"$NEON_BRANCH\") | .id")
+
+          if [ -z "$BRANCH_ID" ]; then
+            echo "::warning::No Neon branch found for $NEON_BRANCH — skipping seed"
+            exit 0
+          fi
+          echo "Found Neon branch: $NEON_BRANCH (ID: $BRANCH_ID)"
+
+          # Get the unpooled connection URI
+          CONNECTION_URI=$(curl -sf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$BRANCH_ID&database_name=neondb&role_name=neondb_owner&pooled=false" \
+            | jq -r '.uri')
+
+          if [ -z "$CONNECTION_URI" ] || [ "$CONNECTION_URI" = "null" ]; then
+            echo "::warning::Could not get connection URI — skipping seed"
+            exit 0
+          fi
+
+          # Reseed to reset messages/reactions/reads to clean state
+          export DATABASE_URL_UNPOOLED="$CONNECTION_URI"
+          npm run db:seed
 
       - name: Warm up Vercel preview
         timeout-minutes: 1
