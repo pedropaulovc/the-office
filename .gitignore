@@ -41,6 +41,9 @@ yarn-error.log*
 # playwright-cli
 .playwright-cli/
 
+# dev server logs
+/logs
+
 # sentry trace logs
 .sentry-logs/
 

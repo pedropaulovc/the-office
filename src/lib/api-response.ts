@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/telemetry";
 
 /**
  * Drop-in replacement for NextResponse.json() that attaches the active
@@ -26,4 +27,42 @@ export function emptyResponse(init?: ResponseInit): NextResponse {
     response.headers.set("x-sentry-trace-id", traceId);
   }
   return response;
+}
+
+/**
+ * Parses request JSON safely. Returns the parsed body or a 400 Response on failure.
+ */
+export async function parseRequestJson(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logError("invalid request JSON", { error: message });
+    Sentry.captureException(err);
+    return jsonResponse({ error: "Invalid JSON", detail: message }, { status: 400 });
+  }
+}
+
+/**
+ * Wraps an API route handler with top-level error catching.
+ * On unhandled errors: logs to Sentry + console, returns 500 with error detail.
+ */
+export function apiHandler(
+  name: string,
+  op: string,
+  handler: () => Promise<NextResponse>,
+): Promise<NextResponse> {
+  return Sentry.startSpan({ name, op }, async () => {
+    try {
+      return await handler();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logError(`${name} unhandled error`, { error: message });
+      Sentry.captureException(err);
+      return jsonResponse(
+        { error: "Internal server error", detail: message },
+        { status: 500 },
+      );
+    }
+  });
 }

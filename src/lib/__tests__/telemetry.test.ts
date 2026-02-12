@@ -64,17 +64,23 @@ describe("telemetry helpers", () => {
   });
 
   it("logWarn calls Sentry.logger.warn", async () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(vi.fn());
     const { logWarn } = await import("../telemetry");
     logWarn("warning message");
 
     expect(mockLoggerWarn).toHaveBeenCalledWith("warning message", undefined);
+    expect(spy).toHaveBeenCalledWith("[warn] warning message", "");
+    spy.mockRestore();
   });
 
   it("logError calls Sentry.logger.error", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(vi.fn());
     const { logError } = await import("../telemetry");
     logError("error message", { code: 500 });
 
     expect(mockLoggerError).toHaveBeenCalledWith("error message", { code: 500 });
+    expect(spy).toHaveBeenCalledWith("[error] error message", { code: 500 });
+    spy.mockRestore();
   });
 
   it("countMetric calls Sentry.metrics.count", async () => {

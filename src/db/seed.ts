@@ -302,14 +302,23 @@ const unreadTargets: Record<string, Record<string, number>> = {
 
 async function seed() {
   const { db } = await import("./client");
-  const { agents, channels, channelMembers, messages, reactions, memoryBlocks, channelReads } = await import("./schema");
+  const { agents, channels, channelMembers, messages, reactions, memoryBlocks, channelReads, runs, runSteps, runMessages } = await import("./schema");
   const { sql } = await import("drizzle-orm");
 
   const allChannelDefs = [...channelDefs, ...dmDefs];
 
   // 1. Agents
   console.log("Seeding agents...");
-  await db.insert(agents).values(agentRows).onConflictDoNothing({ target: agents.id });
+  await db.insert(agents).values(agentRows).onConflictDoUpdate({
+    target: agents.id,
+    set: {
+      displayName: sql`excluded.display_name`,
+      title: sql`excluded.title`,
+      avatarColor: sql`excluded.avatar_color`,
+      systemPrompt: sql`excluded.system_prompt`,
+      maxTurns: sql`excluded.max_turns`,
+    },
+  });
   console.log(`  ${agentRows.length} agents`);
 
   // 2. Channels (public + private + DMs)
@@ -327,7 +336,13 @@ async function seed() {
   await db.insert(channelMembers).values(memberRows);
   console.log(`  ${memberRows.length} channel memberships`);
 
-  // 4. Messages — truncate reactions first (FK), then messages, then re-insert
+  // 4. Runs — clear all agent run history (FK: runMessages → runSteps → runs → messages)
+  console.log("Clearing runs...");
+  await db.delete(runMessages);
+  await db.delete(runSteps);
+  await db.delete(runs);
+
+  // 5. Messages — truncate reactions first (FK), then messages, then re-insert
   console.log("Seeding messages...");
   await db.delete(reactions);
   await db.delete(messages);

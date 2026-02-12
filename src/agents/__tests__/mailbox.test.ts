@@ -14,11 +14,16 @@ vi.mock("@/db/queries", () => ({
   listRuns: (...args: unknown[]) => mockListRuns(...args as [unknown]),
 }));
 
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
+
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_name: string, _op: string, fn: () => unknown) => fn(),
   logInfo: vi.fn(),
   logError: vi.fn(),
   countMetric: vi.fn(),
+  distributionMetric: vi.fn(),
 }));
 
 describe("mailbox", () => {
@@ -176,6 +181,63 @@ describe("mailbox", () => {
       status: "completed",
       stopReason: "end_turn",
       tokenUsage: undefined,
+    });
+  });
+
+  it("processNextRun uses stubExecutor when no executor provided", async () => {
+    const run = createMockRun({ status: "running" });
+    mockClaimNextRun
+      .mockResolvedValueOnce(run)
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "completed" }),
+    );
+
+    const { processNextRun } = await import("../mailbox");
+    await processNextRun("michael");
+
+    expect(mockUpdateRunStatus).toHaveBeenCalledWith(run.id, {
+      status: "completed",
+      stopReason: "end_turn",
+      tokenUsage: undefined,
+    });
+  });
+
+  it("processNextRun returns null when claimNextRun throws", async () => {
+    mockClaimNextRun.mockRejectedValue(new Error("db connection lost"));
+
+    const { processNextRun } = await import("../mailbox");
+    const result = await processNextRun("michael");
+
+    expect(result).toBeNull();
+  });
+
+  it("processNextRun handles non-Error thrown by claimNextRun", async () => {
+    mockClaimNextRun.mockRejectedValue("string rejection");
+
+    const { processNextRun } = await import("../mailbox");
+    const result = await processNextRun("michael");
+
+    expect(result).toBeNull();
+  });
+
+  it("processNextRun handles non-Error thrown by executor", async () => {
+    const run = createMockRun({ status: "running" });
+    mockClaimNextRun
+      .mockResolvedValueOnce(run)
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "failed" }),
+    );
+
+    const executor = vi.fn().mockRejectedValue("string error");
+
+    const { processNextRun } = await import("../mailbox");
+    await processNextRun("michael", executor);
+
+    expect(mockUpdateRunStatus).toHaveBeenCalledWith(run.id, {
+      status: "failed",
+      stopReason: "error",
     });
   });
 

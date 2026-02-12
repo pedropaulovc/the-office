@@ -1,15 +1,16 @@
+import { NextResponse } from "next/server";
 import { getMessage, updateMessage, deleteMessage } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { UpdateMessageSchema } from "@/messages/schemas";
-import { jsonResponse } from "@/lib/api-response";
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
+import { logInfo, countMetric } from "@/lib/telemetry";
 
 interface RouteContext {
   params: Promise<{ messageId: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  return withSpan("api.messages.get", "http.server", async () => {
+  return apiHandler("api.messages.get", "http.server", async () => {
     const { messageId } = await context.params;
     const message = await getMessage(messageId);
 
@@ -22,10 +23,12 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  return withSpan("api.messages.update", "http.server", async () => {
+  return apiHandler("api.messages.update", "http.server", async () => {
     const { messageId } = await context.params;
 
-    const body: unknown = await request.json();
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
+
     const parsed = UpdateMessageSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -55,7 +58,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  return withSpan("api.messages.delete", "http.server", async () => {
+  return apiHandler("api.messages.delete", "http.server", async () => {
     const { messageId } = await context.params;
 
     // Fetch message first to get channelId and parentMessageId for SSE

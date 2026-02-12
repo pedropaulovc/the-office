@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
+import { NextResponse } from "next/server";
 import { listAgents, createAgent, getAgent } from "@/db/queries";
-import { jsonResponse } from "@/lib/api-response";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 
 const CreateAgentSchema = z.object({
   id: z.string().min(1),
@@ -15,29 +16,35 @@ const CreateAgentSchema = z.object({
 });
 
 export async function GET() {
-  const agents = await listAgents();
-  return jsonResponse(agents);
+  return apiHandler("api.agents.list", "http.server", async () => {
+    const agents = await listAgents();
+    return jsonResponse(agents);
+  });
 }
 
 export async function POST(request: Request) {
-  const body: unknown = await request.json();
-  const parsed = CreateAgentSchema.safeParse(body);
+  return apiHandler("api.agents.create", "http.server", async () => {
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
 
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+    const parsed = CreateAgentSchema.safeParse(body);
 
-  const existing = await getAgent(parsed.data.id);
-  if (existing) {
-    return jsonResponse(
-      { error: `Agent with id '${parsed.data.id}' already exists` },
-      { status: 409 },
-    );
-  }
+    if (!parsed.success) {
+      return jsonResponse(
+        { error: "Validation failed", issues: parsed.error.issues },
+        { status: 400 },
+      );
+    }
 
-  const agent = await createAgent(parsed.data);
-  return jsonResponse(agent, { status: 201 });
+    const existing = await getAgent(parsed.data.id);
+    if (existing) {
+      return jsonResponse(
+        { error: `Agent with id '${parsed.data.id}' already exists` },
+        { status: 409 },
+      );
+    }
+
+    const agent = await createAgent(parsed.data);
+    return jsonResponse(agent, { status: 201 });
+  });
 }

@@ -17,6 +17,14 @@ vi.mock("@/agents/orchestrator", () => ({
   executeRun: vi.fn(),
 }));
 
+vi.mock("@/lib/telemetry", () => ({
+  logInfo: vi.fn(),
+  logWarn: vi.fn(),
+  logError: vi.fn(),
+  countMetric: vi.fn(),
+  withSpan: vi.fn((_n: string, _o: string, fn: () => unknown) => fn()),
+}));
+
 const MOCK_AGENT = createMockAgent({ id: "michael" });
 const MOCK_RUN = createMockRun({ agentId: "michael", channelId: "general" });
 

@@ -298,12 +298,12 @@ All API routes MUST use `jsonResponse()` / `emptyResponse()` from `src/lib/api-r
 
 ### Debugging with Sentry Traces
 
-The `x-sentry-trace-id` header is the primary debugging tool for correlating API behavior with traces:
+**START HERE: `logs/run-dev-*.log`** — `npm run dev` automatically tees all server output to a timestamped log file in `logs/` (gitignored). This log contains **every Sentry trace ID** for every API request, formatted as `[sentry] http.server | POST /api/messages | 250ms | trace=<TRACE_ID>`. This is the single source of truth for debugging — grep the log for the trace ID you need, then use the tools below to dig deeper.
 
-- **E2E test failures**: When an E2E test fails, check the API responses in the Playwright trace's network tab. The `x-sentry-trace-id` header on each response links directly to the Sentry trace containing all spans, logs, and errors for that request. Use the Sentry `npx sentry-cli` tool to query up the trace by ID.
-- **Console output**: Sentry logs also appear in the server console. When debugging locally, scan the dev server terminal output for structured log lines that include trace context.
-- **Sentry MCP**: If a Sentry MCP server is configured, use it to query traces, look up errors, and inspect spans directly from Claude Code. This is the fastest path to understanding what happened in a failed request.
-- **`scripts/sentry-trace.sh`**: CLI script that fetches all spans and structured logs for a trace ID. Output is written to `.sentry-logs/<trace-id>.txt` (gitignored). Use `--full` to disable log truncation (default: 1024 chars). Usage: `bash scripts/sentry-trace.sh <trace-id> [--spans-only|--logs-only] [--full]`.
+- **Dev server log**: The `logs/run-dev-*.log` file captures all stdout/stderr from the dev server. Every API request logs its Sentry trace ID here. Use `grep trace= logs/run-dev-*.log` to find trace IDs for specific requests. This is the **fastest and most reliable** way to get trace IDs — no need to capture HTTP response headers or check the Sentry UI.
+- **E2E test failures**: Check the API responses in the Playwright trace's network tab. The `x-sentry-trace-id` response header links to the Sentry trace. Or grep the dev server log for the request timestamp.
+- **Sentry MCP**: If a Sentry MCP server is configured, use it to query traces, look up errors, and inspect spans directly from Claude Code.
+- **`scripts/sentry-trace.sh`**: CLI script that fetches all spans and structured logs for a trace ID from Sentry. Output is written to `.sentry-logs/<trace-id>.txt` (gitignored). Use `--full` to disable log truncation (default: 1024 chars). Usage: `bash scripts/sentry-trace.sh <trace-id> [--spans-only|--logs-only] [--full]`.
 
 ## Acknowledgements
 
