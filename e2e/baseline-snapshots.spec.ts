@@ -70,7 +70,7 @@ test.describe("baseline snapshots", () => {
         - button "DS Dwight Schrute"
         - button "JH Jim Halpert"
         - button "RH Ryan Howard"
-        - button "TF Toby Flenderson 1"
+        - button "TF Toby Flenderson 4"
         - text: MS Michael Scott Regional Manager
     `);
 
@@ -346,7 +346,7 @@ test.describe("baseline snapshots", () => {
         - img
         - text: Direct Messages
         - button "AB Andy Bernard 1"
-        - button "DS Dwight Schrute 2"
+        - button "DS Dwight Schrute 5"
         - button "PB Pam Beesly"
         - button "MS Michael Scott"
         - text: JH Jim Halpert Sales Representative
