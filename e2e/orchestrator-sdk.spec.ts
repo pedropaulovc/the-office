@@ -186,6 +186,18 @@ async function ensureCompletedRun(
   timeoutMs: number,
 ): Promise<RunWithStepsResponse> {
   if (run.status === "completed") return run;
+
+  // Log diagnostic info from the failed run
+  const failedMessages = flattenRunMessages(run);
+  const errorMessages = failedMessages.filter((m) =>
+    m.content.startsWith("[error]"),
+  );
+  if (errorMessages.length > 0) {
+    console.log(
+      `Benchmark run failed. Error messages: ${errorMessages.map((m) => m.content).join("; ")}`,
+    );
+  }
+
   await resetAgentSession(request, "michael");
   await seedMessage(request, channelId, "jim", "Michael, share your thoughts!");
   const { runId } = await invokeAgent(request, "michael", channelId);
@@ -348,7 +360,14 @@ test.describe("orchestrator SDK", () => {
     );
     benchmarkRun = run;
 
-    expect(run.status, `Run ${run.id} status=${run.status} stopReason=${run.stopReason} steps=${run.steps.length}`).toBe("completed");
+    const errorMsgs = flattenRunMessages(run)
+      .filter((m) => m.content.startsWith("[error]"))
+      .map((m) => m.content)
+      .join("; ");
+    expect(
+      run.status,
+      `Run ${run.id} status=${run.status} stopReason=${run.stopReason} steps=${run.steps.length} errors=[${errorMsgs}]`,
+    ).toBe("completed");
     expect(run.stopReason).toBe("end_turn");
 
     // Token usage

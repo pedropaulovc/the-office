@@ -348,6 +348,15 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       error: message,
     });
     Sentry.captureException(err);
+
+    // Store error in a run message so it's visible via the API for debugging
+    await createRunMessage({
+      runId: run.id,
+      stepId: null,
+      messageType: "system_message",
+      content: `[error] ${message}`,
+    }).catch(() => {});
+
     return { status: "failed", stopReason: "error" };
   }
 }
