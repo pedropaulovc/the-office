@@ -300,7 +300,7 @@ All API routes MUST use `jsonResponse()` / `emptyResponse()` from `src/lib/api-r
 
 The `x-sentry-trace-id` header is the primary debugging tool for correlating API behavior with traces:
 
-- **E2E test failures**: When an E2E test fails, check the API responses in the Playwright trace's network tab. The `x-sentry-trace-id` header on each response links directly to the Sentry trace containing all spans, logs, and errors for that request. Use the Sentry MCP tool (if available) or go to Sentry UI to look up the trace by ID.
+- **E2E test failures**: When an E2E test fails, check the API responses in the Playwright trace's network tab. The `x-sentry-trace-id` header on each response links directly to the Sentry trace containing all spans, logs, and errors for that request. Use the Sentry `npx sentry-cli` tool to query up the trace by ID.
 - **Console output**: Sentry logs also appear in the server console. When debugging locally, scan the dev server terminal output for structured log lines that include trace context.
 - **Sentry MCP**: If a Sentry MCP server is configured, use it to query traces, look up errors, and inspect spans directly from Claude Code. This is the fastest path to understanding what happened in a failed request.
 
