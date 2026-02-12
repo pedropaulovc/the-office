@@ -15,7 +15,7 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 - `npm run db:generate` — generate migration files
 - `npm run db:migrate` — run migrations (production)
 
-**Environment setup:** The `.env.local` file (with `DATABASE_URL_UNPOOLED` and other secrets) is NOT checked into git. It is auto-created by `npm run dev`, which pulls env vars from Vercel. If `db:push`, `db:seed`, or other DB commands fail with an empty URL, run `npm run dev` first to generate `.env.local`.
+**Environment setup:** The `.env.local` file (with `DATABASE_URL_UNPOOLED` and other secrets) is NOT checked into git. `npm run dev` automatically pulls env vars from Vercel and writes `.env.local` before starting the dev server — you do NOT need to create or manage this file manually. If `db:push`, `db:seed`, or other DB commands fail with an empty URL, run `npm run dev` first so it generates `.env.local`.
 
 **Troubleshooting:** If any `npm run` command fails, the very first thing to try is `npm install`.
 
@@ -272,17 +272,32 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 
 ## Telemetry
 
-Telemetry is VITAL. All agent invocations, tool calls, and API requests must emit Sentry telemetry from M2 onward:
+Telemetry is VITAL. **Be liberal — when in doubt, add a span, log, or metric.** The cost of too much telemetry is trivial; the cost of too little is hours of blind debugging.
 
-- **Traces**: Every agent invocation, tool execution, and API route must be wrapped in a Sentry span.
-- **Logs**: Structured logs for agent decisions, tool outcomes, and errors via `Sentry.logger.*`.
-- **Metrics**: Counters for invocations, tool usage, and errors via `Sentry.metrics.*`.
+### What to Instrument
 
-Use the helpers in `src/lib/telemetry.ts`:
+- **Traces**: Every agent invocation, tool execution, API route, and significant async operation must be wrapped in a Sentry span. Nest child spans for sub-operations (e.g., a DB query inside an API handler).
+- **Logs**: Structured logs for agent decisions, tool outcomes, state transitions, and errors via `Sentry.logger.*`. Include relevant IDs (agentId, channelId, messageId, runId) as attributes so logs are filterable.
+- **Metrics**: Counters for invocations, tool usage, and errors. Distributions for latencies. Don't be stingy — if something is countable or measurable, emit a metric.
+
+### Helpers (`src/lib/telemetry.ts`)
+
 - `withSpan(name, op, fn)` — wrap any function in a traced span
 - `logInfo/logWarn/logError(message, attributes)` — structured logs
 - `countMetric(name, value, attributes)` — counter metrics
 - `distributionMetric(name, value, unit, attributes)` — distribution metrics
+
+### Traced API Responses (`src/lib/api-response.ts`)
+
+All API routes MUST use `jsonResponse()` / `emptyResponse()` from `src/lib/api-response.ts` instead of raw `NextResponse.json()`. These helpers automatically attach the active Sentry trace ID as an `x-sentry-trace-id` response header, linking every HTTP response to its full trace in Sentry.
+
+### Debugging with Sentry Traces
+
+The `x-sentry-trace-id` header is the primary debugging tool for correlating API behavior with traces:
+
+- **E2E test failures**: When an E2E test fails, check the API responses in the Playwright trace's network tab. The `x-sentry-trace-id` header on each response links directly to the Sentry trace containing all spans, logs, and errors for that request. Use the Sentry MCP tool (if available) or go to Sentry UI to look up the trace by ID.
+- **Console output**: Sentry logs also appear in the server console. When debugging locally, scan the dev server terminal output for structured log lines that include trace context.
+- **Sentry MCP**: If a Sentry MCP server is configured, use it to query traces, look up errors, and inspect spans directly from Claude Code. This is the fastest path to understanding what happened in a failed request.
 
 ## Acknowledgements
 
