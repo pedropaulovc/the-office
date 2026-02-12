@@ -292,10 +292,11 @@ export function DataProvider({
   }, []);
 
   const appendMessage = useCallback((channelId: string, message: Message) => {
-    setMessages(prev => ({
-      ...prev,
-      [channelId]: [...(prev[channelId] ?? []), message],
-    }));
+    setMessages(prev => {
+      const existing = prev[channelId] ?? [];
+      if (existing.some(m => m.id === message.id)) return prev;
+      return { ...prev, [channelId]: [...existing, message] };
+    });
   }, []);
 
   useSSE(handleSSEEvent);

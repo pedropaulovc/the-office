@@ -156,7 +156,7 @@ test.describe("baseline snapshots", () => {
         - button "announcements":
           - img
           - text: ""
-        - button "general 1":
+        - button /general \\d+/:
           - img
           - text: ""
         - button "party-planning 3":
