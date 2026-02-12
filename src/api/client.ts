@@ -1,4 +1,4 @@
-import type { Agent } from "@/db/schema";
+import type { Agent, DbMessage } from "@/db/schema";
 import type { ChannelView } from "@/db/queries/messages";
 import type { Message, ThreadReply } from "@/types";
 
@@ -57,7 +57,7 @@ export async function postMessage(params: {
   parentMessageId?: string;
   userId: string;
   text: string;
-}): Promise<Message> {
+}): Promise<DbMessage> {
   const response = await fetch("/api/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -68,7 +68,7 @@ export async function postMessage(params: {
     throw new Error(`Failed to post message: ${response.status}`);
   }
 
-  return response.json() as Promise<Message>;
+  return response.json() as Promise<DbMessage>;
 }
 
 export async function fetchDms(userId: string): Promise<ChannelView[]> {

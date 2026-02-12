@@ -4,12 +4,13 @@ import { useState, useCallback, type KeyboardEvent, type ChangeEvent } from 'rea
 import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
 import { postMessage } from '@/api/client';
+import type { Message } from '@/types';
 
 type SubmitState = 'idle' | 'sending';
 
 export default function ComposeBox() {
   const { activeView, currentUserId } = useApp();
-  const { getChannel, getDmsForUser, getDmOtherParticipant, getAgent } = useData();
+  const { getChannel, getDmsForUser, getDmOtherParticipant, getAgent, appendMessage } = useData();
 
   const [text, setText] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
@@ -35,18 +36,33 @@ export default function ComposeBox() {
 
     setSubmitState('sending');
     try {
-      await postMessage({
+      const created = await postMessage({
         channelId: activeView.id,
         userId: currentUserId,
         text: trimmed,
       });
       setText('');
+
+      // Optimistic update — add message to local state immediately so it
+      // appears without waiting for the SSE round-trip (which is unreliable
+      // on Vercel serverless where function instances don't share memory).
+      const msg: Message = {
+        id: created.id,
+        channelId: created.channelId,
+        userId: created.userId,
+        text: created.text,
+        // createdAt arrives as ISO string from JSON (typed as Date in DbMessage)
+        timestamp: (created.createdAt as unknown as string),
+        reactions: [],
+        threadReplyCount: 0,
+      };
+      appendMessage(activeView.id, msg);
     } catch {
       // Keep text on failure so user can retry
     } finally {
       setSubmitState('idle');
     }
-  }, [text, submitState, activeView.id, currentUserId]);
+  }, [text, submitState, activeView.id, currentUserId, appendMessage]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== 'Enter') return;

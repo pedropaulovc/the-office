@@ -140,7 +140,7 @@ export function DataProvider({
           return;
         }
 
-        // Top-level message — append to channel
+        // Top-level message — append to channel (skip if already added optimistically)
         const newMessage: Message = {
           id: dbMsg.id as string,
           channelId,
@@ -151,10 +151,11 @@ export function DataProvider({
           threadReplyCount: 0,
         };
 
-        setMessages(prev => ({
-          ...prev,
-          [channelId]: [...(prev[channelId] ?? []), newMessage],
-        }));
+        setMessages(prev => {
+          const existing = prev[channelId] ?? [];
+          if (existing.some(m => m.id === newMessage.id)) return prev;
+          return { ...prev, [channelId]: [...existing, newMessage] };
+        });
         break;
       }
 
@@ -290,6 +291,13 @@ export function DataProvider({
     }
   }, []);
 
+  const appendMessage = useCallback((channelId: string, message: Message) => {
+    setMessages(prev => ({
+      ...prev,
+      [channelId]: [...(prev[channelId] ?? []), message],
+    }));
+  }, []);
+
   useSSE(handleSSEEvent);
 
   const value = useMemo(
@@ -304,9 +312,10 @@ export function DataProvider({
       messages,
       messagesLoading,
       loadMessages,
+      appendMessage,
       typingAgents,
     }),
-    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount, messages, messagesLoading, loadMessages, typingAgents],
+    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount, messages, messagesLoading, loadMessages, appendMessage, typingAgents],
   );
 
   return (

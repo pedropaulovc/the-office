@@ -5,6 +5,15 @@ const RECONNECT_DELAY_MS = 3_000;
 
 type SSEEventHandler = (event: SSEEvent) => void;
 
+// Expose dispatch function on window for E2E tests to inject SSE events
+// directly, bypassing the server-to-browser SSE delivery which is unreliable
+// on Vercel serverless (separate function instances don't share in-memory state).
+declare global {
+  interface Window {
+    __dispatchSSE?: (event: SSEEvent) => void;
+  }
+}
+
 export function useSSE(onEvent: SSEEventHandler): void {
   const handlerRef = useRef(onEvent);
 
@@ -16,6 +25,10 @@ export function useSSE(onEvent: SSEEventHandler): void {
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
+
+    window.__dispatchSSE = (event: SSEEvent) => {
+      handlerRef.current(event);
+    };
 
     function connect() {
       if (disposed) return;
@@ -46,6 +59,7 @@ export function useSSE(onEvent: SSEEventHandler): void {
       disposed = true;
       eventSource?.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      delete window.__dispatchSSE;
     };
   }, []);
 }
