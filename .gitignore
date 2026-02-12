@@ -44,6 +44,9 @@ yarn-error.log*
 # sentry trace logs
 .sentry-logs/
 
+# playwright trace exports
+/trace-export
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
