@@ -2,6 +2,8 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { users, SWITCHABLE_USER_IDS } from "../data/users";
+import { systemPrompts } from "../data/system-prompts";
+import { memoryBlockData } from "../data/memory-blocks";
 import type { NewAgent } from "./schema";
 
 // --- Timestamp helper (relative to "today", matching original mock data) ---
@@ -18,12 +20,14 @@ function t(daysAgo: number, hour: number, min: number): Date {
 const agentRows: NewAgent[] = SWITCHABLE_USER_IDS.map((id) => {
   const user = users[id];
   if (!user) throw new Error(`Unknown user: ${id}`);
+  const prompt = systemPrompts[id];
+  if (!prompt) throw new Error(`Missing system prompt for: ${id}`);
   return {
     id: user.id,
     displayName: user.displayName,
     title: user.title,
     avatarColor: user.avatarColor,
-    systemPrompt: `You are ${user.displayName}, ${user.title} at Dunder Mifflin. Stay in character.`,
+    systemPrompt: prompt,
   };
 });
 
@@ -263,12 +267,12 @@ const threadReplyDefs: ThreadReplyDef[] = [
 interface MemoryBlockDef { agentId: string; label: string; content: string }
 
 const memoryBlockDefs: MemoryBlockDef[] = SWITCHABLE_USER_IDS.flatMap((id) => {
-  const user = users[id];
-  if (!user) return [];
+  const blocks = memoryBlockData[id];
+  if (!blocks) throw new Error(`Missing memory blocks for: ${id}`);
   return [
-    { agentId: id, label: "personality", content: `Core personality traits for ${user.displayName}. ${user.title} at Dunder Mifflin Scranton branch.` },
-    { agentId: id, label: "relationships", content: `Key relationships for ${user.displayName} with other Dunder Mifflin employees.` },
-    { agentId: id, label: "current_state", content: `Current emotional state and recent events for ${user.displayName}.` },
+    { agentId: id, label: "personality", content: blocks.personality },
+    { agentId: id, label: "relationships", content: blocks.relationships },
+    { agentId: id, label: "current_state", content: blocks.current_state },
   ];
 });
 
