@@ -10,9 +10,14 @@ export function buildSdkEnv(): Record<string, string | undefined> {
     throw new Error("ANTHROPIC_API_KEY is not set");
   }
 
+  // On Vercel Lambda, HOME may be undefined or point to a read-only directory.
+  // The CLI subprocess needs a writable HOME for ~/.claude/ initialization.
+  const home = process.env.HOME ?? "/tmp";
+
   const env: Record<string, string | undefined> = {
     ...process.env,
     ANTHROPIC_API_KEY: apiKey,
+    HOME: home,
   };
 
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
