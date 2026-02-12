@@ -436,11 +436,14 @@ async function handleSystemMsg(
     return;
   }
 
-  // files_persisted — only remaining subtype after all checks above
-  logInfo("sdk.files_persisted", {
+  // Unknown or new subtype — log generically to avoid runtime errors
+  const subtype = (msg as { subtype?: string }).subtype ?? "unknown";
+  logInfo("sdk.system_message", {
     runId,
-    fileCount: msg.files.length,
-    failedCount: msg.failed.length,
+    subtype,
+    ...(subtype === "files_persisted" && "files" in msg && "failed" in msg
+      ? { fileCount: (msg as { files: unknown[] }).files.length, failedCount: (msg as { failed: unknown[] }).failed.length }
+      : {}),
   });
 }
 

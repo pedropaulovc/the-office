@@ -28,7 +28,6 @@ async function demoResolver() {
     getMessage,
     getChannelMessages,
     getRecentMessages,
-    listChannelMembers,
   } = await import("../src/db/queries/messages");
 
   header("S-2.4: Agent Resolver");

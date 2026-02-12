@@ -42,11 +42,19 @@ export function InvokeAgentButton() {
     error: "!",
   }[status];
 
+  const ariaLabel = {
+    idle: "Invoke agent (dev only)",
+    loading: "Invoking agent (dev only)",
+    success: "Agent invoked successfully (dev only)",
+    error: "Agent invocation failed (dev only)",
+  }[status];
+
   return (
     <button
       onClick={handleClick}
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-500 transition-colors"
       title="Invoke agent (dev only)"
+      aria-label={ariaLabel}
     >
       {label}
     </button>

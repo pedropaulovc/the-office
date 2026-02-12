@@ -13,7 +13,7 @@ export function createSendMessageTool(
     "send_message",
     "Send a message to a channel. Use this to participate in conversations.",
     {
-      channelId: z.string().min(1).describe("The channel to send the message to"),
+      channelId: z.string().min(1).optional().describe("The channel to send the message to (defaults to current channel)"),
       text: z.string().min(1).describe("The message text"),
     },
     async (args) => {
