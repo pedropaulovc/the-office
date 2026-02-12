@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DbMessage, DbReaction, ArchivalPassage, MemoryBlock, RunMessage } from "@/db/schema";
+import type { DbMessage, DbReaction, ArchivalPassage, MemoryBlock, RunMessage, Channel } from "@/db/schema";
 
 // --- Mocks ---
 
@@ -10,6 +10,8 @@ const mockUpsertMemoryBlock = vi.fn<(data: unknown) => Promise<MemoryBlock>>();
 const mockListArchivalPassages = vi.fn<(agentId: string, query: string) => Promise<ArchivalPassage[]>>();
 const mockCreateArchivalPassage = vi.fn<(data: unknown) => Promise<ArchivalPassage>>();
 const mockGetMessage = vi.fn<(id: string) => Promise<DbMessage | undefined>>();
+const mockGetChannel = vi.fn<(id: string) => Promise<Channel | undefined>>();
+const mockListChannelMembers = vi.fn<(channelId: string) => Promise<string[]>>();
 
 vi.mock("@/db/queries", () => ({
   createMessage: (data: unknown) => mockCreateMessage(data),
@@ -19,6 +21,18 @@ vi.mock("@/db/queries", () => ({
   upsertMemoryBlock: (data: unknown) => mockUpsertMemoryBlock(data),
   listArchivalPassages: (agentId: string, query: string) => mockListArchivalPassages(agentId, query),
   createArchivalPassage: (data: unknown) => mockCreateArchivalPassage(data),
+  getChannel: (id: string) => mockGetChannel(id),
+  listChannelMembers: (channelId: string) => mockListChannelMembers(channelId),
+}));
+
+const mockEnqueueRun = vi.fn();
+
+vi.mock("@/agents/mailbox", () => ({
+  enqueueRun: (...args: unknown[]) => mockEnqueueRun(...args) as unknown,
+}));
+
+vi.mock("@/agents/orchestrator", () => ({
+  executeRun: vi.fn(),
 }));
 
 const mockBroadcast = vi.fn();
@@ -74,7 +88,7 @@ describe("send_message tool", () => {
 
   it("creates a message and broadcasts SSE event", async () => {
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "general") as unknown as MockToolDef;
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "general", chainDepth: 0 }) as unknown as MockToolDef;
 
     const result = await toolDef.handler({ channelId: "general", text: "Hello" }, undefined);
 
@@ -89,7 +103,7 @@ describe("send_message tool", () => {
 
   it("records tool_call and tool_return run messages", async () => {
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "general") as unknown as MockToolDef;
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "general", chainDepth: 0 }) as unknown as MockToolDef;
 
     await toolDef.handler({ channelId: "general", text: "Hello" }, undefined);
 
@@ -98,6 +112,81 @@ describe("send_message tool", () => {
     );
     expect(mockCreateRunMessage).toHaveBeenCalledWith(
       expect.objectContaining({ runId: "run-1", messageType: "tool_return_message", toolName: "send_message" }),
+    );
+  });
+});
+
+describe("send_message DM chain", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-1", channelId: "dm-michael-dwight", userId: "michael",
+      text: "Hey Dwight", parentMessageId: null, createdAt: new Date(),
+    });
+    mockCreateRunMessage.mockResolvedValue(undefined);
+    mockEnqueueRun.mockResolvedValue(undefined);
+  });
+
+  it("enqueues response run for DM recipient", async () => {
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "dm", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
+
+    const { createSendMessageTool } = await import("../send-message");
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "dm-michael-dwight", chainDepth: 0 }) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Hey Dwight" }, undefined);
+
+    // Wait for fire-and-forget promise
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockEnqueueRun).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "dwight", channelId: "dm-michael-dwight", chainDepth: 1 }),
+      expect.any(Function),
+    );
+  });
+
+  it("does not enqueue when chain depth exceeds MAX_CHAIN_DEPTH", async () => {
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "dm", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
+
+    const { createSendMessageTool, MAX_CHAIN_DEPTH } = await import("../send-message");
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "dm-michael-dwight", chainDepth: MAX_CHAIN_DEPTH }) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Hey Dwight" }, undefined);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
+  });
+
+  it("does not enqueue for public channels", async () => {
+    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "" });
+    mockCreateMessage.mockResolvedValue({
+      id: "pub-msg-1", channelId: "general", userId: "michael",
+      text: "Hello", parentMessageId: null, createdAt: new Date(),
+    });
+
+    const { createSendMessageTool } = await import("../send-message");
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "general", chainDepth: 0 }) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Hello" }, undefined);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
+  });
+
+  it("increments chain depth by 1 for each hop", async () => {
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "dm", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
+
+    const { createSendMessageTool } = await import("../send-message");
+    const toolDef = createSendMessageTool({ agentId: "michael", runId: "run-1", channelId: "dm-michael-dwight", chainDepth: 1 }) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Reply" }, undefined);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockEnqueueRun).toHaveBeenCalledWith(
+      expect.objectContaining({ chainDepth: 2 }),
+      expect.any(Function),
     );
   });
 });

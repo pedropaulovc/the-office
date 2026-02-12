@@ -64,8 +64,8 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       recentMessages,
     });
 
-    // 5. Create MCP server with tools
-    const mcpServer = getToolServer(run.agentId, run.id, run.channelId);
+    // 5. Create MCP server with tools (pass chainDepth for DM chain tracking)
+    const mcpServer = getToolServer(run.agentId, run.id, run.channelId, run.chainDepth);
 
     // 6. Broadcast agent_typing
     if (run.channelId) {

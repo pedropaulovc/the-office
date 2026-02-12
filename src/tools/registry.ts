@@ -13,9 +13,10 @@ export function getToolServer(
   agentId: string,
   runId: string,
   channelId: string | null,
+  chainDepth = 0,
 ) {
   const tools = [
-    createSendMessageTool(agentId, runId, channelId),
+    createSendMessageTool({ agentId, runId, channelId, chainDepth }),
     createReactToMessageTool(agentId, runId),
     createDoNothingTool(runId),
     createUpdateMemoryTool(agentId, runId),

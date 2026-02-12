@@ -323,7 +323,7 @@ describe("orchestrator", () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general");
+    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", RUN.chainDepth);
   });
 
   it("passes resume: sessionId when agent has existing session", async () => {
