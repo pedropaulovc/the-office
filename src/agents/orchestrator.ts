@@ -108,6 +108,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       currentStep: null as RunStep | null,
       result: null as SDKResultMessage | null,
       sessId: null as string | null,
+      msgCount: 0,
     };
 
     await Sentry.startSpanManual(
@@ -126,6 +127,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
         });
 
         for await (const msg of sdkQuery) {
+          loopState.msgCount++;
           // Re-establish querySpan as active — the for-await over the SDK subprocess
           // loses Node.js async context, so child spans/logs would otherwise be orphaned.
           await Sentry.withActiveSpan(querySpan, async () => {
@@ -278,7 +280,21 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       },
     );
 
-    const { stepNum: stepNumber, result: resultMessage, sessId: sessionId } = loopState;
+    const { stepNum: stepNumber, result: resultMessage, sessId: sessionId, msgCount } = loopState;
+
+    // Diagnostic: log when SDK produced no result message
+    if (!resultMessage) {
+      const diagMsg = `SDK finished with no result message. steps=${stepNumber} msgCount=${msgCount} durationMs=${Date.now() - startTime}`;
+      logError(diagMsg, { runId: run.id, agentId: run.agentId });
+      await createRunMessage({
+        runId: run.id,
+        stepId: null,
+        messageType: "system_message",
+        content: `[error] ${diagMsg}`,
+      }).catch((e: unknown) => {
+        logError("failed to store diag run_message", { error: String(e) });
+      });
+    }
 
     // 10. Persist session ID
     if (sessionId) {
