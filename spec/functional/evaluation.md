@@ -62,7 +62,7 @@ evaluation_scores
   dimension         text NOT NULL
                     -- 'adherence' | 'consistency' | 'fluency' | 'convergence' | 'ideas_quantity'
   proposition_id    text NOT NULL
-  score             real NOT NULL   -- 0–9
+  score             real NOT NULL   -- 0–9 for scored dimensions; integer count for ideas_quantity
   reasoning         text NOT NULL
   context_snippet   text
   created_at        timestamptz NOT NULL DEFAULT now()
@@ -127,6 +127,26 @@ agent_evaluation_config
   updated_at                      timestamptz NOT NULL DEFAULT now()
 ```
 
+### intervention_logs
+
+```sql
+intervention_logs
+  id                          uuid PK DEFAULT gen_random_uuid()
+  agent_id                    text NOT NULL FK(agents.id) ON DELETE CASCADE
+  channel_id                  text NOT NULL FK(channels.id) ON DELETE CASCADE
+  intervention_type           text NOT NULL
+                              -- 'anti_convergence' | 'variety' | 'custom'
+  textual_precondition        text             -- the claim evaluated by LLM, if any
+  textual_precondition_result boolean          -- LLM judge verdict
+  functional_precondition_result boolean       -- TypeScript function result
+  propositional_precondition_result boolean    -- Proposition check/score result
+  fired                       boolean NOT NULL -- whether the intervention activated
+  nudge_text                  text             -- the injected guidance, if fired
+  token_usage                 jsonb
+  created_at                  timestamptz NOT NULL DEFAULT now()
+  INDEX(agent_id, created_at)
+```
+
 ## Propositions
 
 Propositions are natural language claims about agent behavior, defined in YAML files and scored by an LLM judge.
@@ -175,7 +195,7 @@ src/features/evaluation/propositions/
 │   └── _default.yaml
 ├── convergence/
 │   └── _default.yaml
-└── ideas-quantity/
+└── ideas_quantity/
     └── _default.yaml       # Environment-level idea enumeration
 ```
 

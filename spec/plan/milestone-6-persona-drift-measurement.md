@@ -122,7 +122,7 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 - [ ] [AC-6.0.3a] Inverted propositions (anti-patterns) have their raw LLM score flipped (`9 - raw`) before aggregation
 - [ ] [AC-6.0.4] Two evaluation modes: `scoreProposition()` returns integer 0–9 with reasoning + confidence; `checkProposition()` returns boolean true/false (used by intervention preconditions in S-7.1). Both share the same LLM judge infrastructure. `scorePropositions()` supports batch mode grouping up to 10 per call.
 - [ ] [AC-6.0.5] Scoring rubric (0–9 with band descriptions) included in every judge system prompt
-- [ ] [AC-6.0.6] Single LLM judge prompt instructs the model to score each proposition independently and return structured JSON with `reasoning`, `justification`, `value`, `confidence` fields
+- [ ] [AC-6.0.6] Single LLM judge prompt instructs the model to score each proposition independently and return structured JSON per proposition with `score` (0–9), `reasoning`, and `confidence` fields; `score` maps to `evaluation_scores.score`, `reasoning` maps to `evaluation_scores.reasoning`, `confidence` is used transiently for logging but not persisted
 - [ ] [AC-6.0.7] Evaluation API: GET list runs (filterable by `agentId`), POST trigger new run, GET single run with scores
 - [ ] [AC-6.0.8] Migration generated and applied — both tables queryable
 - [ ] [AC-6.0.9] `include_personas` flag: when `true` (default), agent persona specification included in judge context; when `false`, persona is omitted (used for self-consistency and fluency where persona should not bias evaluation)
@@ -373,7 +373,7 @@ This metric is only meaningful for brainstorming/creative scenarios. It is optio
 | File | Purpose |
 |------|---------|
 | `src/features/evaluation/scorers/ideas-quantity.ts` | `scoreIdeasQuantity(channelId, timeWindow)` |
-| `src/features/evaluation/propositions/ideas-quantity/_default.yaml` | Ideas quantity prompt template (`target_type: environment`, `include_personas: false`) |
+| `src/features/evaluation/propositions/ideas_quantity/_default.yaml` | Ideas quantity prompt template (`target_type: environment`, `include_personas: false`) |
 
 ### Acceptance Criteria
 - [ ] [AC-6.6.1] `scoreIdeasQuantity()` pulls all messages from a channel within the time window

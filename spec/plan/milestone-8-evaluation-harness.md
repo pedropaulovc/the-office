@@ -95,7 +95,7 @@ Options:
   --agents <list>        Comma-separated agent IDs (default: all)
   --dimensions <list>    Comma-separated dimensions (default: all)
   --window <duration>    Time window for message sampling (default: 7d)
-  --threshold <n>        Minimum score to pass (default: 5.0)
+  --threshold <n>        Minimum score to pass for 0–9 dimensions (default: 5.0); does not apply to ideas_quantity (count-based, informational only)
   --mock-judge           Use pre-recorded scores (for CI)
   --synthetic            Generate synthetic conversations instead of using real data
   --output <path>        Write JSON report to file (default: stdout)
@@ -114,7 +114,7 @@ Options:
         "consistency": { "score": 7.0, "pass": true },
         "fluency": { "score": 6.8, "pass": true },
         "convergence": { "score": 7.5, "pass": true },
-        "ideas_quantity": { "count": 5, "pass": true }
+        "ideas_quantity": { "count": 5 }
       },
       "baselineDelta": { "adherence": -0.3, "consistency": +0.1 }
     }
@@ -495,17 +495,24 @@ Options:
   "agents_count": 200,
   "environments_count": 40,
   "metrics": {
-    "persona_adherence": {
+    "adherence": {
       "treatment": { "mean": 5.81, "sd": 1.66 },
       "control": { "mean": 6.72, "sd": 1.50 },
       "delta": -0.92,
       "p_value": 0.001,
       "significant": true
     },
-    "self_consistency": { ... },
+    "consistency": { ... },
     "fluency": { ... },
-    "divergence": { ... },
+    "convergence": { ... },
     "ideas_quantity": { ... }
+  },
+  "display_labels": {
+    "adherence": "persona_adherence",
+    "consistency": "self_consistency",
+    "fluency": "fluency",
+    "convergence": "divergence",
+    "ideas_quantity": "ideas_qty"
   }
 }
 ```
@@ -518,7 +525,7 @@ Options:
 | `src/features/evaluation/experiment/runner.ts` | `ExperimentRunner` class: orchestrates full experiment lifecycle |
 | `src/features/evaluation/experiment/environment-manager.ts` | Creates T/C environment pairs, assigns agents, manages experiment sessions using `ExperimentEnvironment` from S-8.5 |
 | `src/features/evaluation/experiment/statistical-testing.ts` | `welchTTest(groupA, groupB)`, `cohensD(groupA, groupB)`, `tDistributionCDF(t, df)` |
-| `src/features/evaluation/experiment/experiment-report.ts` | `generateExperimentReport(results)` — Table 1-format JSON + human-readable |
+| `src/features/evaluation/experiment/experiment-report.ts` | `generateExperimentReport(results)` — Table 1-format JSON + human-readable. Contains `DISPLAY_LABELS` mapping from canonical internal IDs (`adherence`, `consistency`, `convergence`) to paper display labels (`persona_adherence`, `self_consistency`, `divergence`) |
 
 ### Files to modify
 

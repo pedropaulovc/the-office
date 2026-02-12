@@ -115,7 +115,7 @@ This is faster than regeneration (one LLM call vs. full agent turn) and can succ
 - [ ] [AC-7.0.10] "Best-scoring" = attempt with highest SUM of all dimension scores across ALL stages (original + regeneration + direct correction), matching TinyTroupe's `total_score` aggregation. After all enabled stages exhausted, best-scoring attempt committed if `continue_on_failure` is true (default), else error returned.
 - [ ] [AC-7.0.11] Quality checks use action-level trajectory windows: `first_n: 5, last_n: 10` (narrower than offline evaluation)
 - [ ] [AC-7.0.12] Quality checks skip if agent has fewer than a configurable minimum number of prior actions (`minimum_required_qty_of_actions`, default 0)
-- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, correction stage (`original` | `regeneration` | `direct_correction`), and outcome (`passed` | `regeneration_success` | `direct_correction_success` | `forced_through` | `timeout_passed`)
+- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, correction stage (`original` | `regeneration` | `direct_correction`), and outcome (`passed` | `regeneration_success` | `direct_correction_success` | `forced_through` | `timeout_pass_through`)
 - [ ] [AC-7.0.14] Gate is a no-op when all quality checks disabled (configurable per agent — see S-7.3)
 - [ ] [AC-7.0.15] LLM judge calls have a 5-second timeout per dimension; on timeout, that dimension passes (fail-open)
 - [ ] [AC-7.0.16] Statistics tracked (matching TinyTroupe's `ActionGenerator.get_statistics()`): `total_actions`, `original_pass_count`, `original_pass_rate`, `regeneration_count`, `regeneration_success_count`, `regeneration_failure_rate`, `regeneration_mean_score`, `regeneration_sd_score`, `direct_correction_count`, `direct_correction_success_count`, `direct_correction_failure_rate`, `direct_correction_mean_score`, `direct_correction_sd_score`, `forced_through_count`, `similarity_failure_count`, per-dimension failure counts and mean scores
@@ -197,6 +197,7 @@ Nudges are transient — appended to the system prompt, NOT stored in memory.
 |------|--------|
 | `src/agents/prompt-builder.ts` | Accept optional `interventions` parameter; append nudge/guidance text to system prompt when present |
 | `src/agents/orchestrator.ts` | Before invoking agent, evaluate all active interventions for this agent+channel; pass any triggered effects to the prompt builder |
+| `src/db/schema/evaluations.ts` | Add `intervention_logs` table |
 
 ### Acceptance Criteria
 - [ ] [AC-7.1.1] `Intervention` class accepts targets (agent(s) or environment(s)), supports `first_n` and `last_n` trajectory windowing for precondition evaluation
@@ -215,7 +216,7 @@ Nudges are transient — appended to the system prompt, NOT stored in memory.
 - [ ] [AC-7.1.14] Interventions evaluated once per orchestrator step, BEFORE agents act (matching TinyTroupe's `TinyWorld._step()` which evaluates interventions before calling `agent.act()`)
 - [ ] [AC-7.1.15] Interventions only fire for channel messages (not DMs) unless explicitly configured otherwise
 - [ ] [AC-7.1.16] Each intervention type individually configurable per-agent: enable/disable + thresholds (see S-7.3)
-- [ ] [AC-7.1.17] `intervention_logs` table records every intervention evaluation: precondition results (textual/functional/propositional each tracked), whether it fired, nudge injected
+- [ ] [AC-7.1.17] `intervention_logs` table added via DB migration with columns: `id` (uuid PK), `agent_id` (FK agents), `channel_id` (FK channels), `intervention_type` (text: `anti_convergence` | `variety` | `custom`), `textual_precondition` (text, nullable), `textual_precondition_result` (boolean, nullable), `functional_precondition_result` (boolean, nullable), `propositional_precondition_result` (boolean, nullable), `fired` (boolean), `nudge_text` (text, nullable — the injected guidance if fired), `token_usage` (jsonb, nullable), `created_at` (timestamptz)
 - [ ] [AC-7.1.18] Unit tests for: textual precondition evaluation, functional precondition, propositional precondition (with and without threshold), inverted threshold logic, batch creation, chaining API, anti-convergence detection, variety intervention detection, nudge selection, prompt injection
 - [ ] [AC-7.1.19] Sentry spans and logs for intervention evaluation and nudge injection
 
