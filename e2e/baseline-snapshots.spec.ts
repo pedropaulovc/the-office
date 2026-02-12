@@ -1,29 +1,38 @@
 import { test, expect } from "@playwright/test";
 
-// Clean up stale test messages left by other test runs (or parallel tests).
-// Test messages always match patterns like "compose-*", "lifecycle-*", etc.
-const TEST_MSG_PATTERN =
-  /^(compose|lifecycle|thread|react|rapid|cascade|gen-|sales-|edit|sse-edit|valid|SSE test)/;
-
 test.describe("baseline snapshots", () => {
-  // Clean stale messages before each test to prevent cross-test pollution.
-  // Removes test-pattern messages AND any agent-generated messages that
-  // accumulated after the last seed message in #general.
-  // Uses beforeEach (not beforeAll) because `request` is a test-scoped fixture.
-  test.beforeEach(async ({ request }) => {
-    const res = await request.get("/api/channels/general/messages");
-    const msgs = (await res.json()) as { id: string; text: string }[];
-    const lastSeedIdx = msgs.findIndex((m) =>
-      m.text.includes("That's what she said!"),
-    );
-    const stale = msgs.filter(
-      (m, i) => TEST_MSG_PATTERN.test(m.text) || (lastSeedIdx !== -1 && i > lastSeedIdx),
-    );
-    if (stale.length > 0) {
-      await Promise.all(
-        stale.map((m) => request.delete(`/api/messages/${m.id}`)),
+  // Intercept #general messages API to filter out pollution from parallel
+  // test workers and agent activity on the shared Neon DB. Slices the
+  // response at the last known seed message so the page only renders seed
+  // data — eliminates the race between DB cleanup and page load.
+  test.beforeEach(async ({ page }) => {
+    // Filter REST response to only seed messages.
+    await page.route("**/api/channels/general/messages", async (route) => {
+      const response = await route.fetch();
+      const msgs = (await response.json()) as { text: string }[];
+      const lastSeedIdx = msgs.findIndex((m) =>
+        m.text.includes("That's what she said!"),
       );
-    }
+      const filtered =
+        lastSeedIdx !== -1 ? msgs.slice(0, lastSeedIdx + 1) : msgs;
+      await route.fulfill({ response, json: filtered });
+    });
+
+    // Block SSE so parallel workers can't push messages into the UI.
+    await page.route("**/api/sse", async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+        },
+        body: ": connected\n\n",
+      });
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
   test("general channel", async ({ page }) => {
