@@ -6,12 +6,19 @@ const TEST_MSG_PATTERN =
   /^(compose|lifecycle|thread|react|rapid|cascade|gen-|sales-|edit|sse-edit|valid|SSE test)/;
 
 test.describe("baseline snapshots", () => {
-  // Clean stale test messages before each test to prevent cross-test pollution.
+  // Clean stale messages before each test to prevent cross-test pollution.
+  // Removes test-pattern messages AND any agent-generated messages that
+  // accumulated after the last seed message in #general.
   // Uses beforeEach (not beforeAll) because `request` is a test-scoped fixture.
   test.beforeEach(async ({ request }) => {
     const res = await request.get("/api/channels/general/messages");
     const msgs = (await res.json()) as { id: string; text: string }[];
-    const stale = msgs.filter((m) => TEST_MSG_PATTERN.test(m.text));
+    const lastSeedIdx = msgs.findIndex((m) =>
+      m.text.includes("That's what she said!"),
+    );
+    const stale = msgs.filter(
+      (m, i) => TEST_MSG_PATTERN.test(m.text) || (lastSeedIdx !== -1 && i > lastSeedIdx),
+    );
     if (stale.length > 0) {
       await Promise.all(
         stale.map((m) => request.delete(`/api/messages/${m.id}`)),
