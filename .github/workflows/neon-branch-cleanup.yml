@@ -2,6 +2,7 @@ name: Neon Branch Cleanup
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   pull_request:
@@ -23,7 +24,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Get all open PR head branches
-          open_branches=$(gh api repos/${{ github.repository }}/pulls --jq '.[].head.ref' -q 'state=open' --paginate)
+          open_branches=$(gh api repos/${{ github.repository }}/pulls --method GET -f state=open --jq '.[].head.ref' --paginate)
 
           # Get all Neon branches (JSON array)
           neon_branches=$(curl -sf \
