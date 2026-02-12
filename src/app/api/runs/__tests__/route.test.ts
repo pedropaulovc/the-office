@@ -96,6 +96,7 @@ describe("GET /api/runs/[runId]", () => {
     const hierarchy: RunWithHierarchy = {
       ...MOCK_RUN,
       steps: [{ ...step, messages: [message] }],
+      orphanMessages: [],
     };
     mockGetRunWithSteps.mockResolvedValue(hierarchy);
 

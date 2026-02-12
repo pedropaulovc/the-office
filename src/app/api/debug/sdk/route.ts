@@ -27,8 +27,9 @@ async function testDirectSpawn(
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
 
+    const spawnEnv: Record<string, string | undefined> = { ...env, HOME: "/tmp" };
     const child: ChildProcess = spawn(process.execPath, [cliPath, "--version"], {
-      env: { ...env, HOME: "/tmp" },
+      env: spawnEnv as NodeJS.ProcessEnv,
       timeout: 10_000,
     });
 
