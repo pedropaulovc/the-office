@@ -86,7 +86,9 @@ print_spans() {
     echo "--- $txn ---"
     echo "$event" | jq -r '
       .entries[] | select(.type == "spans") | .data | sort_by(.start_timestamp)[] |
-      "  \(.start_timestamp | tostring[11:23]) | \(.op // "-") | \(.description // "-")"
+      (.start_timestamp | floor | strftime("%H:%M:%S")) as $t |
+      ((.start_timestamp - (.start_timestamp | floor)) * 1000 | floor | tostring | ("000" + .)[-3:]) as $ms |
+      "  \($t).\($ms) | \(.op // "-") | \(.description // "-")"
     '
     echo ""
   done
