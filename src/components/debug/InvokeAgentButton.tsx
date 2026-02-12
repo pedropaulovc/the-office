@@ -8,7 +8,7 @@ type InvokeStatus = "idle" | "loading" | "success" | "error";
 
 export function InvokeAgentButton() {
   const [status, setStatus] = useState<InvokeStatus>("idle");
-  const { activeView } = useApp();
+  const { activeView, currentUserId } = useApp();
 
   function handleClick() {
     setStatus("loading");
@@ -17,7 +17,7 @@ export function InvokeAgentButton() {
       { name: "invoke-agent-button", op: "ui.click" },
       async () => {
         try {
-          const res = await fetch("/api/agents/michael/invoke", {
+          const res = await fetch(`/api/agents/${currentUserId}/invoke`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ channelId: activeView.id }),

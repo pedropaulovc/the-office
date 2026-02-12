@@ -206,6 +206,7 @@ export async function updateRunStep(
   if (data.status === "completed" || data.status === "failed") {
     sets.completedAt = sql`now()`;
   }
+  if (Object.keys(sets).length === 0) return undefined;
 
   const rows = await db
     .update(runSteps)

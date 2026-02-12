@@ -511,7 +511,7 @@ function mapStopReason(result: SDKResultMessage | null): {
   stopReason: NonNullable<RunResult["stopReason"]>;
 } {
   if (!result) {
-    return { status: "completed", stopReason: "end_turn" };
+    return { status: "failed", stopReason: "error" };
   }
 
   switch (result.subtype) {
