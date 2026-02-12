@@ -20,6 +20,7 @@ import { buildSdkEnv, createSdkStderrHandler } from "@/agents/sdk-env";
 import { getToolServer } from "@/tools/registry";
 import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
+import { MAX_CHAIN_DEPTH } from "@/agents/constants";
 import {
   logInfo,
   logWarn,
@@ -42,6 +43,18 @@ async function executeRunInner(run: Run): Promise<RunResult> {
   const startTime = Date.now();
 
   try {
+    // 0. Defense-in-depth: reject runs that exceed max chain depth
+    if (run.chainDepth >= MAX_CHAIN_DEPTH) {
+      logWarn("chain depth exceeded, skipping run", {
+        runId: run.id,
+        agentId: run.agentId,
+        chainDepth: run.chainDepth,
+        maxChainDepth: MAX_CHAIN_DEPTH,
+      });
+      countMetric("orchestrator.chain_depth_exceeded", 1, { agentId: run.agentId });
+      return { status: "completed", stopReason: "end_turn" };
+    }
+
     // 1. Load agent
     const agent = await getAgent(run.agentId);
     if (!agent) {
@@ -65,7 +78,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
     });
 
     // 5. Create MCP server with tools
-    const mcpServer = getToolServer(run.agentId, run.id, run.channelId);
+    const mcpServer = getToolServer(run.agentId, run.id, run.channelId, run.chainDepth, executeRun);
 
     // 6. Broadcast agent_typing
     if (run.channelId) {
