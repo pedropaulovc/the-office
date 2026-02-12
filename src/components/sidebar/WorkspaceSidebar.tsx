@@ -4,6 +4,7 @@ import { useApp } from '@/context/AppContext';
 import { useData } from '@/context/useData';
 import { getInitials } from '@/utils/get-initials';
 import { TelemetryTestButton } from '@/components/debug/TelemetryTestButton';
+import { InvokeAgentButton } from '@/components/debug/InvokeAgentButton';
 
 export default function WorkspaceSidebar() {
   const { currentUserId, switchUser } = useApp();
@@ -62,7 +63,12 @@ export default function WorkspaceSidebar() {
       })}
       </div>
 
-      {process.env.NODE_ENV === "development" && <TelemetryTestButton />}
+      {process.env.NODE_ENV === "development" && (
+        <div className="flex flex-col items-center gap-2">
+          <InvokeAgentButton />
+          <TelemetryTestButton />
+        </div>
+      )}
     </aside>
   );
 }

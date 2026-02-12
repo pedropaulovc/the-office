@@ -184,13 +184,21 @@ for await (const msg of query({
 - [ ] [AC-2.3.7] Run status updated with stop reason and token usage on completion
 - [ ] [AC-2.3.8] Sentry trace span wraps each invocation with child spans for steps
 - [ ] [AC-2.3.9] Unit tests for orchestrator flow (mocking Claude SDK)
+- [ ] [AC-2.3.10] All SDK message types emit Sentry structured logs (logInfo/logWarn/logError) with relevant attributes
+- [ ] [AC-2.3.11] Assistant turns wrapped in child spans (`sdk.turn.{N}`, op: `ai.agent.turn`) with tool call details
+- [ ] [AC-2.3.12] Tool calls from assistant messages recorded as `tool_call_message` in `run_messages` with `toolName`/`toolInput`
+- [ ] [AC-2.3.13] User messages (tool returns) recorded as `user_message` / `tool_return_message` in `run_messages`
+- [ ] [AC-2.3.14] Result message emits metrics: `sdk.duration_ms`, `sdk.duration_api_ms`, `sdk.num_turns`, `sdk.cost_usd`
+- [ ] [AC-2.3.15] Compaction events emit `logWarn` + counter metric
+- [ ] [AC-2.3.16] Unit tests for new telemetry (message recording, log emission, span creation)
 
 ### Demo
-Run a script that enqueues a run for Michael via the mailbox. Show:
-1. The run transitions: created → running → completed
-2. `run_steps` and `run_messages` populated — showing the LLM call chain
-3. The agent uses tools to build its response (e.g., trigger → tool_call → tool_return → response)
-4. Sentry trace appears with the full invocation span
+Run a script that triggers an agent (e.g. Michael in #general). In Sentry, show:
+1. Rich trace with nested spans: `executeRun` → `sdk.query` → `sdk.turn.1`, `sdk.turn.2`, etc.
+2. Structured logs for every SDK message: init (with model/tools), assistant turns, tool calls, user messages, result summary
+3. Turn boundaries clearly visible — each assistant message starts a new span with step number
+4. Metrics: token usage, cost, duration, number of turns, compaction count
+5. `run_messages` table populated with full conversation transcript (system, user, assistant, tool_call, tool_return)
 
 ---
 

@@ -7,11 +7,17 @@ import {
   countMetric,
 } from "@/lib/telemetry";
 
-export type RunExecutor = (run: Run) => Promise<void>;
+export interface RunResult {
+  status?: Run["status"];
+  stopReason?: Run["stopReason"];
+  tokenUsage?: Run["tokenUsage"];
+}
+
+export type RunExecutor = (run: Run) => Promise<RunResult | undefined>;
 
 const stubExecutor: RunExecutor = (run: Run) => {
   logInfo("stub executor: no-op", { runId: run.id, agentId: run.agentId });
-  return Promise.resolve();
+  return Promise.resolve(undefined);
 };
 
 /**
@@ -51,10 +57,11 @@ export async function processNextRun(
     const exec = executor ?? stubExecutor;
 
     try {
-      await exec(run);
+      const result = await exec(run);
       await updateRunStatus(run.id, {
-        status: "completed",
-        stopReason: "end_turn",
+        status: result?.status ?? "completed",
+        stopReason: result?.stopReason ?? "end_turn",
+        tokenUsage: result?.tokenUsage,
       });
       logInfo("run completed", { runId: run.id, agentId });
     } catch (err) {

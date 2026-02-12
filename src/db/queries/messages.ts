@@ -1,4 +1,4 @@
-import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, inArray, sql, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   channels,
@@ -259,6 +259,20 @@ export function getThreadReplies(
       reactions: reactionsMap.get(m.id) ?? [],
     }));
   });
+}
+
+/**
+ * Get last N top-level messages from a channel, ordered chronologically.
+ * Lightweight query for the orchestrator (no reaction joins, no thread counts).
+ */
+export async function getRecentMessages(channelId: string, limit = 20): Promise<DbMessage[]> {
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.channelId, channelId), isNull(messages.parentMessageId)))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+  return rows.reverse();
 }
 
 // --- Helpers ---
