@@ -46,6 +46,7 @@ interface RunWithStepsResponse {
     totalCostUsd: number;
   } | null;
   steps: RunStepResponse[];
+  orphanMessages?: RunMessageResponse[];
 }
 
 interface ChannelMessageResponse {
@@ -360,7 +361,11 @@ test.describe("orchestrator SDK", () => {
     );
     benchmarkRun = run;
 
-    const errorMsgs = flattenRunMessages(run)
+    const allMsgs = [
+      ...flattenRunMessages(run),
+      ...(run.orphanMessages ?? []),
+    ];
+    const errorMsgs = allMsgs
       .filter((m) => m.content.startsWith("[error]"))
       .map((m) => m.content)
       .join("; ");

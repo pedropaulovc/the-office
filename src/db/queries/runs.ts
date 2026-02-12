@@ -21,6 +21,7 @@ export interface RunStatusUpdate {
 
 export type RunWithHierarchy = Run & {
   steps: (RunStep & { messages: RunMessage[] })[];
+  orphanMessages: RunMessage[];
 };
 
 export function createRun(data: NewRun): Promise<Run> {
@@ -137,7 +138,10 @@ export function getRunWithSteps(
       messages: messagesByStep.get(step.id) ?? [],
     }));
 
-    return { ...run, steps };
+    // Include orphan messages (stepId=null) so diagnostic errors are visible
+    const orphanMessages = messagesByStep.get("__no_step__") ?? [];
+
+    return { ...run, steps, orphanMessages };
   });
 }
 

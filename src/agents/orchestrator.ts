@@ -16,7 +16,7 @@ import {
 } from "@/db/queries";
 import type { Run, RunStep } from "@/db/schema";
 import { buildSystemPrompt } from "@/agents/prompt-builder";
-import { buildSdkEnv, createSdkStderrHandler } from "@/agents/sdk-env";
+import { buildSdkEnv } from "@/agents/sdk-env";
 import { getToolServer } from "@/tools/registry";
 import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
@@ -80,6 +80,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
     const prompt = formatTriggerPrompt(run);
 
     // 8. Call SDK
+    const stderrChunks: string[] = [];
     const sdkOptions: Parameters<typeof query>[0]["options"] = {
       systemPrompt,
       model: agent.modelId,
@@ -90,7 +91,10 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       allowDangerouslySkipPermissions: true,
       tools: [],
       env: buildSdkEnv(),
-      stderr: createSdkStderrHandler(run.id, run.agentId),
+      stderr: (data: string) => {
+        stderrChunks.push(data.trim());
+        logInfo("sdk.stderr", { runId: run.id, agentId: run.agentId, output: data.trim() });
+      },
     };
     if (agent.sessionId) {
       sdkOptions.resume = agent.sessionId;
@@ -284,7 +288,8 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
     // Diagnostic: log when SDK produced no result message
     if (!resultMessage) {
-      const diagMsg = `SDK finished with no result message. steps=${stepNumber} msgCount=${msgCount} durationMs=${Date.now() - startTime}`;
+      const stderrOutput = stderrChunks.join("\n").slice(0, 2000);
+      const diagMsg = `SDK finished with no result message. steps=${stepNumber} msgCount=${msgCount} durationMs=${Date.now() - startTime} stderr=[${stderrOutput}]`;
       logError(diagMsg, { runId: run.id, agentId: run.agentId });
       await createRunMessage({
         runId: run.id,
