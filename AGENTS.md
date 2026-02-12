@@ -243,7 +243,7 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 ### Parallelism & Agent Swarms
 
 - **Leverage agent swarms whenever possible.** When a story has multiple independent tasks (e.g., schema + tests + API route + frontend wiring), spin up parallel subagents rather than doing everything sequentially.
-- **Preferred execution skill**: When using superpowers skills to implement work, prefer `subagent-driven-development` over `executing-plans`. Subagent-driven development maximizes parallelism and throughput by dispatching independent tasks to concurrent agents.
+- **Preferred execution skill**: When using superpowers skills to implement work, prefer `subagent-driven-development` over `executing-plans`. Subagent-driven development maximizes parallelism and throughput by dispatching independent tasks to concurrent agents. The main agent must keep exactly one story or top-level feature in flight at a time, while delegating independent subtasks for that story to parallel subagents.
 
 ### Stop and Read Policy
 
