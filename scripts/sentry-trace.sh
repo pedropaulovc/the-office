@@ -19,6 +19,7 @@ SENTRY_PROJECT="the-office"
 SENTRY_PROJECT_ID="4510864889413632"
 SENTRY_BASE="https://us.sentry.io/api/0"
 MAX_LOG_CHARS=1024
+MAX_PAGES=10
 
 # --- Auth ---
 if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
@@ -60,7 +61,36 @@ mkdir -p "$OUT_DIR"
 OUT_FILE="$OUT_DIR/$TRACE_ID.txt"
 
 fetch() {
-  curl -sf -H "$AUTH" "$1"
+  curl -sSf -H "$AUTH" "$1"
+}
+
+# Fetch all pages from a Sentry paginated endpoint.
+# Merges .data arrays from each page into a single JSON array on stdout.
+fetch_paginated() {
+  local url="$1"
+  local all_data="[]"
+  local page=0
+
+  while [[ -n "$url" && $page -lt $MAX_PAGES ]]; do
+    local tmp
+    tmp=$(mktemp)
+    local body
+    body=$(curl -sSf -D "$tmp" -H "$AUTH" "$url")
+    local page_data
+    page_data=$(echo "$body" | jq '.data')
+    all_data=$(echo "$all_data" "$page_data" | jq -s '.[0] + .[1]')
+    page=$((page + 1))
+
+    # Parse Link header for next cursor
+    local next_url=""
+    if grep -q 'rel="next"; results="true"' "$tmp" 2>/dev/null; then
+      next_url=$(grep -o '<[^>]*>; rel="next"; results="true"' "$tmp" | grep -o '<[^>]*>' | tr -d '<>')
+    fi
+    rm -f "$tmp"
+    url="$next_url"
+  done
+
+  echo "$all_data"
 }
 
 # --- Spans ---
@@ -69,17 +99,17 @@ print_spans() {
   echo ""
 
   local events
-  events=$(fetch "$SENTRY_BASE/organizations/$SENTRY_ORG/events/?project=$SENTRY_PROJECT_ID&query=trace:$TRACE_ID&field=id&field=timestamp&field=transaction&field=event.type&per_page=50")
+  events=$(fetch_paginated "$SENTRY_BASE/organizations/$SENTRY_ORG/events/?project=$SENTRY_PROJECT_ID&query=trace:$TRACE_ID&field=id&field=timestamp&field=transaction&field=event.type&per_page=50")
 
   local count
-  count=$(echo "$events" | jq '.data | length')
+  count=$(echo "$events" | jq 'length')
 
   if [[ "$count" == "0" ]]; then
     echo "  (no transactions found)"
     return
   fi
 
-  echo "$events" | jq -r '.data[] | "\(.id) \(.transaction)"' | while read -r eid txn; do
+  echo "$events" | jq -r '.[] | "\(.id)\t\(.transaction)"' | while IFS=$'\t' read -r eid txn; do
     local event
     event=$(fetch "$SENTRY_BASE/projects/$SENTRY_ORG/$SENTRY_PROJECT/events/$eid/")
 
@@ -100,10 +130,10 @@ print_logs() {
   echo ""
 
   local logs
-  logs=$(fetch "$SENTRY_BASE/organizations/$SENTRY_ORG/trace-logs/?dataset=ourlogs&field=timestamp_precise&field=severity&field=message&orderby=-timestamp&per_page=1000&project=-1&query=trace%3A$TRACE_ID&statsPeriod=14d&traceId=$TRACE_ID")
+  logs=$(fetch_paginated "$SENTRY_BASE/organizations/$SENTRY_ORG/trace-logs/?dataset=ourlogs&field=timestamp_precise&field=severity&field=message&orderby=-timestamp&per_page=1000&project=-1&query=trace%3A$TRACE_ID&statsPeriod=14d&traceId=$TRACE_ID")
 
   local count
-  count=$(echo "$logs" | jq '.data | length')
+  count=$(echo "$logs" | jq 'length')
 
   if [[ "$count" == "0" ]]; then
     echo "  (no logs found)"
@@ -112,7 +142,7 @@ print_logs() {
 
   if [[ "$TRUNCATE" == "true" ]]; then
     echo "$logs" | jq -r --argjson max "$MAX_LOG_CHARS" '
-      .data | sort_by(.timestamp_precise) | .[] |
+      sort_by(.timestamp_precise) | .[] |
       if (.message | length) > $max then
         "  \(.severity) | \(.message[:$max])… [truncated, use --full]"
       else
@@ -120,7 +150,7 @@ print_logs() {
       end
     '
   else
-    echo "$logs" | jq -r '.data | sort_by(.timestamp_precise) | .[] | "  \(.severity) | \(.message)"'
+    echo "$logs" | jq -r 'sort_by(.timestamp_precise) | .[] | "  \(.severity) | \(.message)"'
   fi
 }
 
