@@ -96,7 +96,7 @@ test.describe("baseline snapshots", () => {
       - text: /🐕 1 MS Michael Scott \\d+:\\d+ (?:A|P)M/
       - paragraph: That's what she said! ...wait, that doesn't work there. Or does it? 🤔
       - text: 😂 3 🤦 3
-      - paragraph: "Message #general (read-only)"
+      - 'textbox "Message #general"'
       - button "bold" [disabled]
       - button "italic" [disabled]
       - button "code" [disabled]:
@@ -184,7 +184,7 @@ test.describe("baseline snapshots", () => {
       - paragraph: I ran the numbers again. The discrepancy is from Michael's 'business lunch' at Benihana. He charged it to office supplies.
       - text: /😑 1 AM Angela Martin \\d+:\\d+ (?:A|P)M/
       - paragraph: I am filing a formal complaint. This is the third time this quarter.
-      - paragraph: "Message #accounting (read-only)"
+      - 'textbox "Message #accounting"'
       - button "bold" [disabled]
       - button "italic" [disabled]
       - button "code" [disabled]:
@@ -230,7 +230,7 @@ test.describe("baseline snapshots", () => {
       - paragraph: How about Cooper's? They have good sandwiches.
       - text: /MS Michael Scott \\d+:\\d+ (?:A|P)M/
       - paragraph: Deal! You're paying though. Boss privileges. 😎
-      - paragraph: Message Jim Halpert (read-only)
+      - textbox "Message Jim Halpert"
       - button "bold" [disabled]
       - button "italic" [disabled]
       - button "code" [disabled]:
@@ -269,9 +269,10 @@ test.describe("baseline snapshots", () => {
       - text: /PB Pam Beesly \\d+:\\d+ (?:A|P)M/
       - paragraph: Last time he had a 'big announcement' it was that he learned how to make espresso.
       - text: ☕ 2
-      - paragraph: Reply... (read-only)
+      - textbox "Reply..."
       - img
-      - img
+      - button "send" [disabled]:
+        - img
     `);
   });
 

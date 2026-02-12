@@ -52,6 +52,25 @@ export async function fetchThreadReplies(messageId: string): Promise<ThreadReply
   return response.json() as Promise<ThreadReply[]>;
 }
 
+export async function postMessage(params: {
+  channelId: string;
+  parentMessageId?: string;
+  userId: string;
+  text: string;
+}): Promise<Message> {
+  const response = await fetch("/api/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to post message: ${response.status}`);
+  }
+
+  return response.json() as Promise<Message>;
+}
+
 export async function fetchDms(userId: string): Promise<ChannelView[]> {
   const response = await fetch(`/api/channels?kind=dm&userId=${encodeURIComponent(userId)}`);
 

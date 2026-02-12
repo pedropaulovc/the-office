@@ -158,6 +158,115 @@ export function DataProvider({
         break;
       }
 
+      case 'message_updated': {
+        const dbMsg = event.data as Record<string, unknown>;
+        const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+        const msgId = dbMsg.id as string;
+        const newText = dbMsg.text as string;
+
+        setMessages(prev => {
+          const channelMsgs = prev[channelId];
+          if (!channelMsgs) return prev;
+          return {
+            ...prev,
+            [channelId]: channelMsgs.map(m =>
+              m.id === msgId ? { ...m, text: newText } : m
+            ),
+          };
+        });
+        break;
+      }
+
+      case 'message_deleted': {
+        const dbMsg = event.data as Record<string, unknown>;
+        const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+        const msgId = dbMsg.id as string;
+        const parentId = dbMsg.parentMessageId as string | undefined;
+
+        if (parentId) {
+          // Thread reply deleted — decrement parent's threadReplyCount
+          setMessages(prev => {
+            const channelMsgs = prev[channelId];
+            if (!channelMsgs) return prev;
+            return {
+              ...prev,
+              [channelId]: channelMsgs.map(m =>
+                m.id === parentId
+                  ? { ...m, threadReplyCount: Math.max(0, m.threadReplyCount - 1) }
+                  : m
+              ),
+            };
+          });
+          return;
+        }
+
+        // Top-level message deleted — remove from array
+        setMessages(prev => {
+          const channelMsgs = prev[channelId];
+          if (!channelMsgs) return prev;
+          return {
+            ...prev,
+            [channelId]: channelMsgs.filter(m => m.id !== msgId),
+          };
+        });
+        break;
+      }
+
+      case 'reaction_added': {
+        const dbMsg = event.data as Record<string, unknown>;
+        const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+        const msgId = dbMsg.messageId as string;
+        const emoji = dbMsg.emoji as string;
+        const userId = dbMsg.userId as string;
+
+        setMessages(prev => {
+          const channelMsgs = prev[channelId];
+          if (!channelMsgs) return prev;
+          return {
+            ...prev,
+            [channelId]: channelMsgs.map(m => {
+              if (m.id !== msgId) return m;
+              const existing = m.reactions.find(r => r.emoji === emoji);
+              if (existing) {
+                if (existing.userIds.includes(userId)) return m;
+                return {
+                  ...m,
+                  reactions: m.reactions.map(r =>
+                    r.emoji === emoji ? { ...r, userIds: [...r.userIds, userId] } : r
+                  ),
+                };
+              }
+              return { ...m, reactions: [...m.reactions, { emoji, userIds: [userId] }] };
+            }),
+          };
+        });
+        break;
+      }
+
+      case 'reaction_removed': {
+        const dbMsg = event.data as Record<string, unknown>;
+        const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+        const msgId = dbMsg.messageId as string;
+        const emoji = dbMsg.emoji as string;
+        const userId = dbMsg.userId as string;
+
+        setMessages(prev => {
+          const channelMsgs = prev[channelId];
+          if (!channelMsgs) return prev;
+          return {
+            ...prev,
+            [channelId]: channelMsgs.map(m => {
+              if (m.id !== msgId) return m;
+              const updated = m.reactions
+                .map(r => r.emoji === emoji ? { ...r, userIds: r.userIds.filter(id => id !== userId) } : r)
+                .filter(r => r.userIds.length > 0);
+              return { ...m, reactions: updated };
+            }),
+          };
+        });
+        break;
+      }
+
       case 'agent_typing': {
         const agentId = event.agentId;
         if (!agentId) return;

@@ -14,9 +14,13 @@ export async function POST(request: Request): Promise<Response> {
   const userId = typeof body.userId === "string" ? body.userId : "michael";
   const text = typeof body.text === "string" ? body.text : "Test SSE message";
 
+  const agentId =
+    typeof body.agentId === "string" ? body.agentId : undefined;
+
   const event = {
     type,
     channelId,
+    ...(agentId && { agentId }),
     data: body.data ?? {
       id: crypto.randomUUID(),
       channelId,

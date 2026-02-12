@@ -46,4 +46,10 @@ class ConnectionRegistry {
   }
 }
 
-export const connectionRegistry = new ConnectionRegistry();
+// Use globalThis to share the singleton across Turbopack module instances in dev mode.
+// Without this, each API route gets its own ConnectionRegistry and broadcasts don't
+// reach SSE clients connected via a different route's instance.
+interface GlobalSSE { __sseRegistry?: ConnectionRegistry }
+const g = globalThis as unknown as GlobalSSE;
+export const connectionRegistry: ConnectionRegistry =
+  g.__sseRegistry ?? (g.__sseRegistry = new ConnectionRegistry());
