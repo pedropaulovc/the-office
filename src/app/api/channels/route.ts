@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
+import { NextResponse } from "next/server";
 import { listChannelsWithMembers, createChannel, getChannel } from "@/db/queries";
-import { jsonResponse } from "@/lib/api-response";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 
 const CreateChannelSchema = z.object({
   id: z.string().min(1),
@@ -11,55 +12,61 @@ const CreateChannelSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const kind = searchParams.get("kind");
-  const userId = searchParams.get("userId");
+  return apiHandler("api.channels.list", "http.server", async () => {
+    const { searchParams } = new URL(request.url);
+    const kind = searchParams.get("kind");
+    const userId = searchParams.get("userId");
 
-  const allChannels = await listChannelsWithMembers();
+    const allChannels = await listChannelsWithMembers();
 
-  if (kind === "dm" && userId) {
-    const dms = allChannels.filter(
-      (ch) => ch.kind === "dm" && ch.memberIds.includes(userId),
-    );
-    return jsonResponse(dms);
-  }
+    if (kind === "dm" && userId) {
+      const dms = allChannels.filter(
+        (ch) => ch.kind === "dm" && ch.memberIds.includes(userId),
+      );
+      return jsonResponse(dms);
+    }
 
-  if (kind) {
-    return jsonResponse(allChannels.filter((ch) => ch.kind === kind));
-  }
+    if (kind) {
+      return jsonResponse(allChannels.filter((ch) => ch.kind === kind));
+    }
 
-  return jsonResponse(allChannels);
+    return jsonResponse(allChannels);
+  });
 }
 
 export async function POST(request: Request) {
-  const body: unknown = await request.json();
-  const parsed = CreateChannelSchema.safeParse(body);
+  return apiHandler("api.channels.create", "http.server", async () => {
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
 
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+    const parsed = CreateChannelSchema.safeParse(body);
 
-  if (parsed.data.kind === "dm") {
-    if (parsed.data.memberIds?.length !== 2) {
+    if (!parsed.success) {
       return jsonResponse(
-        { error: "DM channels require exactly 2 memberIds" },
+        { error: "Validation failed", issues: parsed.error.issues },
         { status: 400 },
       );
     }
-  }
 
-  const existing = await getChannel(parsed.data.id);
-  if (existing) {
-    return jsonResponse(
-      { error: `Channel with id '${parsed.data.id}' already exists` },
-      { status: 409 },
-    );
-  }
+    if (parsed.data.kind === "dm") {
+      if (parsed.data.memberIds?.length !== 2) {
+        return jsonResponse(
+          { error: "DM channels require exactly 2 memberIds" },
+          { status: 400 },
+        );
+      }
+    }
 
-  const { memberIds, ...rest } = parsed.data;
-  const channel = await createChannel({ ...rest, memberIds: memberIds ?? [] });
-  return jsonResponse(channel, { status: 201 });
+    const existing = await getChannel(parsed.data.id);
+    if (existing) {
+      return jsonResponse(
+        { error: `Channel with id '${parsed.data.id}' already exists` },
+        { status: 409 },
+      );
+    }
+
+    const { memberIds, ...rest } = parsed.data;
+    const channel = await createChannel({ ...rest, memberIds: memberIds ?? [] });
+    return jsonResponse(channel, { status: 201 });
+  });
 }

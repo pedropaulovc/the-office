@@ -4,13 +4,16 @@ import { CreateMessageSchema } from "@/messages/schemas";
 import { resolveTargetAgents } from "@/agents/resolver";
 import { enqueueRun } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
-import { jsonResponse } from "@/lib/api-response";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 import * as Sentry from "@sentry/nextjs";
-import { withSpan, logInfo, logError, countMetric } from "@/lib/telemetry";
+import { logInfo, logError, countMetric } from "@/lib/telemetry";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-  return withSpan("api.messages.create", "http.server", async () => {
-    const body: unknown = await request.json();
+  return apiHandler("api.messages.create", "http.server", async () => {
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
+
     const parsed = CreateMessageSchema.safeParse(body);
 
     if (!parsed.success) {

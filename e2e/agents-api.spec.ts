@@ -35,7 +35,7 @@ test.describe("agents API", () => {
     expect(michael?.title).toBe("Regional Manager");
     expect(michael?.avatarColor).toBe("#4A90D9");
     expect(michael?.systemPrompt).toBeTruthy();
-    expect(michael?.modelId).toBe("claude-sonnet-4-5-20250929");
+    expect(michael?.modelId).toBe("claude-haiku-4-5-20251001");
     expect(michael?.isActive).toBe(true);
   });
 

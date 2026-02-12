@@ -18,23 +18,25 @@ export function logInfo(
 }
 
 /**
- * Emits a structured warning log to Sentry.
+ * Emits a structured warning log to Sentry and console.
  */
 export function logWarn(
   message: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
   Sentry.logger.warn(message, attributes);
+  console.warn(`[warn] ${message}`, attributes ?? "");
 }
 
 /**
- * Emits a structured error log to Sentry.
+ * Emits a structured error log to Sentry and console.
  */
 export function logError(
   message: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
   Sentry.logger.error(message, attributes);
+  console.error(`[error] ${message}`, attributes ?? "");
 }
 
 /**

@@ -1,7 +1,8 @@
 import { z } from "zod/v4";
+import { NextResponse } from "next/server";
 import { listRuns } from "@/db/queries";
 import { enqueueRun } from "@/agents/mailbox";
-import { jsonResponse } from "@/lib/api-response";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 
 const VALID_STATUSES = [
   "created",
@@ -17,21 +18,23 @@ const ListRunsSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const parsed = ListRunsSchema.safeParse({
-    agentId: searchParams.get("agentId") ?? undefined,
-    status: searchParams.get("status") ?? undefined,
+  return apiHandler("api.runs.list", "http.server", async () => {
+    const { searchParams } = new URL(request.url);
+    const parsed = ListRunsSchema.safeParse({
+      agentId: searchParams.get("agentId") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
+    });
+
+    if (!parsed.success) {
+      return jsonResponse(
+        { error: "Validation failed", issues: parsed.error.issues },
+        { status: 400 },
+      );
+    }
+
+    const runs = await listRuns(parsed.data);
+    return jsonResponse(runs);
   });
-
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const runs = await listRuns(parsed.data);
-  return jsonResponse(runs);
 }
 
 const CreateRunSchema = z.object({
@@ -42,16 +45,20 @@ const CreateRunSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const body: unknown = await request.json();
-  const parsed = CreateRunSchema.safeParse(body);
+  return apiHandler("api.runs.create", "http.server", async () => {
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
 
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+    const parsed = CreateRunSchema.safeParse(body);
 
-  const run = await enqueueRun(parsed.data);
-  return jsonResponse(run, { status: 201 });
+    if (!parsed.success) {
+      return jsonResponse(
+        { error: "Validation failed", issues: parsed.error.issues },
+        { status: 400 },
+      );
+    }
+
+    const run = await enqueueRun(parsed.data);
+    return jsonResponse(run, { status: 201 });
+  });
 }

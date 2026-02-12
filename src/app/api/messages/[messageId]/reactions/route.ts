@@ -1,18 +1,21 @@
+import { NextResponse } from "next/server";
 import { getMessage, createReaction, deleteReaction } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { CreateReactionSchema, DeleteReactionSchema } from "@/messages/schemas";
-import { jsonResponse } from "@/lib/api-response";
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
+import { logInfo, countMetric } from "@/lib/telemetry";
 
 interface RouteContext {
   params: Promise<{ messageId: string }>;
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  return withSpan("api.reactions.create", "http.server", async () => {
+  return apiHandler("api.reactions.create", "http.server", async () => {
     const { messageId } = await context.params;
 
-    const body: unknown = await request.json();
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
+
     const parsed = CreateReactionSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -55,10 +58,12 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  return withSpan("api.reactions.delete", "http.server", async () => {
+  return apiHandler("api.reactions.delete", "http.server", async () => {
     const { messageId } = await context.params;
 
-    const body: unknown = await request.json();
+    const body = await parseRequestJson(request);
+    if (body instanceof NextResponse) return body;
+
     const parsed = DeleteReactionSchema.safeParse(body);
 
     if (!parsed.success) {
