@@ -87,7 +87,7 @@ graph TD
 
 ### Horizontal Requirements
 
-- Each story = one pull request, implemented and merged independently. Commits must be made on a dedicated feature branch (not the worktree branch). PRs must always target `main`.
+- **Branch immediately**: The very first thing you do when starting any new work is create a feature branch off `main`: `git checkout -b feature/my-feature main`. Never commit directly to the worktree branch — a pre-commit hook will block it. Each story = one PR on its own feature branch, targeting `main`.
 - Each schema story = one DB migration, tested and validated
 - Testing is mandatory: unit tests + integration tests + 1-2 E2E tests for user-facing features
 - Every story must be demoable with a live demo before claiming completion
@@ -239,6 +239,11 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
  * Final quality assurance. Don't ask the user to test a feature manually before you did it yourself!
 
 ## Agent Workflow Standards
+
+### Parallelism & Agent Swarms
+
+- **Leverage agent swarms whenever possible.** When a story has multiple independent tasks (e.g., schema + tests + API route + frontend wiring), spin up parallel subagents rather than doing everything sequentially.
+- **Preferred execution skill**: When using superpowers skills to implement work, prefer `subagent-driven-development` over `executing-plans`. Subagent-driven development maximizes parallelism and throughput by dispatching independent tasks to concurrent agents.
 
 ### Stop and Read Policy
 
