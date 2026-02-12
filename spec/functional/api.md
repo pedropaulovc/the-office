@@ -8,7 +8,7 @@ The server auto-generates an OpenAPI 3.1 spec from Zod schemas and serves it at 
 
 ### Approach
 
-All request/response schemas are defined as Zod objects (already required for validation). The `@asteasolutions/zod-to-openapi` library annotates those schemas and produces a full OpenAPI 3.1 document.
+All request/response schemas are defined as Zod objects (already required for validation). The `zod-openapi` library uses Zod v4's native `.meta()` method to annotate schemas and produces a full OpenAPI 3.1 document.
 
 ### Endpoints
 
@@ -19,48 +19,43 @@ All request/response schemas are defined as Zod objects (already required for va
 
 ### How It Works
 
-1. Each API route file defines Zod schemas for request body, query params, and response shapes
-2. Schemas are registered with `OpenAPIRegistry` alongside HTTP method, path, and description
-3. `GET /api/openapi.json` calls `OpenApiGeneratorV31.generateDocument()` and returns the result
+1. All request/response Zod schemas are defined centrally in `src/api/openapi.ts`
+2. `createDocument()` from `zod-openapi` assembles paths, methods, and schemas into an OpenAPI 3.1 document
+3. `GET /api/openapi.json` calls `generateDocument()` and returns the result
 4. `GET /api/docs` serves a Scalar HTML page pointing at `/api/openapi.json`
 
 ### Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| `@asteasolutions/zod-to-openapi` | Generate OpenAPI 3.1 from Zod schemas |
-| `@scalar/nextjs` | Lightweight API explorer UI |
+| `zod-openapi` | Generate OpenAPI 3.1 from Zod schemas (native Zod v4 support via `.meta()`) |
+| `@scalar/nextjs-api-reference` | Lightweight API explorer UI |
 
-### Registry Pattern
+### Document Pattern
 
 ```typescript
 // src/api/openapi.ts
-import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
-
-export const registry = new OpenAPIRegistry();
+import { z } from 'zod/v4';
+import { createDocument } from 'zod-openapi';
 
 export function generateDocument() {
-  const generator = new OpenApiGeneratorV31(registry.definitions);
-  return generator.generateDocument({
+  return createDocument({
     openapi: '3.1.0',
-    info: { title: 'The Office API', version: '1.0.0' },
+    info: { title: 'The Office — Slack API', version: '0.1.0' },
+    paths: {
+      '/api/agents': {
+        get: {
+          summary: 'List all agents',
+          responses: { '200': { description: 'Success', content: { 'application/json': { schema: z.array(AgentSchema) } } } },
+        },
+      },
+      // ... all other paths
+    },
   });
 }
 ```
 
-Each route file registers itself:
-
-```typescript
-// src/app/api/agents/route.ts
-import { registry } from '@/api/openapi';
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/agents',
-  summary: 'List all agents',
-  responses: { 200: { description: 'Agent list', content: { 'application/json': { schema: AgentListResponseSchema } } } },
-});
-```
+All schemas and paths are defined centrally in `src/api/openapi.ts` using `zod-openapi`'s `createDocument()`. Schemas use Zod v4's `.meta({ id: '...' })` for reusable component registration.
 
 ---
 
