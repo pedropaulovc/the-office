@@ -27,7 +27,7 @@ This matches TinyTroupe's `ActionGenerator` which independently checks persona a
 
 **Integration point**: Hooks into the `send_message` tool handler. After the agent produces a message text but before `createMessage()` is called, the gate runs.
 
-**Flow**:
+**Flow** (matching TinyTroupe's `ActionGenerator` two-stage correction pipeline):
 1. Agent calls `send_message(channelId, text)`
 2. Gate intercepts: evaluates the message on all enabled quality dimensions
 3. Each dimension scored independently via its action-level proposition (using `first_n: 5, last_n: 10` trajectory windows):
@@ -35,20 +35,45 @@ This matches TinyTroupe's `ActionGenerator` which independently checks persona a
    - **Self-consistency** (`include_personas: false`): "The agent's next action is self-consistent — it does not contradict the agent's previous actions in this conversation. Ignore the agent's persona; self-consistency concerns ONLY the actions observed."
    - **Fluency** (`include_personas: false`): "The agent's next action is fluent — it is natural and human-like, avoids repetition of thoughts or words, and avoids formulaic language patterns"
    - **Suitability** (`include_personas: true`): "The agent's next action is suitable — it is a reasonable step toward a goal, produces relevant information, OR is a reasonable response to incoming stimuli. Meeting ANY ONE of these conditions means FULLY suitable."
-4. If all enabled dimensions score >= their threshold: proceed normally, commit message
-5. If any dimension scores < threshold: discard the tool call, return feedback to the agent including which dimensions failed and why, plus `recommendations_for_improvement` from each failing proposition
-6. Agent retries with the feedback context
-7. Max 2 correction attempts (configurable). After max failures, commit the best-scoring attempt (fail-open — prefer response over silence). If `continue_on_failure` is `false`, return an error instead.
-8. Additionally, compute **action similarity** (Jaccard similarity of the proposed message vs. the agent's last 5 messages). If similarity exceeds threshold (default 0.6), treat as a quality failure and regenerate. This prevents copy-paste-like repetition without needing an LLM call.
-9. Track statistics: regeneration failure rate, original success rate, per-dimension failure rates
+4. If all enabled dimensions score >= their threshold AND similarity check passes: proceed normally, commit message
+5. If any dimension scores < threshold: enter **Stage 1: Regeneration** (if enabled)
+6. **Stage 1 — Regeneration**: Discard the tool call, return feedback to the agent including which dimensions failed and why, plus `recommendations_for_improvement` from each failing proposition. Agent retries from scratch with the feedback context. Max `max_correction_attempts` (default 2) regeneration attempts.
+7. If regeneration exhausted and still failing: enter **Stage 2: Direct Correction** (if enabled)
+8. **Stage 2 — Direct Correction**: Instead of asking the agent to regenerate, the LLM judge extracts corrective rules from the quality check feedback and directly corrects the action text. This is a separate LLM call that takes the failed action + per-dimension feedback and produces a corrected version. Max `max_correction_attempts` (default 2) direct correction attempts. Each corrected version is re-evaluated through quality checks.
+9. After both stages exhausted: if `continue_on_failure` is `true` (default), commit the best-scoring attempt across ALL attempts (fail-open — prefer response over silence). If `false`, return an error instead.
+10. Additionally, compute **action similarity** (Jaccard similarity of the proposed message vs. the agent's last 5 messages). If similarity exceeds threshold (default 0.6), treat as a quality failure and enter the correction pipeline. This prevents copy-paste-like repetition without needing an LLM call.
+11. Track comprehensive statistics (see below)
 
-**Regeneration feedback** (matching TinyTroupe's exact approach from `action_generator.py`): When an action fails quality checks, the feedback message includes:
+**Regeneration feedback** (Stage 1, matching TinyTroupe's exact approach from `action_generator.py`): When an action fails quality checks, the feedback message includes:
 - The tentative action that was about to be generated
 - For each failing dimension: the problem description, the judge's reasoning, and `recommendations_for_improvement` from the proposition
 - An escalating instruction: "Each time your tentative action fails a quality check, you should be MORE RADICAL in your changes, and try to produce something that is **very** different from the previous attempts. It is better to stop acting than to act poorly."
 - The agent may choose to issue a "do nothing" response instead of continuing to fail
 
-**Score aggregation**: The "best-scoring" attempt is determined by the SUM of all dimension scores (not average), matching TinyTroupe's `total_score` calculation. If `continue_on_failure` is true (default), the best attempt is committed even if it doesn't pass all checks.
+**Direct correction feedback** (Stage 2, matching TinyTroupe's `_direct_correction()` method): When regeneration fails, the LLM judge:
+1. Extracts corrective rules from the quality check feedback for each failing dimension
+2. Takes the best regeneration attempt as input
+3. Directly rewrites the action text to satisfy the rules, without involving the agent
+4. The corrected text is re-evaluated through quality checks
+This is faster than regeneration (one LLM call vs. full agent turn) and can succeed where regeneration fails because the agent itself may struggle to self-correct.
+
+**Score aggregation**: The "best-scoring" attempt is determined by the SUM of all dimension scores (not average), matching TinyTroupe's `total_score` calculation. Best attempt is tracked across ALL stages (original + regeneration + direct correction). If `continue_on_failure` is true (default), the best attempt is committed even if it doesn't pass all checks.
+
+**Statistics** (matching TinyTroupe's `ActionGenerator.get_statistics()`): The gate tracks per-agent statistics accessible via `getGateStatistics(agentId, timeWindow)`:
+- `total_actions`: Total actions evaluated
+- `original_pass_count`: Actions that passed on first try
+- `original_pass_rate`: `original_pass_count / total_actions`
+- `regeneration_count`: Actions that entered regeneration stage
+- `regeneration_success_count`: Actions fixed by regeneration
+- `regeneration_failure_rate`: Failed regeneration / total regeneration attempts
+- `regeneration_mean_score` / `regeneration_sd_score`: Mean and SD of scores during regeneration
+- `direct_correction_count`: Actions that entered direct correction stage
+- `direct_correction_success_count`: Actions fixed by direct correction
+- `direct_correction_failure_rate`: Failed correction / total correction attempts
+- `direct_correction_mean_score` / `direct_correction_sd_score`: Mean and SD of scores during correction
+- `forced_through_count`: Actions committed via fail-open
+- `similarity_failure_count`: Actions that failed the similarity check
+- Per-dimension failure counts and mean scores
 
 **Cost**: Each check is 1–4 Claude Haiku calls (one per enabled dimension) plus one algorithmic similarity check. At ~$0.25/1M input tokens, approximately $0.00003–$0.00012 per check.
 
@@ -59,8 +84,10 @@ This matches TinyTroupe's `ActionGenerator` which independently checks persona a
 | File | Purpose |
 |------|---------|
 | `src/features/evaluation/gates/action-correction.ts` | `checkActionQuality(agentId, messageText, conversationContext)` — returns per-dimension scores, similarity score, and overall pass/fail |
+| `src/features/evaluation/gates/direct-correction.ts` | `directCorrect(messageText, qualityFeedback, context)` — LLM extracts corrective rules and rewrites action text |
 | `src/features/evaluation/gates/action-similarity.ts` | `computeActionSimilarity(proposedText, recentMessages)` — Jaccard similarity check (algorithmic, no LLM) |
-| `src/features/evaluation/gates/types.ts` | Types: `GateResult`, `DimensionResult`, `SimilarityResult`, `CorrectionAttempt`, `CorrectionConfig`, `GateStatistics` |
+| `src/features/evaluation/gates/types.ts` | Types: `GateResult`, `DimensionResult`, `SimilarityResult`, `CorrectionAttempt`, `CorrectionStage`, `CorrectionConfig`, `GateStatistics` |
+| `src/tests/factories/bad-action-injector.ts` | `BadActionInjector` test utility — deliberately produces persona-violating actions for testing the correction pipeline (matching TinyTroupe's `BadActionInjector` test helper) |
 
 ### Files to modify
 
@@ -80,29 +107,33 @@ This matches TinyTroupe's `ActionGenerator` which independently checks persona a
 - [ ] [AC-7.0.4] Each dimension has its own score threshold (default 7 for all, matching TinyTroupe's `quality_threshold`; configurable per agent)
 - [ ] [AC-7.0.5] **Action similarity check**: Jaccard similarity of proposed message vs. agent's last 5 messages; if similarity > threshold (default 0.6), treated as quality failure. Purely algorithmic, no LLM call. Independently enabled/disabled.
 - [ ] [AC-7.0.6] `send_message` tool handler calls the gate before committing, when any quality check is enabled for the agent
-- [ ] [AC-7.0.7] Messages failing ANY enabled dimension are not committed; detailed per-dimension feedback returned to the agent for retry
-- [ ] [AC-7.0.8] Feedback includes: tentative action text, per-dimension problem description + reasoning + `recommendations_for_improvement` from each proposition, and escalating "be more radical" instruction
-- [ ] [AC-7.0.9] Maximum 2 correction attempts per message (configurable); after max failures, best-scoring attempt committed if `continue_on_failure` is true (default), else error returned
-- [ ] [AC-7.0.10] "Best-scoring" = attempt with highest SUM of all dimension scores (matching TinyTroupe's `total_score` aggregation)
+- [ ] [AC-7.0.7] Messages failing ANY enabled dimension are not committed; detailed per-dimension feedback returned to the agent for retry (Stage 1: Regeneration)
+- [ ] [AC-7.0.8] Regeneration feedback includes: tentative action text, per-dimension problem description + reasoning + `recommendations_for_improvement` from each proposition, and escalating "be more radical" instruction
+- [ ] [AC-7.0.9] Maximum `max_correction_attempts` (default 2) regeneration attempts per message (Stage 1); independently enabled/disabled via `enable_regeneration` config flag
+- [ ] [AC-7.0.9a] **Stage 2: Direct Correction** — after regeneration exhausted, LLM judge extracts corrective rules from feedback and directly rewrites the action text. Max `max_correction_attempts` direct correction attempts. Independently enabled/disabled via `enable_direct_correction` config flag. Re-evaluates corrected text through quality checks.
+- [ ] [AC-7.0.9b] Both stages can be independently enabled: regeneration only, direct correction only, both (sequential), or neither (single-shot quality check only)
+- [ ] [AC-7.0.10] "Best-scoring" = attempt with highest SUM of all dimension scores across ALL stages (original + regeneration + direct correction), matching TinyTroupe's `total_score` aggregation. After all enabled stages exhausted, best-scoring attempt committed if `continue_on_failure` is true (default), else error returned.
 - [ ] [AC-7.0.11] Quality checks use action-level trajectory windows: `first_n: 5, last_n: 10` (narrower than offline evaluation)
 - [ ] [AC-7.0.12] Quality checks skip if agent has fewer than a configurable minimum number of prior actions (`minimum_required_qty_of_actions`, default 0)
-- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, and outcome (`passed` | `corrected` | `passed_after_retry` | `forced_through` | `timeout_passed`)
+- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, correction stage (`original` | `regeneration` | `direct_correction`), and outcome (`passed` | `regeneration_success` | `direct_correction_success` | `forced_through` | `timeout_passed`)
 - [ ] [AC-7.0.14] Gate is a no-op when all quality checks disabled (configurable per agent — see S-7.3)
 - [ ] [AC-7.0.15] LLM judge calls have a 5-second timeout per dimension; on timeout, that dimension passes (fail-open)
-- [ ] [AC-7.0.16] Statistics tracked: `total_actions`, `original_pass_count`, `regeneration_count`, `forced_through_count`, per-dimension failure counts, mean scores, similarity failure count
-- [ ] [AC-7.0.17] `getGateStatistics(agentId, timeWindow)` returns aggregated statistics
-- [ ] [AC-7.0.18] Unit tests: all dimensions pass, single dimension fails with retry, multiple dimensions fail, suitability check (any-one-condition logic), similarity check, best-scoring selection, forced-through, timeout behavior, statistics, minimum actions skip
+- [ ] [AC-7.0.16] Statistics tracked (matching TinyTroupe's `ActionGenerator.get_statistics()`): `total_actions`, `original_pass_count`, `original_pass_rate`, `regeneration_count`, `regeneration_success_count`, `regeneration_failure_rate`, `regeneration_mean_score`, `regeneration_sd_score`, `direct_correction_count`, `direct_correction_success_count`, `direct_correction_failure_rate`, `direct_correction_mean_score`, `direct_correction_sd_score`, `forced_through_count`, `similarity_failure_count`, per-dimension failure counts and mean scores
+- [ ] [AC-7.0.17] `getGateStatistics(agentId, timeWindow)` returns aggregated statistics matching the full set above
+- [ ] [AC-7.0.18] Unit tests: all dimensions pass, single dimension fails with regeneration retry, direct correction after regeneration failure, both stages disabled (single-shot), multiple dimensions fail, suitability check (any-one-condition logic), similarity check, best-scoring selection across stages, forced-through, timeout behavior, statistics aggregation, minimum actions skip
+- [ ] [AC-7.0.18a] `BadActionInjector` test utility: generates deliberate persona violations for testing the correction pipeline (e.g., makes Michael speak like Dwight, makes Stanley enthusiastic). Used in unit tests to verify the gate catches violations and both correction stages work.
 - [ ] [AC-7.0.19] Sentry spans for gate evaluation and each dimension check
 
 ### Demo
-1. Enable all four quality dimensions for Michael (threshold = 7, matching TinyTroupe default)
+1. Enable all four quality dimensions for Michael (threshold = 7, matching TinyTroupe default), with both regeneration and direct correction enabled
 2. Seed the system so Michael will receive a message
 3. Show a normal response passing all enabled checks (adherence, self-consistency, fluency, suitability)
-4. Temporarily swap Michael's persona to a very specific one and send a message that will produce an off-character response
-5. Show the gate catching it per-dimension, the correction feedback with per-dimension reasoning + recommendations_for_improvement, and the agent retrying
-6. Show the escalating "be more radical" instruction on second failure
-7. Show the `correction_logs` entry with per-dimension scores and similarity score
-8. Show `getGateStatistics()` output
+4. Use `BadActionInjector` to produce a persona-violating response
+5. Show Stage 1 (Regeneration): gate catches per-dimension failures, returns feedback with reasoning + recommendations_for_improvement, agent retries
+6. Show escalating "be more radical" instruction on second regeneration failure
+7. Show Stage 2 (Direct Correction): LLM extracts corrective rules and rewrites the action text
+8. Show the `correction_logs` entries with per-dimension scores, correction stage, and similarity score
+9. Show `getGateStatistics()` output with full statistics across both stages
 
 ---
 
@@ -279,7 +310,8 @@ Configuration is stored in `agent_evaluation_config` table. Cost is tracked via 
   - Action gate per-dimension toggles: `gate_adherence_enabled`, `gate_consistency_enabled`, `gate_fluency_enabled`, `gate_suitability_enabled`
   - Action gate per-dimension thresholds: `gate_adherence_threshold`, `gate_consistency_threshold`, `gate_fluency_threshold`, `gate_suitability_threshold` (all default 7, matching TinyTroupe)
   - Action gate similarity: `gate_similarity_enabled` (default false), `max_action_similarity` (default 0.6)
-  - Action gate general: `max_correction_attempts` (default 2), `continue_on_failure` (default true), `minimum_required_qty_of_actions` (default 0)
+  - Action gate stages: `enable_regeneration` (default true), `enable_direct_correction` (default false — matching TinyTroupe's `ENABLE_DIRECT_CORRECTION=False` default)
+  - Action gate general: `max_correction_attempts` (default 2, applies per-stage), `continue_on_failure` (default true), `minimum_required_qty_of_actions` (default 0)
   - Interventions: `anti_convergence_enabled`, `convergence_threshold`, `variety_intervention_enabled`, `variety_message_threshold` (default 7)
   - Repetition: `repetition_suppression_enabled`, `repetition_threshold`
 - [ ] [AC-7.3.2] Default config used when no agent-specific config exists (all mechanisms disabled by default, matching TinyTroupe's `ENABLE_QUALITY_CHECKS=False` default)

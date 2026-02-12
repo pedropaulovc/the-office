@@ -17,10 +17,14 @@ The first four dimensions are scored 0–9 (0 = worst, 9 = best), matching the T
 ## Proposition Engine
 
 Propositions support:
+- **Two evaluation modes** (matching TinyTroupe's `Proposition` class):
+  - **`score()`**: Quantitative 0–9 integer scoring with detailed rubric (used for offline evaluation and action quality checks)
+  - **`check()`**: Boolean true/false evaluation (used for intervention preconditions — "Is X happening?"). Shares the same LLM judge infrastructure.
 - **`include_personas`**: Whether agent persona spec is included in judge context (default: true)
 - **`target_type`**: `agent` (single agent evaluation) or `environment` (full channel/group evaluation)
 - **`first_n` / `last_n`**: Trajectory windowing — how much of the agent's action history to include as context. Evaluation-level defaults: `first_n: 10, last_n: 100`. Action-level defaults: `first_n: 5, last_n: 10`.
 - **`double_check`**: Judge reconsiders evaluation ("Are you sure?") for stricter scoring (use for experiments, not CI)
+- **`hard`**: Applies a 20% penalty for ANY detected flaw (matching TinyTroupe's `hard_action_persona_adherence`). Used for strict experiment evaluation.
 - **`recommendations_for_improvement`**: Optional per-proposition text guidance returned in feedback when score is below threshold
 - **`precondition`**: Optional function `(target, additionalContext, claimVariables) => boolean` gating when a proposition applies; if false, proposition evaluates as trivially true (score 9)
 - **Scoring rubric**: Integer 0–9 scale matching TinyTroupe's exact rubric with band descriptions included in every judge prompt. Key principle: "If data required to evaluate is not present, assign score 9."
@@ -56,7 +60,7 @@ evaluation_scores
   id                uuid PK DEFAULT gen_random_uuid()
   evaluation_run_id uuid NOT NULL FK(evaluation_runs.id) ON DELETE CASCADE
   dimension         text NOT NULL
-                    -- 'adherence' | 'consistency' | 'fluency' | 'convergence'
+                    -- 'adherence' | 'consistency' | 'fluency' | 'convergence' | 'ideas_quantity'
   proposition_id    text NOT NULL
   score             real NOT NULL   -- 0–9
   reasoning         text NOT NULL
@@ -77,9 +81,10 @@ correction_logs
   dimension_scores jsonb            -- Per-dimension: { adherence: {score, reasoning}, consistency: {...}, fluency: {...}, suitability: {...} }
   similarity_score real             -- Jaccard similarity against recent messages
   total_score     real              -- Sum of all dimension scores (for best-attempt selection)
+  correction_stage text NOT NULL    -- 'original' | 'regeneration' | 'direct_correction'
   attempt_number  integer NOT NULL
   outcome         text NOT NULL
-                  -- 'passed' | 'corrected' | 'passed_after_retry' | 'forced_through' | 'timeout_pass_through'
+                  -- 'passed' | 'regeneration_success' | 'direct_correction_success' | 'forced_through' | 'timeout_pass_through'
   token_usage     jsonb
   created_at      timestamptz NOT NULL DEFAULT now()
   INDEX(agent_id, created_at)
@@ -104,8 +109,11 @@ agent_evaluation_config
   -- Action similarity check
   gate_similarity_enabled         boolean NOT NULL DEFAULT false
   max_action_similarity           real NOT NULL DEFAULT 0.6
+  -- Action gate correction stages
+  enable_regeneration             boolean NOT NULL DEFAULT true
+  enable_direct_correction        boolean NOT NULL DEFAULT false    -- matching TinyTroupe ENABLE_DIRECT_CORRECTION=False
   -- Action gate general
-  max_correction_attempts         integer NOT NULL DEFAULT 2
+  max_correction_attempts         integer NOT NULL DEFAULT 2       -- applies per-stage
   continue_on_failure             boolean NOT NULL DEFAULT true
   minimum_required_qty_of_actions integer NOT NULL DEFAULT 0
   -- Interventions
@@ -165,8 +173,10 @@ src/features/evaluation/propositions/
 │   └── _default.yaml
 ├── fluency/
 │   └── _default.yaml
-└── convergence/
-    └── _default.yaml
+├── convergence/
+│   └── _default.yaml
+└── ideas-quantity/
+    └── _default.yaml       # Environment-level idea enumeration
 ```
 
 ## Scorers
@@ -195,9 +205,11 @@ Hooks into `send_message` tool handler. After agent generates message text, befo
 
 ```
 Agent → send_message(text) → Gate → [all enabled dimensions >= threshold?] → commit
-                                  → [any dimension < threshold?] → per-dimension feedback + recommendations → retry (max 2)
-                                  → [similarity > threshold?]    → too similar to recent messages → retry
-                                                                 → commit best-scoring attempt (sum of all dimension scores)
+                                  → [any dimension < threshold?]
+                                      → Stage 1: Regeneration (if enabled) → agent retries with feedback (max 2)
+                                      → Stage 2: Direct Correction (if enabled) → LLM rewrites action (max 2)
+                                      → commit best-scoring attempt across all stages (sum of dimension scores)
+                                  → [similarity > threshold?] → too similar to recent messages → enter correction pipeline
 ```
 
 - **Four quality dimensions** (matching TinyTroupe): persona adherence (`include_personas: true`), self-consistency (`include_personas: false`), fluency (`include_personas: false`), suitability (`include_personas: true`)
@@ -205,10 +217,11 @@ Agent → send_message(text) → Gate → [all enabled dimensions >= threshold?]
 - **Per-dimension enable/disable**: Each dimension and similarity check toggled independently per agent
 - **Default threshold**: 7 (matching TinyTroupe's `quality_threshold`)
 - **Trajectory window**: `first_n: 5, last_n: 10` (narrower than offline evaluation)
-- **Fail-open**: 5s timeout per dimension → that dimension passes. Max 2 retries → best-scoring attempt committed (sum aggregation).
+- **Two correction stages** (matching TinyTroupe's `ActionGenerator`): Stage 1 = Regeneration (agent retries from scratch with feedback); Stage 2 = Direct Correction (LLM rewrites action directly). Both independently enabled/disabled.
+- **Fail-open**: 5s timeout per dimension → that dimension passes. After both stages exhausted → best-scoring attempt committed (sum aggregation).
 - **Escalating feedback**: "Each time your tentative action fails a quality check, you should be MORE RADICAL in your changes" + `recommendations_for_improvement` per proposition
 - **Cost**: ~$0.00003–$0.00012 per check (1–4 Claude Haiku calls + algorithmic similarity)
-- **Statistics**: Tracks regeneration failure rate, per-dimension failure counts, similarity failure count, mean scores
+- **Statistics**: Tracks original pass rate, regeneration failure rate, direct correction failure rate, per-dimension failure counts, similarity failure count, mean/SD scores per stage (matching TinyTroupe's `get_statistics()`)
 
 ### Intervention Framework
 

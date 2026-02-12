@@ -30,16 +30,20 @@ This is the foundation for all persona drift measurement. A **proposition** is a
 
 The proposition engine:
 1. Loads proposition definitions from YAML files in `src/features/evaluation/propositions/`
-2. Evaluates propositions individually (for experiment accuracy) or in batches of up to 10 (for cost efficiency in CI)
-3. Scores each proposition 0–9 (integer) using a detailed scoring rubric matching TinyTroupe's exact scale
-4. Stores results in an `evaluation_runs` / `evaluation_scores` table
-5. Supports template variables in propositions (e.g., `{{agent_name}}`, `{{action}}`) filled at evaluation time via Mustache-style interpolation
-6. Supports both **agent-level** and **environment-level** proposition targets (environment = channel/group conversation)
-7. Optionally includes agent persona specification in judge context via `include_personas` flag
-8. Supports `double_check` mode where the judge reconsiders its evaluation for stricter scoring
-9. Supports `precondition` functions that gate when a proposition applies (e.g., only for TALK/send_message actions)
-10. Supports `first_n` and `last_n` trajectory windowing — controls how much of the agent's history to include as context (matching TinyTroupe's trajectory window parameters)
-11. Supports `recommendations_for_improvement` per proposition — text guidance returned in feedback when the proposition score is below threshold (used by the action correction gate in M7)
+2. Supports **two evaluation modes** matching TinyTroupe's `Proposition` class:
+   - **`score()`**: Quantitative 0–9 integer scoring with detailed rubric (used for offline evaluation and action quality checks)
+   - **`check()`**: Boolean true/false evaluation (used for intervention preconditions — "Is X happening?")
+3. Evaluates propositions individually (for experiment accuracy) or in batches of up to 10 (for cost efficiency in CI)
+4. Scores each proposition 0–9 (integer) using a detailed scoring rubric matching TinyTroupe's exact scale
+5. Stores results in an `evaluation_runs` / `evaluation_scores` table
+6. Supports template variables in propositions (e.g., `{{agent_name}}`, `{{action}}`) filled at evaluation time via Mustache-style interpolation
+7. Supports both **agent-level** and **environment-level** proposition targets (environment = channel/group conversation)
+8. Optionally includes agent persona specification in judge context via `include_personas` flag
+9. Supports `double_check` mode where the judge reconsiders its evaluation for stricter scoring
+10. Supports `precondition` functions that gate when a proposition applies (e.g., only for TALK/send_message actions)
+11. Supports `first_n` and `last_n` trajectory windowing — controls how much of the agent's history to include as context (matching TinyTroupe's trajectory window parameters)
+12. Supports `recommendations_for_improvement` per proposition — text guidance returned in feedback when the proposition score is below threshold (used by the action correction gate in M7)
+13. Supports **hard evaluation mode** (`hard: true`) — applies a 20% score penalty for ANY detected flaw, regardless of severity. Used for stricter persona adherence checks in experiments (matching TinyTroupe's `hard_action_persona_adherence`)
 
 **Scoring rubric** (included in every LLM judge system prompt, matching TinyTroupe's exact rubric from `proposition.py`):
 ```
@@ -103,7 +107,7 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 |------|---------|
 | `src/db/schema/evaluations.ts` | `evaluation_runs`, `evaluation_scores` tables |
 | `src/features/evaluation/types.ts` | Types: `Proposition`, `PropositionResult`, `EvaluationDimension`, `EvaluationRun`, `EvaluationScore`, `TargetType`, `TrajectoryWindow`, `PreconditionFn` |
-| `src/features/evaluation/proposition-engine.ts` | `loadPropositions(dimension, agentId)`, `evaluateProposition(prop, context)`, `evaluatePropositions(props, context)`, `batchEvaluate(batches)` |
+| `src/features/evaluation/proposition-engine.ts` | `scoreProposition(prop, context)` (0–9), `checkProposition(prop, context)` (boolean), `scorePropositions(props, context)`, `batchScore(batches)` |
 | `src/features/evaluation/proposition-loader.ts` | YAML loader: reads `.yaml` files, validates with Zod, fills template variables |
 | `src/features/evaluation/schemas.ts` | Zod schemas for proposition YAML format, evaluation API request/response |
 | `src/features/evaluation/propositions/README.md` | Documentation for the proposition YAML format |
@@ -116,7 +120,7 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 - [ ] [AC-6.0.2] Proposition YAML loader reads files from `src/features/evaluation/propositions/`, validates with Zod, supports optional `inverted` boolean per proposition
 - [ ] [AC-6.0.3] Template variables (`{{agent_name}}`, `{{channel_name}}`, `{{action}}`) filled at evaluation time from agent/context data
 - [ ] [AC-6.0.3a] Inverted propositions (anti-patterns) have their raw LLM score flipped (`9 - raw`) before aggregation
-- [ ] [AC-6.0.4] `evaluateProposition()` sends a single proposition + context to Claude Haiku and parses score (0–9) + reasoning + confidence; `evaluatePropositions()` supports batch mode grouping up to 10 per call
+- [ ] [AC-6.0.4] Two evaluation modes: `scoreProposition()` returns integer 0–9 with reasoning + confidence; `checkProposition()` returns boolean true/false (used by intervention preconditions in S-7.1). Both share the same LLM judge infrastructure. `scorePropositions()` supports batch mode grouping up to 10 per call.
 - [ ] [AC-6.0.5] Scoring rubric (0–9 with band descriptions) included in every judge system prompt
 - [ ] [AC-6.0.6] Single LLM judge prompt instructs the model to score each proposition independently and return structured JSON with `reasoning`, `justification`, `value`, `confidence` fields
 - [ ] [AC-6.0.7] Evaluation API: GET list runs (filterable by `agentId`), POST trigger new run, GET single run with scores
@@ -128,8 +132,9 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 - [ ] [AC-6.0.13] Trajectory formatted as `"Agent acts: [MESSAGE]"` for agent actions and `"--> Agent: [STIMULUS]"` for incoming messages, matching TinyTroupe's format
 - [ ] [AC-6.0.14] Optional `recommendations_for_improvement` per proposition — text guidance returned when score is below threshold
 - [ ] [AC-6.0.15] Precondition function support: `precondition(target, additionalContext, claimVariables) => boolean`; if `false`, proposition evaluates as trivially true (score 9)
-- [ ] [AC-6.0.16] Unit tests for YAML loading, template variable replacement, LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow, trajectory formatting, precondition gating
-- [ ] [AC-6.0.17] Sentry spans for evaluation runs and LLM judge calls
+- [ ] [AC-6.0.16] Hard evaluation mode: when `hard: true` on a proposition, a 20% penalty is applied to the raw score for ANY detected flaw (matching TinyTroupe's `hard_action_persona_adherence` which states "apply a 20% penalty for each detected flaw"). Hard mode is used in experiments for stricter persona checks.
+- [ ] [AC-6.0.17] Unit tests for YAML loading, template variable replacement, LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow, trajectory formatting, precondition gating, check() vs score() modes, hard evaluation penalty
+- [ ] [AC-6.0.18] Sentry spans for evaluation runs and LLM judge calls
 
 ### Demo
 1. Create a sample proposition YAML for Michael
@@ -157,6 +162,8 @@ This scorer always sets `include_personas: true` — the judge must see the pers
 
 The LLM judge prompt is structured as: "Given this character's persona: [persona]. This character sent the following message: [message]. Score 0–9 how well the following claim holds true: [claim]."
 
+**Hard adherence mode** (optional, for experiments): When `options.hard = true`, uses the hard evaluation variant matching TinyTroupe's `hard_action_persona_adherence`. The judge applies a 20% penalty for ANY detected flaw, regardless of severity. The prompt explicitly instructs: "Each criterion should have equal weight. If any criterion fails, apply a 20% penalty to the overall score for each violation." This produces stricter scores and is the variant used in the Table 1 experiment pipeline (S-8.6/S-8.7). Default mode (non-hard) is used for regular persona drift monitoring.
+
 ### Files to create
 
 | File | Purpose |
@@ -177,8 +184,9 @@ The LLM judge prompt is structured as: "Given this character's persona: [persona
 - [ ] [AC-6.1.4] Each sampled message evaluated against all adherence propositions for that agent
 - [ ] [AC-6.1.5] Propositions from `_default.yaml` merged with agent-specific propositions
 - [ ] [AC-6.1.6] Returns a weighted-average score (0–9) with per-proposition breakdowns stored in `evaluation_scores`
-- [ ] [AC-6.1.7] Unit tests with mocked LLM responses verifying score aggregation, message sampling, proposition merging
-- [ ] [AC-6.1.8] Sentry span wraps adherence scoring
+- [ ] [AC-6.1.7] `options.hard` enables hard adherence mode: 20% penalty per flaw, each criterion equal weight (matching TinyTroupe's `hard_action_persona_adherence`)
+- [ ] [AC-6.1.8] Unit tests with mocked LLM responses verifying score aggregation, message sampling, proposition merging, hard vs. normal mode
+- [ ] [AC-6.1.9] Sentry span wraps adherence scoring
 
 ### Demo
 1. Seed several `run_messages` entries containing `send_message` tool calls for Michael
