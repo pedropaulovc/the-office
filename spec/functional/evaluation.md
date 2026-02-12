@@ -1,221 +1,95 @@
-# Evaluation
+# Evaluation (TinyTroupe Table 1 Reproduction)
 
-Persona drift measurement, correction, and regression testing. Scores agent behavior on four dimensions using proposition-based LLM-as-judge evaluation, applies runtime corrections to maintain character consistency, and provides a CI harness for persona regression testing.
+This project must reproduce Table 1 from the TinyTroupe paper using the official paper artifacts and (optionally) rerunning the experiments. The evaluation system in milestones 6-8 is dedicated to TinyTroupe reproduction, not the Office persona drift system.
 
-## Evaluation Dimensions
+## Table 1 Experiments
 
-| Dimension | What It Measures | Method |
-|-----------|-----------------|--------|
-| **Adherence** | Does agent behavior match its persona spec? | LLM judge scores message vs. system prompt persona |
-| **Consistency** | Is the agent consistent with its own past behavior? | LLM judge compares current vs. historical messages (no persona spec) |
-| **Fluency** | Does the agent avoid repetitive/formulaic language? | Algorithmic n-gram overlap + LLM judge for structural variety |
-| **Convergence** | Do agents maintain distinct voices in group conversations? | Vocabulary stats + LLM judge on anonymized messages |
+| Code | Scenario | Population | Treatment | Control | Artifact JSON |
+|------|----------|------------|-----------|---------|--------------|
+| exp_1 | Brainstorming with average customers | `population/usa_general` | action correction + variety intervention | no correction, no intervention | `paper_artifacts_june-2025/brainstorming_and_focus_group_quantitative_experimentation_1c.json` |
+| exp_2_1 | Brainstorming with difficult customers | `population/difficult_people` + `fragments/difficult_person.agent.fragment.json` | action correction + variety intervention | no correction, no intervention | `paper_artifacts_june-2025/brainstorming_and_focus_group_quantitative_experimentation_2.1c.json` |
+| exp_2_2 | Brainstorming with difficult customers | `population/difficult_people` + fragment | variety intervention only | no correction, no intervention | `paper_artifacts_june-2025/brainstorming_and_focus_group_quantitative_experimentation_2.2b.json` |
+| exp_3 | Debating controversial themes | `population/political_compass` | action correction only | no correction | `paper_artifacts_june-2025/debating_quantitative_experimentation_1c.json` |
 
-All dimensions scored 0–9 (0 = worst, 9 = best), matching the TinyTroupe evaluation scale. For the **Convergence** dimension specifically, higher scores mean agents **better maintain distinct voices** (i.e., less convergence / more divergence in style). Conceptually this is a "voice divergence" score stored under the `convergence` dimension name — treat it as such in aggregation and regression logic.
+## Metrics
+
+Table 1 uses these metrics, scored 0-9 unless noted:
+- `persona_adherence`: derived from TinyTroupe `Hard Persona Adherence` or `Persona Adherence` (mapped to one key)
+- `self_consistency`
+- `fluency`
+- `divergence`
+- `ideas_qty`: integer count of ideas (brainstorming only)
+
+Metrics are computed from TinyTroupe validation propositions and aggregated as mean and standard deviation. P-values use Welch t-test.
 
 ## Data Model
 
-### evaluation_runs
+TinyTroupe reproduction stores data in dedicated tables.
+
+### tt_experiments
 
 ```sql
-evaluation_runs
+tt_experiments
+  id            uuid PK DEFAULT gen_random_uuid()
+  code          text NOT NULL UNIQUE
+  label         text NOT NULL
+  na            integer NOT NULL
+  ne            integer NOT NULL
+  treatment     text NOT NULL
+  control       text NOT NULL
+  artifact_path text NOT NULL
+  notebook_path text NOT NULL
+  created_at    timestamptz NOT NULL DEFAULT now()
+```
+
+### tt_metric_samples
+
+```sql
+tt_metric_samples
+  id            uuid PK DEFAULT gen_random_uuid()
+  experiment_id uuid NOT NULL FK(tt_experiments.id) ON DELETE CASCADE
+  group         text NOT NULL  -- control | treatment
+  metric        text NOT NULL
+  values        real[] NOT NULL
+  created_at    timestamptz NOT NULL DEFAULT now()
+```
+
+### tt_metric_stats
+
+```sql
+tt_metric_stats
   id              uuid PK DEFAULT gen_random_uuid()
-  agent_id        text NOT NULL FK(agents.id) ON DELETE CASCADE
-  status          text NOT NULL DEFAULT 'pending'
-                  -- 'pending' | 'running' | 'completed' | 'failed'
-  dimensions      text[] NOT NULL
-  window_start    timestamptz
-  window_end      timestamptz
-  sample_size     integer NOT NULL
-  overall_score   real
-  is_baseline     boolean NOT NULL DEFAULT false
-  token_usage     jsonb         -- { input_tokens, output_tokens }
+  experiment_id   uuid NOT NULL FK(tt_experiments.id) ON DELETE CASCADE
+  metric          text NOT NULL
+  control_mean    real NOT NULL
+  control_sd      real NOT NULL
+  treatment_mean  real NOT NULL
+  treatment_sd    real NOT NULL
+  delta           real NOT NULL
+  p_value         real NOT NULL
+  test_type       text NOT NULL DEFAULT 'welch_t_test'
   created_at      timestamptz NOT NULL DEFAULT now()
-  completed_at    timestamptz
-  INDEX(agent_id, created_at)
 ```
 
-### evaluation_scores
+## CLI and API
 
-```sql
-evaluation_scores
-  id                uuid PK DEFAULT gen_random_uuid()
-  evaluation_run_id uuid NOT NULL FK(evaluation_runs.id) ON DELETE CASCADE
-  dimension         text NOT NULL
-                    -- 'adherence' | 'consistency' | 'fluency' | 'convergence'
-  proposition_id    text NOT NULL
-  score             real NOT NULL   -- 0–9
-  reasoning         text NOT NULL
-  context_snippet   text
-  created_at        timestamptz NOT NULL DEFAULT now()
-  INDEX(evaluation_run_id, dimension)
+CLI:
+```
+npm run tinytroupe:table1 -- [--from-artifacts | --rerun] [--validate] [--out <path>]
 ```
 
-### correction_logs
+API:
+- `POST /api/tinytroupe/table1` recomputes Table 1
+- `GET /api/tinytroupe/table1` returns the latest report
 
-```sql
-correction_logs
-  id              uuid PK DEFAULT gen_random_uuid()
-  agent_id        text NOT NULL FK(agents.id) ON DELETE CASCADE
-  run_id          uuid FK(runs.id) ON DELETE SET NULL
-  original_text   text NOT NULL
-  corrected_text  text
-  score           real              -- NULL for timeout_pass_through
-  threshold       real NOT NULL
-  reasoning       text              -- NULL for timeout_pass_through
-  attempt_number  integer NOT NULL
-  outcome         text NOT NULL
-                  -- 'passed' | 'corrected' | 'passed_after_retry' | 'forced_through' | 'timeout_pass_through'
-  token_usage     jsonb
-  created_at      timestamptz NOT NULL DEFAULT now()
-  INDEX(agent_id, created_at)
-```
+## Validation
 
-### agent_evaluation_config
+The published Table 1 values are stored in `src/evaluation/tinytroupe/baselines/table1.json`. Validation compares computed values to this baseline with a default tolerance of 0.01 for mean/sd/delta and 1e-3 for p-values.
 
-```sql
-agent_evaluation_config
-  id                              uuid PK DEFAULT gen_random_uuid()
-  agent_id                        text NOT NULL UNIQUE FK(agents.id) ON DELETE CASCADE
-  action_gate_enabled             boolean NOT NULL DEFAULT false
-  action_gate_threshold           real NOT NULL DEFAULT 5.0
-  anti_convergence_enabled        boolean NOT NULL DEFAULT false
-  convergence_threshold           real NOT NULL DEFAULT 0.6
-  repetition_suppression_enabled  boolean NOT NULL DEFAULT false
-  repetition_threshold            real NOT NULL DEFAULT 0.3
-  max_correction_attempts         integer NOT NULL DEFAULT 2
-  updated_at                      timestamptz NOT NULL DEFAULT now()
-```
+## CI
 
-## Propositions
-
-Propositions are natural language claims about agent behavior, defined in YAML files and scored by an LLM judge.
-
-### YAML Format
-
-```yaml
-dimension: adherence        # Which dimension this proposition set evaluates
-agent_id: michael           # Which agent (or '_default' for universal)
-propositions:
-  - id: michael-self-centered
-    claim: "{{agent_name}} makes conversations about themselves"
-    weight: 1.0             # 0–1, importance for this character
-  - id: michael-never-boring
-    claim: "{{agent_name}} would NEVER give a dry, factual response"
-    weight: 0.8
-    inverted: true          # Anti-pattern: high score = bad
-```
-
-### Template Variables
-
-| Variable | Replaced With |
-|----------|---------------|
-| `{{agent_name}}` | Agent's display name (e.g., "Michael Scott") |
-| `{{channel_name}}` | Channel where the message was sent |
-| `{{recipient_name}}` | DM recipient's name (DMs only) |
-
-### File Organization
-
-```
-src/features/evaluation/propositions/
-├── adherence/
-│   ├── _default.yaml      # Universal (all agents)
-│   ├── michael.yaml        # Character-specific
-│   ├── dwight.yaml
-│   └── ...                 # One per character
-├── consistency/
-│   └── _default.yaml
-├── fluency/
-│   └── _default.yaml
-└── convergence/
-    └── _default.yaml
-```
-
-## Scorers
-
-Each dimension has a dedicated scorer function that:
-1. Pulls relevant messages from `run_messages`
-2. Loads propositions for the dimension + agent
-3. Evaluates via the proposition engine (LLM judge or algorithmic)
-4. Returns a weighted score (0–9)
-
-| Scorer | Input | LLM Calls | Key Logic |
-|--------|-------|-----------|-----------|
-| `scoreAdherence()` | Agent messages + persona spec | Yes (batched) | Judge scores message vs. persona claim |
-| `scoreConsistency()` | Current + historical message pairs | Yes (batched) | Judge scores whether paired messages come from same character |
-| `scoreFluency()` | Agent's recent messages | Partial (structural only) | N-gram overlap (algorithmic) + structural variety (LLM) |
-| `scoreConvergence()` | All agent messages in a channel | Yes (batched) | Vocabulary stats (algorithmic) + voice distinctiveness (LLM) |
-
-## Runtime Corrections
-
-Three mechanisms, all configurable per-agent, all disabled by default:
-
-### Action Correction Gate
-
-Hooks into `send_message` tool handler. After agent generates message text, before DB commit:
-
-```
-Agent → send_message(text) → Gate → [score >= threshold?] → commit
-                                  → [score < threshold?] → feedback → retry (max 2)
-                                                                    → force-through after max retries
-```
-
-- **Fail-open**: 5s timeout on judge call → pass through. Max 2 retries → force-through.
-- **Cost**: ~$0.00003 per check (Claude Haiku, ~100 tokens)
-
-### Anti-Convergence Intervention
-
-Hooks into orchestrator, pre-invocation. Checks agreement ratio in last 10 channel messages:
-
-```
-Orchestrator → [agreement ratio > threshold?] → inject nudge into system prompt
-             → [ratio OK?] → proceed normally
-```
-
-- Character-aware nudges (Michael: "tell a story", Dwight: "assert authority", Jim: "witty observation")
-- Transient: nudge not stored in memory, single-use
-
-### Repetition Suppression
-
-Hooks into orchestrator, pre-invocation. Checks n-gram overlap in agent's last 5 messages:
-
-```
-Orchestrator → [overlap > threshold?] → inject "recent messages + avoid phrases" into prompt
-             → [overlap OK?] → proceed normally
-```
-
-- Purely algorithmic detection (no LLM call)
-- Lists specific repeated n-grams for the agent to avoid
-
-## Evaluation Harness
-
-CLI tool for dev-time and CI persona testing:
-
-```
-npm run eval:run -- [options]
-npm run eval:baseline -- --agents michael,dwight
-```
-
-### Modes
-
-| Mode | When | LLM Calls | Deterministic |
-|------|------|-----------|---------------|
-| Live | Manual evaluation | Yes | No |
-| Mock judge | CI, regression testing | No (pre-recorded) | Yes |
-| Synthetic | No real messages exist | Yes (generate + evaluate) | No |
-
-### Golden Baselines
-
-JSON files committed to `src/features/evaluation/baselines/`. Regression = score drops >1.0 point below baseline.
-
-### CI Workflow
-
-GitHub Actions on PRs touching persona-related files. Runs mock-judge mode (<60s). Posts PR comment with scores table. Fails on regressions.
+CI runs `npm run tinytroupe:table1 -- --from-artifacts --validate`. No LLM calls and no reruns in CI.
 
 ## Related
 
-- [Agents](agents.md) — Agent persistence, system prompts
-- [Memory](memory.md) — Core memory blocks that shape agent behavior
-- [Runtime](runtime.md) — Orchestrator pipeline where corrections integrate
-- [Tools](tools.md) — `send_message` tool where action gate hooks in
-- Implementation: `spec/plan/milestone-6-persona-drift-measurement.md`, `spec/plan/milestone-7-persona-drift-correction.md`, `spec/plan/milestone-8-evaluation-harness.md`
+- Implementation plan: `spec/plan/milestone-6-persona-drift-measurement.md`, `spec/plan/milestone-7-persona-drift-correction.md`, `spec/plan/milestone-8-evaluation-harness.md`

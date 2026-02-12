@@ -1,0 +1,51 @@
+{
+  "experiments": {
+    "exp_1": {
+      "label": "Brainstorming with average customers",
+      "na": 200,
+      "ne": 40,
+      "metrics": {
+        "persona_adherence": { "t_mean": 5.81, "t_sd": 1.66, "c_mean": 6.72, "c_sd": 1.50, "delta": -0.92, "p_value": "<0.001" },
+        "self_consistency": { "t_mean": 5.00, "t_sd": 1.79, "c_mean": 7.16, "c_sd": 1.15, "delta": -2.16, "p_value": "<0.001" },
+        "fluency": { "t_mean": 6.75, "t_sd": 1.02, "c_mean": 7.27, "c_sd": 0.65, "delta": -0.52, "p_value": "<0.001" },
+        "divergence": { "t_mean": 6.15, "t_sd": 1.08, "c_mean": 6.63, "c_sd": 1.05, "delta": -0.47, "p_value": 0.050 },
+        "ideas_qty": { "t_mean": 8.28, "t_sd": 2.34, "c_mean": 3.85, "c_sd": 2.01, "delta": 4.43, "p_value": "<0.001" }
+      }
+    },
+    "exp_2_1": {
+      "label": "Brainstorming with difficult customers (action + variety)",
+      "na": 96,
+      "ne": 24,
+      "metrics": {
+        "persona_adherence": { "t_mean": 4.95, "t_sd": 1.09, "c_mean": 4.15, "c_sd": 1.39, "delta": 0.80, "p_value": "<0.001" },
+        "self_consistency": { "t_mean": 3.54, "t_sd": 1.44, "c_mean": 5.60, "c_sd": 1.51, "delta": -2.06, "p_value": "<0.001" },
+        "fluency": { "t_mean": 3.22, "t_sd": 1.45, "c_mean": 6.34, "c_sd": 1.35, "delta": -3.13, "p_value": "<0.001" },
+        "divergence": { "t_mean": 4.88, "t_sd": 1.94, "c_mean": 6.29, "c_sd": 1.12, "delta": -1.42, "p_value": 0.004 },
+        "ideas_qty": { "t_mean": 2.45, "t_sd": 1.54, "c_mean": 4.17, "c_sd": 2.50, "delta": -1.72, "p_value": 0.008 }
+      }
+    },
+    "exp_2_2": {
+      "label": "Brainstorming with difficult customers (variety only)",
+      "na": 96,
+      "ne": 24,
+      "metrics": {
+        "persona_adherence": { "t_mean": 4.74, "t_sd": 1.55, "c_mean": 5.34, "c_sd": 1.48, "delta": -0.60, "p_value": 0.006 },
+        "self_consistency": { "t_mean": 4.55, "t_sd": 1.63, "c_mean": 5.47, "c_sd": 1.67, "delta": -0.92, "p_value": "<0.001" },
+        "fluency": { "t_mean": 6.11, "t_sd": 1.56, "c_mean": 6.45, "c_sd": 1.51, "delta": -0.33, "p_value": 0.134 },
+        "divergence": { "t_mean": 6.42, "t_sd": 1.10, "c_mean": 5.88, "c_sd": 1.33, "delta": 0.54, "p_value": 0.131 },
+        "ideas_qty": { "t_mean": 9.29, "t_sd": 3.33, "c_mean": 3.96, "c_sd": 2.27, "delta": 5.33, "p_value": "<0.001" }
+      }
+    },
+    "exp_3": {
+      "label": "Debating controversial themes",
+      "na": 120,
+      "ne": 24,
+      "metrics": {
+        "persona_adherence": { "t_mean": 6.63, "t_sd": 1.34, "c_mean": 6.16, "c_sd": 1.59, "delta": 0.47, "p_value": 0.015 },
+        "self_consistency": { "t_mean": 6.79, "t_sd": 1.63, "c_mean": 5.81, "c_sd": 2.37, "delta": 0.98, "p_value": "<0.001" },
+        "fluency": { "t_mean": 6.38, "t_sd": 1.20, "c_mean": 6.48, "c_sd": 1.04, "delta": -0.11, "p_value": 0.454 },
+        "divergence": { "t_mean": 4.92, "t_sd": 2.24, "c_mean": 5.04, "c_sd": 2.29, "delta": -0.13, "p_value": 0.849 }
+      }
+    }
+  }
+}
