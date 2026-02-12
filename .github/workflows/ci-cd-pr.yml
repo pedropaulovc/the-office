@@ -178,7 +178,10 @@ jobs:
         timeout-minutes: 1
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-ref.outputs.ref || '' }}
+          # E2E tests run against the Vercel preview, which deploys from the
+          # PR branch head — NOT the merge commit. The checkout must match
+          # so the test suite only includes tests for code actually deployed.
+          ref: ${{ needs.resolve-ref.outputs.ref || github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
         timeout-minutes: 1
