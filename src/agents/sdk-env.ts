@@ -5,8 +5,18 @@ import { logInfo, logWarn } from "@/lib/telemetry";
  * Routes SDK's native OTel data to Sentry via OTLP by parsing the Sentry DSN.
  */
 export function buildSdkEnv(): Record<string, string | undefined> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not set");
+  }
+
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    ANTHROPIC_API_KEY: apiKey,
+  };
+
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-  if (!dsn) return { ...process.env };
+  if (!dsn) return env;
 
   try {
     const url = new URL(dsn);
@@ -15,7 +25,7 @@ export function buildSdkEnv(): Record<string, string | undefined> {
     const host = url.hostname;
 
     return {
-      ...process.env,
+      ...env,
       CLAUDE_CODE_ENABLE_TELEMETRY: "1",
       OTEL_METRICS_EXPORTER: "otlp",
       OTEL_LOGS_EXPORTER: "otlp",
@@ -25,7 +35,7 @@ export function buildSdkEnv(): Record<string, string | undefined> {
     };
   } catch {
     logWarn("buildSdkEnv: malformed SENTRY_DSN, skipping OTLP config", { dsn });
-    return { ...process.env };
+    return env;
   }
 }
 

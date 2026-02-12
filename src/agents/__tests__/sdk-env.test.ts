@@ -11,7 +11,7 @@ describe("sdk-env", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnv, ANTHROPIC_API_KEY: "sk-test-key" };
   });
 
   afterEach(() => {
@@ -43,8 +43,16 @@ describe("sdk-env", () => {
     const { buildSdkEnv } = await import("../sdk-env");
     const env = buildSdkEnv();
 
+    expect(env.ANTHROPIC_API_KEY).toBe("sk-test-key");
     expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+  });
+
+  it("buildSdkEnv throws when ANTHROPIC_API_KEY is missing", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+
+    const { buildSdkEnv } = await import("../sdk-env");
+    expect(() => buildSdkEnv()).toThrow("ANTHROPIC_API_KEY is not set");
   });
 
   it("createSdkStderrHandler calls logInfo with correct attributes", async () => {
