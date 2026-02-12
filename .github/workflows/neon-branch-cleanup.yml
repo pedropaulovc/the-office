@@ -1,0 +1,62 @@
+name: Neon Branch Cleanup
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+
+env:
+  NEON_PROJECT_ID: falling-shape-29696747
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-slim
+    steps:
+      - name: Delete stale Neon preview branches
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get all open PR head branches
+          open_branches=$(gh api repos/${{ github.repository }}/pulls --jq '.[].head.ref' -q 'state=open' --paginate)
+
+          # Get all Neon branches (JSON array)
+          neon_branches=$(curl -sf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches" \
+            | jq -c '.branches[] | select(.name != "main") | {id: .id, name: .name}')
+
+          if [ -z "$neon_branches" ]; then
+            echo "No non-main Neon branches found. Nothing to do."
+            exit 0
+          fi
+
+          deleted=0
+          skipped=0
+
+          while IFS= read -r branch; do
+            id=$(echo "$branch" | jq -r '.id')
+            name=$(echo "$branch" | jq -r '.name')
+            git_branch="${name#preview/}"
+
+            # Keep branches that correspond to an open PR
+            if echo "$open_branches" | grep -qxF "$git_branch"; then
+              echo "KEEP: $name (open PR exists for $git_branch)"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            echo "DELETE: $name (id: $id)"
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$id"
+            deleted=$((deleted + 1))
+          done <<< "$neon_branches"
+
+          echo ""
+          echo "Done. Deleted $deleted branch(es), kept $skipped."
