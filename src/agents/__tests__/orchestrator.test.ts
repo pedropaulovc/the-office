@@ -102,6 +102,10 @@ vi.mock("@sentry/nextjs", () => ({
   captureException: (err: unknown) => { mockCaptureException(err); },
 }));
 
+vi.mock("@/agents/constants", () => ({
+  MAX_CHAIN_DEPTH: 3,
+}));
+
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_name: string, _op: string, fn: () => unknown) => fn(),
   logInfo: vi.fn(),
@@ -323,7 +327,7 @@ describe("orchestrator", () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general");
+    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", 0, expect.any(Function));
   });
 
   it("passes resume: sessionId when agent has existing session", async () => {
@@ -564,7 +568,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logWarn).toHaveBeenCalledWith(
-      "sdk.compact",
+      "sdk.compact.michael",
       expect.objectContaining({ trigger: "auto", preTokens: 50000 }),
     );
     expect(countMetric).toHaveBeenCalledWith("sdk.compaction", 1, { agentId: "michael" });
@@ -581,7 +585,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logError).toHaveBeenCalledWith(
-      "sdk.auth_status",
+      "sdk.auth_status.michael",
       expect.objectContaining({ error: "token expired" }),
     );
   });
@@ -597,7 +601,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logWarn).toHaveBeenCalledWith(
-      "sdk.auth_status",
+      "sdk.auth_status.michael",
       expect.objectContaining({ isAuthenticating: true }),
     );
   });
@@ -654,7 +658,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logInfo).toHaveBeenCalledWith(
-      "sdk.init",
+      "sdk.init.michael",
       expect.objectContaining({
         model: "claude-sonnet-4-5-20250929",
         permissionMode: "bypassPermissions",
@@ -669,8 +673,49 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logError).toHaveBeenCalledWith(
-      "sdk.result.error",
+      "sdk.result.error.michael",
       expect.objectContaining({ error: "something failed" }),
+    );
+  });
+
+  it("skips execution when chain depth exceeds MAX_CHAIN_DEPTH", async () => {
+    const deepRun = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 3 });
+
+    const { executeRun } = await import("../orchestrator");
+    const result = await executeRun(deepRun);
+
+    expect(result.status).toBe("completed");
+    expect(result.stopReason).toBe("end_turn");
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(logWarn).toHaveBeenCalledWith(
+      "chain depth exceeded, skipping run",
+      expect.objectContaining({ chainDepth: 3, maxChainDepth: 3 }),
+    );
+    expect(countMetric).toHaveBeenCalledWith(
+      "orchestrator.chain_depth_exceeded", 1, { agentId: "michael" },
+    );
+  });
+
+  it("allows execution at chain depth below MAX_CHAIN_DEPTH", async () => {
+    const run = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 2 });
+    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    const result = await executeRun(run);
+
+    expect(result.status).toBe("completed");
+    expect(mockQuery).toHaveBeenCalled();
+  });
+
+  it("passes chainDepth and executeRun to getToolServer", async () => {
+    const run = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 1 });
+    sdkMessages = [makeInitMessage(), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(run);
+
+    expect(mockGetToolServer).toHaveBeenCalledWith(
+      "michael", run.id, "general", 1, expect.any(Function),
     );
   });
 });

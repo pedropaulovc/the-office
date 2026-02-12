@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DbMessage, DbReaction, ArchivalPassage, MemoryBlock, RunMessage } from "@/db/schema";
+import type { DbMessage, DbReaction, ArchivalPassage, MemoryBlock, RunMessage, Channel, Run } from "@/db/schema";
+import { logInfo, countMetric } from "@/lib/telemetry";
 
 // --- Mocks ---
 
@@ -10,6 +11,8 @@ const mockUpsertMemoryBlock = vi.fn<(data: unknown) => Promise<MemoryBlock>>();
 const mockListArchivalPassages = vi.fn<(agentId: string, query: string) => Promise<ArchivalPassage[]>>();
 const mockCreateArchivalPassage = vi.fn<(data: unknown) => Promise<ArchivalPassage>>();
 const mockGetMessage = vi.fn<(id: string) => Promise<DbMessage | undefined>>();
+const mockGetChannel = vi.fn<(id: string) => Promise<Channel | undefined>>();
+const mockListChannelMembers = vi.fn<(channelId: string) => Promise<string[]>>();
 
 vi.mock("@/db/queries", () => ({
   createMessage: (data: unknown) => mockCreateMessage(data),
@@ -19,6 +22,8 @@ vi.mock("@/db/queries", () => ({
   upsertMemoryBlock: (data: unknown) => mockUpsertMemoryBlock(data),
   listArchivalPassages: (agentId: string, query: string) => mockListArchivalPassages(agentId, query),
   createArchivalPassage: (data: unknown) => mockCreateArchivalPassage(data),
+  getChannel: (id: string) => mockGetChannel(id),
+  listChannelMembers: (channelId: string) => mockListChannelMembers(channelId),
 }));
 
 const mockBroadcast = vi.fn();
@@ -27,11 +32,22 @@ vi.mock("@/messages/sse-registry", () => ({
   connectionRegistry: { broadcast: (...args: unknown[]) => { mockBroadcast(...args); } },
 }));
 
+const mockEnqueueRun = vi.fn<(input: unknown, executor?: unknown) => Promise<Run>>();
+
+vi.mock("@/agents/mailbox", () => ({
+  enqueueRun: (...args: unknown[]) => mockEnqueueRun(...args as [unknown, unknown]),
+}));
+
+vi.mock("@/agents/constants", () => ({
+  MAX_CHAIN_DEPTH: 3,
+}));
+
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_name: string, _op: string, fn: () => unknown) => fn(),
   logInfo: vi.fn(),
   logError: vi.fn(),
   logWarn: vi.fn(),
+  countMetric: vi.fn(),
 }));
 
 interface MockToolDef {
@@ -58,6 +74,12 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   createSdkMcpServer: (opts: unknown) => opts,
 }));
 
+// --- Helpers ---
+
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 10));
+}
+
 // --- Tests ---
 
 describe("MCP tools", () => {
@@ -70,6 +92,9 @@ describe("send_message tool", () => {
       text: "Hello", parentMessageId: null, createdAt: new Date(),
     });
     mockCreateRunMessage.mockResolvedValue(undefined);
+    // Default: non-DM channel (no chain trigger)
+    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight", "jim"]);
   });
 
   it("creates a message and broadcasts SSE event", async () => {
@@ -99,6 +124,118 @@ describe("send_message tool", () => {
     expect(mockCreateRunMessage).toHaveBeenCalledWith(
       expect.objectContaining({ runId: "run-1", messageType: "tool_return_message", toolName: "send_message" }),
     );
+  });
+
+  it("does not enqueue follow-up for non-DM channels", async () => {
+    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "" });
+
+    const { createSendMessageTool } = await import("../send-message");
+    const toolDef = createSendMessageTool("michael", "run-1", "general", 0) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Hello" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
+  });
+
+  it("enqueues follow-up run for DM channel with incremented chain depth", async () => {
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-1", channelId: "dm-michael-dwight", userId: "michael",
+      text: "Hey Dwight", parentMessageId: null, createdAt: new Date(),
+    });
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
+    const mockExecutor = vi.fn();
+
+    const { createSendMessageTool } = await import("../send-message");
+    const toolDef = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 0, mockExecutor) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Hey Dwight" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).toHaveBeenCalledWith(
+      {
+        agentId: "dwight",
+        channelId: "dm-michael-dwight",
+        triggerMessageId: "dm-msg-1",
+        chainDepth: 1,
+      },
+      mockExecutor,
+    );
+  });
+
+  it("does not enqueue when chain depth would reach MAX_CHAIN_DEPTH", async () => {
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-2", channelId: "dm-michael-dwight", userId: "michael",
+      text: "Again", parentMessageId: null, createdAt: new Date(),
+    });
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
+
+    const { createSendMessageTool } = await import("../send-message");
+    // chainDepth=2, so next would be 3 which equals MAX_CHAIN_DEPTH(3)
+    const toolDef = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 2) as unknown as MockToolDef;
+
+    await toolDef.handler({ text: "Again" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
+    expect(logInfo).toHaveBeenCalledWith(
+      "dm chain depth limit reached, not enqueuing",
+      expect.objectContaining({ chainDepth: 2, maxChainDepth: 3 }),
+    );
+    expect(countMetric).toHaveBeenCalledWith("agent.chain_depth_limit", 1, { agentId: "michael" });
+  });
+
+  it("tracks chain depth through consecutive DM exchanges", async () => {
+    // Depth 0 → enqueues depth 1
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-d0", channelId: "dm-ab", userId: "agentA",
+      text: "d0", parentMessageId: null, createdAt: new Date(),
+    });
+    mockGetChannel.mockResolvedValue({ id: "dm-ab", name: "DM", kind: "dm", topic: "" });
+    mockListChannelMembers.mockResolvedValue(["agentA", "agentB"]);
+
+    const { createSendMessageTool } = await import("../send-message");
+    const exec = vi.fn();
+
+    const tool0 = createSendMessageTool("agentA", "run-0", "dm-ab", 0, exec) as unknown as MockToolDef;
+    await tool0.handler({ text: "d0" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "agentB", chainDepth: 1 }),
+      exec,
+    );
+
+    // Depth 1 → enqueues depth 2
+    mockEnqueueRun.mockClear();
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-d1", channelId: "dm-ab", userId: "agentB",
+      text: "d1", parentMessageId: null, createdAt: new Date(),
+    });
+
+    const tool1 = createSendMessageTool("agentB", "run-1", "dm-ab", 1, exec) as unknown as MockToolDef;
+    await tool1.handler({ text: "d1" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "agentA", chainDepth: 2 }),
+      exec,
+    );
+
+    // Depth 2 → does NOT enqueue depth 3 (MAX_CHAIN_DEPTH=3)
+    mockEnqueueRun.mockClear();
+    mockCreateMessage.mockResolvedValue({
+      id: "dm-msg-d2", channelId: "dm-ab", userId: "agentA",
+      text: "d2", parentMessageId: null, createdAt: new Date(),
+    });
+
+    const tool2 = createSendMessageTool("agentA", "run-2", "dm-ab", 2, exec) as unknown as MockToolDef;
+    await tool2.handler({ text: "d2" }, undefined);
+    await flushMicrotasks();
+
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
   });
 });
 
