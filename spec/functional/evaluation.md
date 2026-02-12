@@ -19,8 +19,12 @@ The first four dimensions are scored 0–9 (0 = worst, 9 = best), matching the T
 Propositions support:
 - **`include_personas`**: Whether agent persona spec is included in judge context (default: true)
 - **`target_type`**: `agent` (single agent evaluation) or `environment` (full channel/group evaluation)
-- **`double_check`**: Judge reconsiders evaluation for stricter scoring (use for experiments, not CI)
-- **Scoring rubric**: 0–9 scale with detailed band descriptions included in every judge prompt
+- **`first_n` / `last_n`**: Trajectory windowing — how much of the agent's action history to include as context. Evaluation-level defaults: `first_n: 10, last_n: 100`. Action-level defaults: `first_n: 5, last_n: 10`.
+- **`double_check`**: Judge reconsiders evaluation ("Are you sure?") for stricter scoring (use for experiments, not CI)
+- **`recommendations_for_improvement`**: Optional per-proposition text guidance returned in feedback when score is below threshold
+- **`precondition`**: Optional function `(target, additionalContext, claimVariables) => boolean` gating when a proposition applies; if false, proposition evaluates as trivially true (score 9)
+- **Scoring rubric**: Integer 0–9 scale matching TinyTroupe's exact rubric with band descriptions included in every judge prompt. Key principle: "If data required to evaluate is not present, assign score 9."
+- **Trajectory format**: Agent actions formatted as `"Agent acts: [MESSAGE]"`, stimuli as `"--> Agent: [STIMULUS]"`
 - **Individual and batch evaluation**: Individual mode for experiment accuracy, batch (up to 10) for CI cost efficiency
 
 ## Data Model
@@ -70,9 +74,9 @@ correction_logs
   run_id          uuid FK(runs.id) ON DELETE SET NULL
   original_text   text NOT NULL
   corrected_text  text
-  score           real              -- NULL for timeout_pass_through
-  threshold       real NOT NULL
-  reasoning       text              -- NULL for timeout_pass_through
+  dimension_scores jsonb            -- Per-dimension: { adherence: {score, reasoning}, consistency: {...}, fluency: {...}, suitability: {...} }
+  similarity_score real             -- Jaccard similarity against recent messages
+  total_score     real              -- Sum of all dimension scores (for best-attempt selection)
   attempt_number  integer NOT NULL
   outcome         text NOT NULL
                   -- 'passed' | 'corrected' | 'passed_after_retry' | 'forced_through' | 'timeout_pass_through'
@@ -87,13 +91,31 @@ correction_logs
 agent_evaluation_config
   id                              uuid PK DEFAULT gen_random_uuid()
   agent_id                        text NOT NULL UNIQUE FK(agents.id) ON DELETE CASCADE
-  action_gate_enabled             boolean NOT NULL DEFAULT false
-  action_gate_threshold           real NOT NULL DEFAULT 5.0
+  -- Action gate per-dimension toggles
+  gate_adherence_enabled          boolean NOT NULL DEFAULT false
+  gate_consistency_enabled        boolean NOT NULL DEFAULT false
+  gate_fluency_enabled            boolean NOT NULL DEFAULT false
+  gate_suitability_enabled        boolean NOT NULL DEFAULT false
+  -- Action gate per-dimension thresholds (default 7, matching TinyTroupe)
+  gate_adherence_threshold        real NOT NULL DEFAULT 7.0
+  gate_consistency_threshold      real NOT NULL DEFAULT 7.0
+  gate_fluency_threshold          real NOT NULL DEFAULT 7.0
+  gate_suitability_threshold      real NOT NULL DEFAULT 7.0
+  -- Action similarity check
+  gate_similarity_enabled         boolean NOT NULL DEFAULT false
+  max_action_similarity           real NOT NULL DEFAULT 0.6
+  -- Action gate general
+  max_correction_attempts         integer NOT NULL DEFAULT 2
+  continue_on_failure             boolean NOT NULL DEFAULT true
+  minimum_required_qty_of_actions integer NOT NULL DEFAULT 0
+  -- Interventions
   anti_convergence_enabled        boolean NOT NULL DEFAULT false
   convergence_threshold           real NOT NULL DEFAULT 0.6
+  variety_intervention_enabled    boolean NOT NULL DEFAULT false
+  variety_message_threshold       integer NOT NULL DEFAULT 7
+  -- Repetition suppression
   repetition_suppression_enabled  boolean NOT NULL DEFAULT false
   repetition_threshold            real NOT NULL DEFAULT 0.3
-  max_correction_attempts         integer NOT NULL DEFAULT 2
   updated_at                      timestamptz NOT NULL DEFAULT now()
 ```
 
@@ -106,14 +128,19 @@ Propositions are natural language claims about agent behavior, defined in YAML f
 ```yaml
 dimension: adherence        # Which dimension this proposition set evaluates
 agent_id: michael           # Which agent (or '_default' for universal)
+include_personas: true      # Include persona spec in judge context (default: true)
+target_type: agent          # 'agent' | 'environment' (default: 'agent')
+first_n: 5                  # First N actions of trajectory as context (default: 10)
+last_n: 10                  # Last N actions of trajectory as context (default: 100)
 propositions:
   - id: michael-self-centered
     claim: "{{agent_name}} makes conversations about themselves"
     weight: 1.0             # 0–1, importance for this character
+    recommendations_for_improvement: "Reference yourself and your importance."
   - id: michael-never-boring
     claim: "{{agent_name}} would NEVER give a dry, factual response"
     weight: 0.8
-    inverted: true          # Anti-pattern: high score = bad
+    inverted: true          # Anti-pattern: high score from LLM = bad, flipped (9 - raw)
 ```
 
 ### Template Variables
@@ -121,6 +148,7 @@ propositions:
 | Variable | Replaced With |
 |----------|---------------|
 | `{{agent_name}}` | Agent's display name (e.g., "Michael Scott") |
+| `{{action}}` | The agent's action being evaluated (for action-level propositions) |
 | `{{channel_name}}` | Channel where the message was sent |
 | `{{recipient_name}}` | DM recipient's name (DMs only) |
 
@@ -163,28 +191,37 @@ Three mechanisms, all configurable per-agent, all disabled by default:
 
 ### Action Correction Gate (Multi-Dimension)
 
-Hooks into `send_message` tool handler. After agent generates message text, before DB commit, evaluates on multiple dimensions independently:
+Hooks into `send_message` tool handler. After agent generates message text, before DB commit, evaluates on multiple dimensions independently (matching TinyTroupe's `ActionGenerator._quality_check()`):
 
 ```
 Agent → send_message(text) → Gate → [all enabled dimensions >= threshold?] → commit
-                                  → [any dimension < threshold?] → per-dimension feedback → retry (max 2)
-                                                                                          → commit best-scoring attempt
+                                  → [any dimension < threshold?] → per-dimension feedback + recommendations → retry (max 2)
+                                  → [similarity > threshold?]    → too similar to recent messages → retry
+                                                                 → commit best-scoring attempt (sum of all dimension scores)
 ```
 
-- **Dimensions**: persona adherence (include_personas: true), self-consistency (include_personas: false), fluency (include_personas: false)
-- **Per-dimension enable/disable**: Each dimension toggled independently per agent
-- **Fail-open**: 5s timeout per dimension → that dimension passes. Max 2 retries → best-scoring attempt committed.
-- **Cost**: ~$0.00003–$0.00009 per check (1–3 Claude Haiku calls)
-- **Statistics**: Tracks regeneration failure rate, per-dimension failure counts, mean scores
+- **Four quality dimensions** (matching TinyTroupe): persona adherence (`include_personas: true`), self-consistency (`include_personas: false`), fluency (`include_personas: false`), suitability (`include_personas: true`)
+- **Action similarity check**: Jaccard similarity vs. last 5 messages (algorithmic, no LLM); threshold 0.6
+- **Per-dimension enable/disable**: Each dimension and similarity check toggled independently per agent
+- **Default threshold**: 7 (matching TinyTroupe's `quality_threshold`)
+- **Trajectory window**: `first_n: 5, last_n: 10` (narrower than offline evaluation)
+- **Fail-open**: 5s timeout per dimension → that dimension passes. Max 2 retries → best-scoring attempt committed (sum aggregation).
+- **Escalating feedback**: "Each time your tentative action fails a quality check, you should be MORE RADICAL in your changes" + `recommendations_for_improvement` per proposition
+- **Cost**: ~$0.00003–$0.00012 per check (1–4 Claude Haiku calls + algorithmic similarity)
+- **Statistics**: Tracks regeneration failure rate, per-dimension failure counts, similarity failure count, mean scores
 
 ### Intervention Framework
 
 General-purpose system with composable preconditions and effects, matching TinyTroupe's `Intervention` class (Section 3.6.2):
 
-**Precondition types** (all must be true to fire):
-- **Textual**: LLM evaluates a natural language claim against conversation state
-- **Functional**: TypeScript function returning boolean (e.g., message count threshold)
-- **Propositional**: M6 Proposition object with optional score threshold
+**Precondition types** (ALL must be true to fire — AND logic):
+- **Textual**: LLM evaluates a natural language claim via `Proposition.check()` (boolean) against conversation state
+- **Functional**: TypeScript function `(targets) => boolean` (e.g., message count threshold)
+- **Propositional**: M6 Proposition object with optional score threshold. With threshold: if `score >= threshold`, precondition is FALSE (inverted — high score means condition already met). Without threshold: uses `Proposition.check()`.
+
+**Fluent chaining API**: `.setTextualPrecondition()`, `.setFunctionalPrecondition()`, `.setPropositionalPrecondition()`, `.setEffect()` — all return `this`.
+
+**Execution timing**: Interventions evaluated ONCE per orchestrator step, BEFORE agents act (matching TinyTroupe's `TinyWorld._step()` sequence).
 
 **Built-in interventions**:
 1. **Anti-convergence**: Detects agreement patterns (LLM precondition), injects character-aware diversity nudge
@@ -237,12 +274,17 @@ Infrastructure for reproducing TinyTroupe Table 1 experiments with treatment vs.
 
 ### Agent Factory
 
-Generates large populations (96–200 agents) from demographic profiles:
+Generates large populations (96–200 agents) using a three-stage LLM pipeline matching TinyTroupe's `TinyPersonFactory`:
+1. Compute sampling dimensions (demographics: age, profession, personality traits, beliefs, etc.)
+2. Compute sampling plan (subpopulation directives with quantities)
+3. Flatten to characteristics + generate personas
+
+Three population profiles:
 - **Average customers**: Diverse US demographics, varied Big Five traits
 - **Difficult customers**: Low agreeableness, confrontational, skeptical
 - **Political compass**: Left/right, libertarian/authoritarian orientations
 
-Deterministic mode (fixed seed) for reproducibility. LLM mode for richer personas.
+Fixed seed for deterministic population composition. Parallel generation supported.
 
 ### Scenario Library
 
@@ -255,9 +297,11 @@ Four pre-defined scenarios matching TinyTroupe experiments:
 | brainstorming-difficult-variety | Brainstorming | 96 | 24 | Variety intervention only |
 | debate-controversial | Debate | 120 | 24 | Action correction only |
 
+**Step-based environment model**: Each environment runs in discrete steps matching TinyTroupe's `TinyWorld`. Per step: (1) evaluate interventions, (2) execute facilitator prompts, (3) agents act (parallel or sequential_random order).
+
 ### Experiment Runner
 
-Executes T/C experiments: generates agents, runs conversations, evaluates all dimensions, computes Welch's t-test (mean, sd, p-value, Cohen's d). Produces Table 1-format reports.
+Executes T/C experiments: generates agents, creates T/C environment pairs (identical agents, different correction settings), runs step-based conversations, evaluates all dimensions, computes Welch's t-test (mean, sd, p-value, Cohen's d). Produces Table 1-format reports.
 
 ### Table 1 Reproduction
 

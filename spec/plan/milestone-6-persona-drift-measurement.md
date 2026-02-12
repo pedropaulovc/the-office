@@ -31,27 +31,36 @@ This is the foundation for all persona drift measurement. A **proposition** is a
 The proposition engine:
 1. Loads proposition definitions from YAML files in `src/features/evaluation/propositions/`
 2. Evaluates propositions individually (for experiment accuracy) or in batches of up to 10 (for cost efficiency in CI)
-3. Scores each proposition 0–9 using a detailed scoring rubric matching TinyTroupe's scale
+3. Scores each proposition 0–9 (integer) using a detailed scoring rubric matching TinyTroupe's exact scale
 4. Stores results in an `evaluation_runs` / `evaluation_scores` table
-5. Supports template variables in propositions (e.g., `{{agent_name}}`, `{{action}}`) filled at evaluation time
+5. Supports template variables in propositions (e.g., `{{agent_name}}`, `{{action}}`) filled at evaluation time via Mustache-style interpolation
 6. Supports both **agent-level** and **environment-level** proposition targets (environment = channel/group conversation)
 7. Optionally includes agent persona specification in judge context via `include_personas` flag
 8. Supports `double_check` mode where the judge reconsiders its evaluation for stricter scoring
-9. Supports `precondition` functions that gate when a proposition applies (e.g., only for TALK actions)
+9. Supports `precondition` functions that gate when a proposition applies (e.g., only for TALK/send_message actions)
+10. Supports `first_n` and `last_n` trajectory windowing — controls how much of the agent's history to include as context (matching TinyTroupe's trajectory window parameters)
+11. Supports `recommendations_for_improvement` per proposition — text guidance returned in feedback when the proposition score is below threshold (used by the action correction gate in M7)
 
-**Scoring rubric** (included in every LLM judge system prompt, matching TinyTroupe):
+**Scoring rubric** (included in every LLM judge system prompt, matching TinyTroupe's exact rubric from `proposition.py`):
 ```
-Score 0: Completely false — no evidence whatsoever
-Score 1-2: Little support — mostly false, minor hints at best
-Score 3: Weak support — some evidence but mostly contradicted
-Score 4-5: Mixed evidence — roughly equal support and contradiction
-Score 6: Fair support — more true than false, but notable exceptions
-Score 7-8: Well-supported — mostly true with minor exceptions
-Score 9: Completely true — overwhelming evidence, no doubt
+Score 0: The proposition is without any doubt completely false.
+Score 1-2: The proposition has little support and is mostly false.
+Score 3: Weak support — some evidence but mostly contradicted.
+Score 4-5: The evidence is mixed — the proposition is equally true and false.
+Score 6: Fair support — more true than false, but notable exceptions.
+Score 7-8: The proposition is well-supported and mostly true.
+Score 9: The proposition is without any doubt completely true.
 
-Be rigorous. Never ignore contradictions. Evaluate each element independently.
-When uncertain, err on the lower end.
+Scoring principles:
+- If the data required to evaluate is not present, assign score 9 (assume true unless contradicted).
+- Score 9 only when evidence is the best possible and ALL parts support the claim.
+- Score 0 only when evidence is the worst possible and ALL parts contradict the claim.
+- Be VERY rigorous. When in doubt, assign the LOWER score.
+- Contradictions ALWAYS override positive evidence — don't dismiss as specification errors.
+- Evaluate EACH relevant element individually; final score is the average.
 ```
+
+**Scores are integers (0–9)**, matching TinyTroupe's `MIN_SCORE = 0`, `MAX_SCORE = 9`.
 
 **Proposition YAML format example:**
 ```yaml
@@ -60,10 +69,13 @@ dimension: adherence
 agent_id: michael
 include_personas: true        # Include persona spec in judge context (default: true)
 target_type: agent            # 'agent' | 'environment' (default: 'agent')
+first_n: 5                    # Include first N actions of trajectory as context (default: 10)
+last_n: 10                    # Include last N actions of trajectory as context (default: 100)
 propositions:
   - id: michael-self-centered
     claim: "{{agent_name}} makes conversations about themselves and their importance as Regional Manager"
     weight: 1.0
+    recommendations_for_improvement: "Make sure to reference yourself, your experiences, and your importance as Regional Manager."
   - id: michael-wants-to-be-liked
     claim: "{{agent_name}} desperately seeks approval and friendship from coworkers"
     weight: 1.0
@@ -77,14 +89,20 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 
 **Environment-level propositions** target a channel or group conversation rather than an individual agent. The judge receives the full conversation trajectory (all agents' messages) and optionally all agents' persona specs. This is used for convergence/divergence and ideas quantity scoring.
 
-**Double-check mode**: When enabled, after the initial scoring, the judge is asked "Are you sure? Please revise your evaluation to make it as correct as possible." If the judge revises its score, the new value is used. This is slower but stricter — use for experiments, not CI.
+**Trajectory windowing**: Each proposition specifies `first_n` and `last_n` parameters controlling how much of the agent's action history to include as context. For evaluation-level propositions (offline scoring), defaults are `first_n: 10, last_n: 100` (broad context). For action-level propositions (quality gate), defaults are `first_n: 5, last_n: 10` (focused context). This matches TinyTroupe's approach where action-level quality checks use a narrower window.
+
+**Trajectory format**: Agent actions are formatted as `"Agent acts: [MESSAGE]"` and stimuli (incoming messages) as `"--> Agent: [STIMULUS]"`. This matches TinyTroupe's trajectory format and helps the judge distinguish between agent output and input.
+
+**Recommendations for improvement**: Each proposition can optionally include a `recommendations_for_improvement` text. When the proposition score is below threshold (used in M7 action correction gate), this text is included in the feedback returned to the agent. This matches TinyTroupe's `recommendations_for_improvement()` method on propositions.
+
+**Double-check mode**: When enabled, after the initial scoring, the judge is asked "Are you sure? Please revise your evaluation to make it as correct as possible." If the judge revises its score, the new value is used. This is slower but stricter — use for experiments, not CI. Matching TinyTroupe: `enable_reasoning_step=True` enables extended reasoning before scoring.
 
 ### Files to create
 
 | File | Purpose |
 |------|---------|
 | `src/db/schema/evaluations.ts` | `evaluation_runs`, `evaluation_scores` tables |
-| `src/features/evaluation/types.ts` | Types: `Proposition`, `PropositionResult`, `EvaluationDimension`, `EvaluationRun`, `EvaluationScore`, `TargetType` |
+| `src/features/evaluation/types.ts` | Types: `Proposition`, `PropositionResult`, `EvaluationDimension`, `EvaluationRun`, `EvaluationScore`, `TargetType`, `TrajectoryWindow`, `PreconditionFn` |
 | `src/features/evaluation/proposition-engine.ts` | `loadPropositions(dimension, agentId)`, `evaluateProposition(prop, context)`, `evaluatePropositions(props, context)`, `batchEvaluate(batches)` |
 | `src/features/evaluation/proposition-loader.ts` | YAML loader: reads `.yaml` files, validates with Zod, fills template variables |
 | `src/features/evaluation/schemas.ts` | Zod schemas for proposition YAML format, evaluation API request/response |
@@ -105,9 +123,13 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 - [ ] [AC-6.0.8] Migration generated and applied — both tables queryable
 - [ ] [AC-6.0.9] `include_personas` flag: when `true` (default), agent persona specification included in judge context; when `false`, persona is omitted (used for self-consistency and fluency where persona should not bias evaluation)
 - [ ] [AC-6.0.10] `target_type` support: `agent` targets evaluate a single agent's messages; `environment` targets evaluate the full channel conversation with all agents' trajectories
-- [ ] [AC-6.0.11] `double_check` mode: when enabled, judge is asked to reconsider its evaluation in a follow-up message; revised score used if different
-- [ ] [AC-6.0.12] Unit tests for YAML loading, template variable replacement, LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow
-- [ ] [AC-6.0.13] Sentry spans for evaluation runs and LLM judge calls
+- [ ] [AC-6.0.11] `double_check` mode: when enabled, judge is asked "Are you sure? Please revise your evaluation to make it as correct as possible." in a follow-up message; revised score used if different
+- [ ] [AC-6.0.12] `first_n` and `last_n` trajectory windowing: controls how many actions from the beginning and end of the agent's history are included as context; defaults: `first_n: 10, last_n: 100` for evaluation, `first_n: 5, last_n: 10` for action-level
+- [ ] [AC-6.0.13] Trajectory formatted as `"Agent acts: [MESSAGE]"` for agent actions and `"--> Agent: [STIMULUS]"` for incoming messages, matching TinyTroupe's format
+- [ ] [AC-6.0.14] Optional `recommendations_for_improvement` per proposition — text guidance returned when score is below threshold
+- [ ] [AC-6.0.15] Precondition function support: `precondition(target, additionalContext, claimVariables) => boolean`; if `false`, proposition evaluates as trivially true (score 9)
+- [ ] [AC-6.0.16] Unit tests for YAML loading, template variable replacement, LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow, trajectory formatting, precondition gating
+- [ ] [AC-6.0.17] Sentry spans for evaluation runs and LLM judge calls
 
 ### Demo
 1. Create a sample proposition YAML for Michael

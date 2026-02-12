@@ -325,7 +325,13 @@ type GeneratedPersona = {
 };
 ```
 
-The factory can generate personas either deterministically (from a seed for reproducibility) or via LLM (for richer, more diverse personas). For experiment reproduction, deterministic generation with a fixed seed is preferred.
+**Generation pipeline** (matching TinyTroupe's `TinyPersonFactory` three-stage approach):
+1. **Compute sampling dimensions**: Given a population description (e.g., "average US customers for a travel service"), the LLM identifies relevant demographic dimensions: age range, profession list, country distribution, personality traits (Big Five), political beliefs, economic beliefs, cultural background, preferences. Each dimension has either a range, a list of values, or a value-to-proportion mapping. This step is cached and reused.
+2. **Compute sampling plan**: Given N agents needed, the LLM creates subpopulation directives — groups of characteristics with quantities that cover the full demographic space. This ensures representative coverage rather than random sampling.
+3. **Flatten to characteristics**: Each sampling directive is expanded into concrete characteristic sets (one per agent). The list is shuffled with a fixed seed for deterministic reproducibility.
+4. **Generate personas**: Each characteristic set is sent to the LLM with 2 example agent specifications to produce a full `GeneratedPersona`. Names are globally unique (tracked across all factory instances).
+
+The factory supports both **LLM-based generation** (default, richer personas) and **deterministic template-based generation** (faster, for quick validation). The LLM-based approach uses a fixed `seed` for the sampling shuffle, making the population composition deterministic even though individual persona details vary. For experiment reproduction, LLM-based generation with a fixed seed is preferred (matching TinyTroupe's default).
 
 ### Files to create
 
@@ -340,13 +346,16 @@ The factory can generate personas either deterministically (from a seed for repr
 - [ ] [AC-8.4.1] `AgentFactory.generate(count, profile)` produces `count` unique `GeneratedPersona` objects matching the population profile
 - [ ] [AC-8.4.2] Three population profiles: `averageCustomer` (diverse US demographics), `difficultCustomer` (low agreeableness, confrontational), `politicalCompass` (positioned on political axes)
 - [ ] [AC-8.4.3] Each generated persona includes all fields: name, age, gender, nationality, occupation, personality (Big Five traits), style, goals, preferences
-- [ ] [AC-8.4.4] `system_prompt` auto-generated from persona fields following the same structure as the 16 Office character system prompts
-- [ ] [AC-8.4.5] `memory_blocks` auto-generated with personality, relationships, and current_state blocks
-- [ ] [AC-8.4.6] Deterministic mode: `options.seed` produces identical personas across runs for reproducibility
-- [ ] [AC-8.4.7] LLM mode: `options.useLLM = true` generates richer personas via Claude Haiku (slower, more diverse)
-- [ ] [AC-8.4.8] Generated personas can be loaded into the agent system as temporary agents (not persisted to the main agents table — stored in experiment-specific tables or in-memory)
-- [ ] [AC-8.4.9] Unit tests: deterministic generation produces same output with same seed, profile distributions match specs, all required fields present
-- [ ] [AC-8.4.10] Sentry spans for persona generation
+- [ ] [AC-8.4.4] Three-stage LLM pipeline: (1) compute sampling dimensions from population description, (2) compute sampling plan with subpopulation directives, (3) flatten and generate. Steps 1-2 cached.
+- [ ] [AC-8.4.5] Sampling dimensions include: age, profession, country, personality traits (Big Five), political beliefs, economic beliefs, cultural background, preferences. Value-to-proportion mappings for categorical dimensions.
+- [ ] [AC-8.4.6] `system_prompt` auto-generated from persona fields following the same structure as the 16 Office character system prompts
+- [ ] [AC-8.4.7] `memory_blocks` auto-generated with personality, relationships, and current_state blocks
+- [ ] [AC-8.4.8] Deterministic sampling: `options.seed` produces identical population composition (same demographic distribution) across runs; individual LLM-generated persona details may vary but names are globally unique
+- [ ] [AC-8.4.9] Template-based mode: `options.templateOnly = true` generates personas from templates without LLM calls (faster, for quick validation)
+- [ ] [AC-8.4.10] Generated personas can be loaded into the agent system as temporary agents (not persisted to the main agents table — stored in experiment-specific tables or in-memory)
+- [ ] [AC-8.4.11] Parallel generation supported: multiple personas generated concurrently (matching TinyTroupe's `ThreadPoolExecutor` approach)
+- [ ] [AC-8.4.12] Unit tests: deterministic sampling produces same population composition with same seed, profile distributions match specs, all required fields present, parallel generation produces correct count
+- [ ] [AC-8.4.13] Sentry spans for persona generation
 
 ### Demo
 1. Generate 10 "average customer" personas with a fixed seed
@@ -371,6 +380,15 @@ Each scenario defines the structure of an experiment: what agents do, how they i
 
 2. **Debate (Exp. 3)**: Agents with different political orientations debate a controversial topic. The facilitator introduces a polarizing question and agents argue their positions.
 
+**Environment execution model** (matching TinyTroupe's `TinyWorld`):
+Each environment runs in discrete **steps**. On each step:
+1. All active interventions are evaluated sequentially (preconditions checked, effects fired if true)
+2. All agents act: either in parallel or sequential with randomized order (configurable)
+3. The facilitator may broadcast additional prompts at specific step numbers
+4. Actions are handled: messages delivered to targets, broadcasts go to all agents
+
+This step-based model means interventions fire BEFORE agents act on each step, matching TinyTroupe's `_step()` method.
+
 **Scenario configuration schema:**
 ```typescript
 type ScenarioConfig = {
@@ -381,12 +399,17 @@ type ScenarioConfig = {
   population_profile: string;           // References AgentFactory profile
   agents_per_environment: number;       // e.g., 5 for brainstorming, 5 for debates
   total_environments: number;           // e.g., 40 for Exp. 1
-  rounds_per_environment: number;       // How many conversation rounds
-  facilitator_prompts: string[];        // System messages to kick off and steer
+  steps_per_environment: number;        // How many simulation steps (replaces rounds)
+  facilitator_prompts: {                // Step-indexed facilitator messages
+    step: number;
+    message: string;
+  }[];
+  agent_order: 'parallel' | 'sequential_random';  // How agents act within a step
   treatment: {
     action_correction: boolean;         // Enable action correction gate
     variety_intervention: boolean;      // Enable variety intervention
-    correction_dimensions: string[];    // Which dimensions to check
+    correction_dimensions: string[];    // Which dimensions to check in the gate
+    correction_threshold: number;       // Quality threshold (default 7)
   };
   evaluation_dimensions: string[];      // Which metrics to measure
 };
@@ -401,18 +424,21 @@ type ScenarioConfig = {
 | `src/features/evaluation/experiment/scenarios/brainstorming-difficult-full.ts` | Exp. 2.1: brainstorming, difficult customers, N_a=96, N_e=24, T=action correction + variety |
 | `src/features/evaluation/experiment/scenarios/brainstorming-difficult-variety.ts` | Exp. 2.2: brainstorming, difficult customers, N_a=96, N_e=24, T=variety only |
 | `src/features/evaluation/experiment/scenarios/debate-controversial.ts` | Exp. 3: debate, political compass, N_a=120, N_e=24, T=action correction only |
-| `src/features/evaluation/experiment/facilitator.ts` | `Facilitator` class: broadcasts prompts, manages turns, collects responses |
+| `src/features/evaluation/experiment/facilitator.ts` | `Facilitator` class: broadcasts prompts at specified steps, manages agent turn order |
+| `src/features/evaluation/experiment/environment.ts` | `ExperimentEnvironment` class: step-based execution matching TinyTroupe's `TinyWorld` — interventions before agents, parallel/sequential agent execution |
 
 ### Acceptance Criteria
 - [ ] [AC-8.5.1] Four scenario configs matching TinyTroupe Experiments 1, 2.1, 2.2, and 3
-- [ ] [AC-8.5.2] Each scenario specifies: population profile, agents per environment, total environments, rounds, facilitator prompts, treatment config, evaluation dimensions
+- [ ] [AC-8.5.2] Each scenario specifies: population profile, agents per environment, total environments, steps, step-indexed facilitator prompts, agent execution order, treatment config, evaluation dimensions
 - [ ] [AC-8.5.3] Brainstorming scenarios include facilitator prompts for introducing topics and encouraging idea generation
 - [ ] [AC-8.5.4] Debate scenarios include facilitator prompts for introducing controversial topics and managing turns
 - [ ] [AC-8.5.5] Treatment config specifies which correction mechanisms are active (action correction, variety intervention, or both)
 - [ ] [AC-8.5.6] `getScenario(id)` returns a fully resolved scenario config; `listScenarios()` returns all available scenarios
-- [ ] [AC-8.5.7] `Facilitator` class manages conversation flow: broadcasts prompts, ensures all agents respond in sequence, respects rounds limit
-- [ ] [AC-8.5.8] Unit tests: all scenarios load, config validation, facilitator prompt sequencing
-- [ ] [AC-8.5.9] Sentry spans for scenario loading
+- [ ] [AC-8.5.7] `Facilitator` class broadcasts prompts at step-indexed points, matching TinyTroupe's `TinyWorld.broadcast()`
+- [ ] [AC-8.5.8] `ExperimentEnvironment` class implements step-based execution: on each step, (1) evaluate interventions sequentially, (2) execute facilitator prompts for this step, (3) agents act in configured order (parallel or sequential_random)
+- [ ] [AC-8.5.9] Sequential_random agent order: agents act one at a time in a randomized order each step (matching TinyTroupe's `randomize_agents_order` option)
+- [ ] [AC-8.5.10] Unit tests: all scenarios load, config validation, facilitator prompt sequencing, environment step execution order
+- [ ] [AC-8.5.11] Sentry spans for scenario loading and environment step execution
 
 ### Demo
 1. List all available scenarios
@@ -433,14 +459,15 @@ The experiment runner executes a full experiment: generates agents, creates envi
 **Experiment execution flow:**
 1. Load scenario config
 2. Generate agent population via AgentFactory (deterministic seed for reproducibility)
-3. Create environments and assign agents
-4. For each environment, run two variants:
-   - **Treatment (T)**: Correction mechanisms enabled as specified by scenario
+3. Create environments (one per `total_environments`) and assign agents (round-robin or shuffle with seed)
+4. For each environment, create TWO copies with identical agents:
+   - **Treatment (T)**: Correction mechanisms enabled as specified by scenario (action correction gate, variety intervention, etc.)
    - **Control (C)**: No correction mechanisms (all disabled)
-5. After all conversations complete, run M6 scorers on every agent in every environment
-6. Aggregate results: mean and standard deviation per metric, per group (T vs C)
-7. Run statistical tests: Welch's t-test comparing T vs C for each metric
-8. Generate Table 1-format report
+5. Run each environment for `steps_per_environment` steps using the step-based execution model from S-8.5. T and C environments run independently.
+6. After all conversations complete, run M6 scorers on every agent in every environment (both T and C)
+7. Aggregate results: mean and standard deviation per metric, per group (T vs C)
+8. Run statistical tests: Welch's t-test comparing T vs C for each metric
+9. Generate Table 1-format report
 
 **Statistical testing:**
 - **Welch's t-test** (unequal variance t-test) for each metric: compares T group mean vs C group mean
@@ -489,7 +516,7 @@ Options:
 |------|---------|
 | `src/features/evaluation/experiment/cli.ts` | Experiment CLI entry point |
 | `src/features/evaluation/experiment/runner.ts` | `ExperimentRunner` class: orchestrates full experiment lifecycle |
-| `src/features/evaluation/experiment/environment-manager.ts` | Creates environments, assigns agents, manages conversation sessions |
+| `src/features/evaluation/experiment/environment-manager.ts` | Creates T/C environment pairs, assigns agents, manages experiment sessions using `ExperimentEnvironment` from S-8.5 |
 | `src/features/evaluation/experiment/statistical-testing.ts` | `welchTTest(groupA, groupB)`, `cohensD(groupA, groupB)`, `tDistributionCDF(t, df)` |
 | `src/features/evaluation/experiment/experiment-report.ts` | `generateExperimentReport(results)` — Table 1-format JSON + human-readable |
 
