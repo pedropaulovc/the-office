@@ -128,12 +128,12 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       async (querySpan) => {
 
         // Log inputs inside sdk.query span so they're linked to it
-        logInfo(`sdk.input.system_prompt | ${truncate(systemPrompt)}`, {
+        logInfo(`sdk.input.system_prompt.${run.agentId} | ${truncate(systemPrompt)}`, {
           runId: run.id,
           agentId: run.agentId,
           length: systemPrompt.length,
         });
-        logInfo(`sdk.input.trigger | ${prompt}`, {
+        logInfo(`sdk.input.trigger.${run.agentId} | ${prompt}`, {
           runId: run.id,
           agentId: run.agentId,
         });
@@ -175,12 +175,12 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   });
 
                   if (thinking) {
-                    logInfo(`sdk.thinking | ${truncate(thinking)}`, {
+                    logInfo(`sdk.thinking.${run.agentId} | ${truncate(thinking)}`, {
                       runId: run.id,
                       step,
                     });
                   }
-                  logInfo(`sdk.response | ${truncate(content)}`, {
+                  logInfo(`sdk.response.${run.agentId} | ${truncate(content)}`, {
                     runId: run.id,
                     step,
                   });
@@ -195,7 +195,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                       toolName: toolUse.name,
                       toolInput: toolUse.input as Record<string, unknown>,
                     });
-                    logInfo(`sdk.tool_call | ${toolUse.name} ${truncate(inputStr)}`, {
+                    logInfo(`sdk.tool_call.${run.agentId} | ${toolUse.name} ${truncate(inputStr)}`, {
                       runId: run.id,
                       toolName: toolUse.name,
                       toolUseId: toolUse.id,
@@ -218,7 +218,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                 messageType: "user_message",
                 content: userContent,
               });
-              logInfo(`sdk.user_message | ${truncate(userContent)}`, {
+              logInfo(`sdk.user_message.${run.agentId} | ${truncate(userContent)}`, {
                 runId: run.id,
               });
               if (msg.tool_use_result != null) {
@@ -232,7 +232,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   messageType: "tool_return_message",
                   content: toolResult,
                 });
-                logInfo(`sdk.tool_return | ${truncate(toolResult)}`, {
+                logInfo(`sdk.tool_return.${run.agentId} | ${truncate(toolResult)}`, {
                   runId: run.id,
                 });
               }
@@ -240,7 +240,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
             }
 
             if (msg.type === "tool_progress") {
-              logInfo("sdk.tool_progress", {
+              logInfo(`sdk.tool_progress.${run.agentId}`, {
                 runId: run.id,
                 toolName: msg.tool_name,
                 toolUseId: msg.tool_use_id,
@@ -250,7 +250,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
             }
 
             if (msg.type === "tool_use_summary") {
-              logInfo("sdk.tool_use_summary", {
+              logInfo(`sdk.tool_use_summary.${run.agentId}`, {
                 runId: run.id,
                 summary: msg.summary,
               });
@@ -259,13 +259,13 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
             if (msg.type === "auth_status") {
               if (msg.error) {
-                logError("sdk.auth_status", {
+                logError(`sdk.auth_status.${run.agentId}`, {
                   runId: run.id,
                   isAuthenticating: msg.isAuthenticating,
                   error: msg.error,
                 });
               } else {
-                logWarn("sdk.auth_status", {
+                logWarn(`sdk.auth_status.${run.agentId}`, {
                   runId: run.id,
                   isAuthenticating: msg.isAuthenticating,
                 });
@@ -330,11 +330,11 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
       if ("errors" in resultMessage && Array.isArray(resultMessage.errors)) {
         for (const err of resultMessage.errors) {
-          logError("sdk.result.error", { runId: run.id, error: err });
+          logError(`sdk.result.error.${run.agentId}`, { runId: run.id, error: err });
         }
       }
       if (resultMessage.permission_denials.length > 0) {
-        logWarn("sdk.result.permission_denials", {
+        logWarn(`sdk.result.permission_denials.${run.agentId}`, {
           runId: run.id,
           count: resultMessage.permission_denials.length,
         });
@@ -400,7 +400,7 @@ async function handleSystemMsg(
       messageType: "system_message",
       content: "[system:init]",
     });
-    logInfo("sdk.init", {
+    logInfo(`sdk.init.${agentId}`, {
       runId,
       model: msg.model,
       permissionMode: msg.permissionMode,
@@ -410,7 +410,7 @@ async function handleSystemMsg(
   }
 
   if (msg.subtype === "compact_boundary") {
-    logWarn("sdk.compact", {
+    logWarn(`sdk.compact.${agentId}`, {
       runId,
       trigger: msg.compact_metadata.trigger,
       preTokens: msg.compact_metadata.pre_tokens,
@@ -420,27 +420,27 @@ async function handleSystemMsg(
   }
 
   if (msg.subtype === "status") {
-    logInfo("sdk.status", { runId });
+    logInfo(`sdk.status.${agentId}`, { runId });
     return;
   }
 
   if (msg.subtype === "hook_started") {
-    logInfo("sdk.hook.started", { runId, hookName: msg.hook_name, hookEvent: msg.hook_event });
+    logInfo(`sdk.hook.started.${agentId}`, { runId, hookName: msg.hook_name, hookEvent: msg.hook_event });
     return;
   }
 
   if (msg.subtype === "hook_progress") {
-    logInfo("sdk.hook.progress", { runId, hookName: msg.hook_name });
+    logInfo(`sdk.hook.progress.${agentId}`, { runId, hookName: msg.hook_name });
     return;
   }
 
   if (msg.subtype === "hook_response") {
-    logInfo("sdk.hook.response", { runId, hookName: msg.hook_name, outcome: msg.outcome });
+    logInfo(`sdk.hook.response.${agentId}`, { runId, hookName: msg.hook_name, outcome: msg.outcome });
     return;
   }
 
   if (msg.subtype === "task_notification") {
-    logInfo("sdk.task_notification", {
+    logInfo(`sdk.task_notification.${agentId}`, {
       runId,
       taskId: msg.task_id,
       status: msg.status,
@@ -451,7 +451,7 @@ async function handleSystemMsg(
 
   // Unknown or new subtype — log generically to avoid runtime errors
   const subtype = (msg as { subtype?: string }).subtype ?? "unknown";
-  logInfo("sdk.system_message", {
+  logInfo(`sdk.system_message.${agentId}`, {
     runId,
     subtype,
     ...(subtype === "files_persisted" && "files" in msg && "failed" in msg
