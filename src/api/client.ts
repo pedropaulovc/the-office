@@ -1,4 +1,4 @@
-import type { Agent } from "@/db/schema";
+import type { Agent, DbMessage } from "@/db/schema";
 import type { ChannelView } from "@/db/queries/messages";
 import type { Message, ThreadReply } from "@/types";
 
@@ -50,6 +50,25 @@ export async function fetchThreadReplies(messageId: string): Promise<ThreadReply
   }
 
   return response.json() as Promise<ThreadReply[]>;
+}
+
+export async function postMessage(params: {
+  channelId: string;
+  parentMessageId?: string;
+  userId: string;
+  text: string;
+}): Promise<DbMessage> {
+  const response = await fetch("/api/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to post message: ${response.status}`);
+  }
+
+  return response.json() as Promise<DbMessage>;
 }
 
 export async function fetchDms(userId: string): Promise<ChannelView[]> {

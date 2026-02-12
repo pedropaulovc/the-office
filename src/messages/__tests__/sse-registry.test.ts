@@ -12,6 +12,8 @@ vi.mock("@/lib/telemetry", () => ({
 describe("ConnectionRegistry", () => {
   beforeEach(() => {
     vi.resetModules();
+    // Clear the globalThis singleton so each test gets a fresh registry
+    delete (globalThis as unknown as { __sseRegistry?: unknown }).__sseRegistry;
     mockLogInfo.mockClear();
     mockCountMetric.mockClear();
   });

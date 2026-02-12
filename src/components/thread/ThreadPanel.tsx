@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchThreadReplies } from '@/api/client';
 import { useData } from '@/context/useData';
 import ThreadHeader from './ThreadHeader';
@@ -49,6 +49,15 @@ export default function ThreadPanel({ parentMessageId, channelId }: ThreadPanelP
     void loadReplies();
   }, [loadReplies]);
 
+  // Re-fetch replies when parent's threadReplyCount changes (SSE update)
+  const replyCount = parentMessage?.threadReplyCount ?? 0;
+  const prevReplyCount = useRef(replyCount);
+  useEffect(() => {
+    if (prevReplyCount.current === replyCount) return;
+    prevReplyCount.current = replyCount;
+    void loadReplies();
+  }, [replyCount, loadReplies]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-[360px] shrink-0 flex-col bg-white border-l border-slack-thread-border">
@@ -85,7 +94,7 @@ export default function ThreadPanel({ parentMessageId, channelId }: ThreadPanelP
           <MessageItem key={msg.id} message={msg} showHeader isThread />
         ))}
       </div>
-      <ThreadComposeBox />
+      <ThreadComposeBox parentMessageId={parentMessageId} channelId={channelId} />
     </div>
   );
 }

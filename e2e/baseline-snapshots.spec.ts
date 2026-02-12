@@ -1,6 +1,24 @@
 import { test, expect } from "@playwright/test";
 
+// Clean up stale test messages left by other test runs (or parallel tests).
+// Test messages always match patterns like "compose-*", "lifecycle-*", etc.
+const TEST_MSG_PATTERN =
+  /^(compose|lifecycle|thread|react|rapid|cascade|gen-|sales-|edit|sse-edit|valid|SSE test)/;
+
 test.describe("baseline snapshots", () => {
+  // Clean stale test messages before each test to prevent cross-test pollution.
+  // Uses beforeEach (not beforeAll) because `request` is a test-scoped fixture.
+  test.beforeEach(async ({ request }) => {
+    const res = await request.get("/api/channels/general/messages");
+    const msgs = (await res.json()) as { id: string; text: string }[];
+    const stale = msgs.filter((m) => TEST_MSG_PATTERN.test(m.text));
+    if (stale.length > 0) {
+      await Promise.all(
+        stale.map((m) => request.delete(`/api/messages/${m.id}`)),
+      );
+    }
+  });
+
   test("general channel", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("Good morning everyone!")).toBeVisible();
@@ -96,9 +114,9 @@ test.describe("baseline snapshots", () => {
       - text: /🐕 1 MS Michael Scott \\d+:\\d+ (?:A|P)M/
       - paragraph: That's what she said! ...wait, that doesn't work there. Or does it? 🤔
       - text: 😂 3 🤦 3
-      - paragraph: "Message #general (read-only)"
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - 'textbox "Message #general"'
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:
@@ -138,7 +156,7 @@ test.describe("baseline snapshots", () => {
         - button "announcements":
           - img
           - text: ""
-        - button "general 1":
+        - button /general \\d+/:
           - img
           - text: ""
         - button "party-planning 3":
@@ -184,9 +202,9 @@ test.describe("baseline snapshots", () => {
       - paragraph: I ran the numbers again. The discrepancy is from Michael's 'business lunch' at Benihana. He charged it to office supplies.
       - text: /😑 1 AM Angela Martin \\d+:\\d+ (?:A|P)M/
       - paragraph: I am filing a formal complaint. This is the third time this quarter.
-      - paragraph: "Message #accounting (read-only)"
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - 'textbox "Message #accounting"'
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:
@@ -230,9 +248,9 @@ test.describe("baseline snapshots", () => {
       - paragraph: How about Cooper's? They have good sandwiches.
       - text: /MS Michael Scott \\d+:\\d+ (?:A|P)M/
       - paragraph: Deal! You're paying though. Boss privileges. 😎
-      - paragraph: Message Jim Halpert (read-only)
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - textbox "Message Jim Halpert"
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:
@@ -269,9 +287,10 @@ test.describe("baseline snapshots", () => {
       - text: /PB Pam Beesly \\d+:\\d+ (?:A|P)M/
       - paragraph: Last time he had a 'big announcement' it was that he learned how to make espresso.
       - text: ☕ 2
-      - paragraph: Reply... (read-only)
+      - textbox "Reply..."
       - img
-      - img
+      - button "send" [disabled]:
+        - img
     `);
   });
 

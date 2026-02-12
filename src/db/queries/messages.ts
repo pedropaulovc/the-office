@@ -277,12 +277,69 @@ export async function getRecentMessages(channelId: string, limit = 20): Promise<
   return rows.reverse();
 }
 
+export function updateMessage(
+  id: string,
+  data: { text: string },
+): Promise<DbMessage | undefined> {
+  return withSpan("updateMessage", "db.query", async () => {
+    const rows = await db
+      .update(messages)
+      .set(data)
+      .where(eq(messages.id, id))
+      .returning();
+    return rows[0];
+  });
+}
+
+export function deleteMessage(id: string): Promise<DbMessage | undefined> {
+  return withSpan("deleteMessage", "db.query", async () => {
+    // Delete child replies first (no FK cascade on parentMessageId)
+    const childReplies = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.parentMessageId, id));
+
+    for (const child of childReplies) {
+      await db.delete(messages).where(eq(messages.id, child.id));
+    }
+
+    // Now delete the message itself (reactions cascade via FK)
+    const rows = await db
+      .delete(messages)
+      .where(eq(messages.id, id))
+      .returning();
+    return rows[0];
+  });
+}
+
 // --- Reactions ---
 
-export async function createReaction(data: NewDbReaction): Promise<DbReaction> {
-  const [row] = await db.insert(reactions).values(data).returning();
-  if (!row) throw new Error("Insert returned no rows");
-  return row;
+export function createReaction(data: NewDbReaction): Promise<DbReaction> {
+  return withSpan("createReaction", "db.query", async () => {
+    const [row] = await db.insert(reactions).values(data).returning();
+    if (!row) throw new Error("Insert returned no rows");
+    return row;
+  });
+}
+
+export function deleteReaction(
+  messageId: string,
+  userId: string,
+  emoji: string,
+): Promise<boolean> {
+  return withSpan("deleteReaction", "db.query", async () => {
+    const rows = await db
+      .delete(reactions)
+      .where(
+        and(
+          eq(reactions.messageId, messageId),
+          eq(reactions.userId, userId),
+          eq(reactions.emoji, emoji),
+        ),
+      )
+      .returning();
+    return rows.length > 0;
+  });
 }
 
 // --- Helpers ---
