@@ -355,7 +355,9 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       stepId: null,
       messageType: "system_message",
       content: `[error] ${message}`,
-    }).catch(() => {});
+    }).catch((e: unknown) => {
+      logError("failed to store error run_message", { error: String(e) });
+    });
 
     return { status: "failed", stopReason: "error" };
   }

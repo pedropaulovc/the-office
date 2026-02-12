@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import type { Run, NewRun } from "@/db/schema";
 import { createRun, claimNextRun, updateRunStatus, listRuns } from "@/db/queries";
 import {
@@ -62,6 +63,7 @@ export async function processNextRun(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logError("run failed", { runId: run.id, agentId, error: message });
+      Sentry.captureException(err);
       await updateRunStatus(run.id, {
         status: "failed",
         stopReason: "error",
