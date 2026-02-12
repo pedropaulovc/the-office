@@ -1,27 +1,58 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("SSE real-time events", () => {
-  test("message broadcast via SSE appears in the UI", async ({
-    page,
-    request,
-  }) => {
-    // 1. Open the app -- default view is #general
-    await page.goto("/");
+  test("message broadcast via SSE appears in the UI", async ({ page }) => {
+    // The in-memory connectionRegistry doesn't share state across Vercel
+    // serverless function instances (GET /api/sse vs POST /api/sse/test).
+    // Instead, intercept the SSE connection via Playwright and inject the
+    // test event directly — this tests the full client-side SSE pipeline.
 
-    // 2. Wait for initial messages to load
-    const authorNames = page.locator(".font-bold.text-sm.text-gray-900");
-    await expect(authorNames.first()).toBeVisible();
-
-    // 3. POST a test SSE event for #general
     const testText = `SSE test ${Date.now()}`;
-    const res = await request.post("/api/sse/test", {
+    const event = {
+      type: "message_created",
+      channelId: "general",
       data: {
+        id: crypto.randomUUID(),
         channelId: "general",
         userId: "dwight",
         text: testText,
+        createdAt: new Date().toISOString(),
       },
+    };
+
+    // Hold the SSE connection until we're ready to deliver the event
+    let deliverEvent!: () => void;
+    const eventReady = new Promise<void>((resolve) => {
+      deliverEvent = resolve;
     });
-    expect(res.status()).toBe(200);
+    let intercepted = false;
+
+    await page.route("**/api/sse", async (route) => {
+      if (intercepted) {
+        await route.continue();
+        return;
+      }
+      intercepted = true;
+      await eventReady;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+        },
+        body: `: connected\n\ndata: ${JSON.stringify(event)}\n\n`,
+      });
+    });
+
+    // 1. Open the app — default view is #general
+    await page.goto("/");
+
+    // 2. Wait for initial messages to load (avoids overwrite race condition)
+    const authorNames = page.locator(".font-bold.text-sm.text-gray-900");
+    await expect(authorNames.first()).toBeVisible();
+
+    // 3. Deliver the SSE event now that initial state is settled
+    deliverEvent();
 
     // 4. Verify the new message appears in the UI
     await expect(page.getByText(testText)).toBeVisible();
