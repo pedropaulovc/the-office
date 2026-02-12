@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
+import type { OpenAPIDocument } from "../openapi";
 import { generateDocument } from "../openapi";
 
 describe("OpenAPI document generation", () => {
-  const doc = generateDocument();
+  const doc: OpenAPIDocument = generateDocument();
 
   it("produces a valid OpenAPI 3.1 document", () => {
     expect(doc.openapi).toBe("3.1.0");

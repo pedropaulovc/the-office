@@ -1,6 +1,8 @@
 import { z } from "zod/v4";
 import { createDocument } from "zod-openapi";
 
+export type OpenAPIDocument = ReturnType<typeof createDocument>;
+
 // ---------------------------------------------------------------------------
 // Common schemas
 // ---------------------------------------------------------------------------
@@ -343,7 +345,7 @@ const runIdParam = pathParam("runId", "Run UUID");
 // Document
 // ---------------------------------------------------------------------------
 
-export function generateDocument() {
+export function generateDocument(): OpenAPIDocument {
   return createDocument({
     openapi: "3.1.0",
     info: {
