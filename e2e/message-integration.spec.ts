@@ -265,9 +265,13 @@ test.describe("message integration", () => {
   test("SSE typing indicator lifecycle", async ({ page }) => {
     await page.goto("/");
 
-    // Wait for messages to load (ensures SSE hook is mounted)
+    // Wait for messages to load
     const authorNames = page.locator(".font-bold.text-sm.text-gray-900");
     await expect(authorNames.first()).toBeVisible();
+
+    // Wait for client hydration so __dispatchSSE is available.
+    // Author names render via SSR before the useEffect that sets __dispatchSSE runs.
+    await page.waitForFunction(() => typeof window.__dispatchSSE === "function");
 
     // Inject SSE events directly via window.__dispatchSSE to avoid relying on
     // server-to-browser SSE delivery (unreliable on Vercel serverless where
