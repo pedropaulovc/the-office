@@ -1,5 +1,8 @@
 import { after } from "next/server";
 import { z } from "zod/v4";
+
+/** Allow up to 60s for the after() callback to complete the SDK call. */
+export const maxDuration = 60;
 import { listRuns } from "@/db/queries";
 import { enqueueRun, processNextRun } from "@/agents/mailbox";
 import { jsonResponse } from "@/lib/api-response";

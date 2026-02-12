@@ -6,6 +6,9 @@ import { executeRun } from "@/agents/orchestrator";
 import { jsonResponse } from "@/lib/api-response";
 import { withSpan, logInfo, logWarn, countMetric } from "@/lib/telemetry";
 
+/** Allow up to 60s for the after() callback to complete the SDK call. */
+export const maxDuration = 60;
+
 interface RouteContext {
   params: Promise<{ agentId: string }>;
 }

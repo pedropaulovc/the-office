@@ -348,7 +348,7 @@ test.describe("orchestrator SDK", () => {
     );
     benchmarkRun = run;
 
-    expect(run.status).toBe("completed");
+    expect(run.status, `Run ${run.id} status=${run.status} stopReason=${run.stopReason} steps=${run.steps.length}`).toBe("completed");
     expect(run.stopReason).toBe("end_turn");
 
     // Token usage
