@@ -69,6 +69,7 @@ graph TD
     M2 --> M7
     M6 --> M8[M8: Evaluation Harness]
     M5 --> M8
+    M7 --> M8
 ```
 
 ### Milestones
@@ -80,9 +81,9 @@ graph TD
 | M3: API Layer, SSE & OpenAPI | S-3.0 – S-3.3 | `spec/plan/milestone-3-api-layer-sse.md` |
 | M4: Advanced Interactions & Scheduling | S-4.0 – S-4.3 | `spec/plan/milestone-4-advanced-interactions.md` |
 | M5: Character Personalities | S-5.0 – S-5.1 | `spec/plan/milestone-5-character-personalities.md` |
-| M6: Persona Drift Measurement | S-6.0 – S-6.5 | `spec/plan/milestone-6-persona-drift-measurement.md` |
+| M6: Persona Drift Measurement | S-6.0 – S-6.6 | `spec/plan/milestone-6-persona-drift-measurement.md` |
 | M7: Persona Drift Correction | S-7.0 – S-7.3 | `spec/plan/milestone-7-persona-drift-correction.md` |
-| M8: Evaluation Harness | S-8.0 – S-8.3 | `spec/plan/milestone-8-evaluation-harness.md` |
+| M8: Evaluation Harness | S-8.0 – S-8.7 | `spec/plan/milestone-8-evaluation-harness.md` |
 
 ### Horizontal Requirements
 

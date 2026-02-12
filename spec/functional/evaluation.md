@@ -1,17 +1,27 @@
 # Evaluation
 
-Persona drift measurement, correction, and regression testing. Scores agent behavior on four dimensions using proposition-based LLM-as-judge evaluation, applies runtime corrections to maintain character consistency, and provides a CI harness for persona regression testing.
+Persona drift measurement, correction, regression testing, and experiment reproduction. Scores agent behavior on five dimensions using proposition-based LLM-as-judge evaluation, applies runtime corrections to maintain character consistency, provides a CI harness for persona regression testing, and includes experiment infrastructure to reproduce TinyTroupe Table 1 (arXiv:2507.09788).
 
 ## Evaluation Dimensions
 
 | Dimension | What It Measures | Method |
 |-----------|-----------------|--------|
-| **Adherence** | Does agent behavior match its persona spec? | LLM judge scores message vs. system prompt persona |
-| **Consistency** | Is the agent consistent with its own past behavior? | LLM judge compares current vs. historical messages (no persona spec) |
-| **Fluency** | Does the agent avoid repetitive/formulaic language? | Algorithmic n-gram overlap + LLM judge for structural variety |
-| **Convergence** | Do agents maintain distinct voices in group conversations? | Vocabulary stats + LLM judge on anonymized messages |
+| **Adherence** | Does agent behavior match its persona spec? | LLM judge scores message vs. system prompt persona (`include_personas: true`) |
+| **Consistency** | Is the agent consistent with its own past behavior? | LLM judge compares current vs. historical messages (`include_personas: false`) |
+| **Fluency** | Does the agent avoid repetitive/formulaic language? | LLM judge primary + n-gram overlap as supplementary evidence (`include_personas: false`) |
+| **Convergence** | Do agents maintain distinct voices in group conversations? | LLM judge on full conversation trajectory + vocabulary stats as supplementary (`target_type: environment`, `include_personas: false`) |
+| **Ideas Quantity** | How many distinct ideas emerge in a conversation? | LLM judge enumerates unique ideas in conversation (`target_type: environment`) — integer count, not 0–9 |
 
-All dimensions scored 0–9 (0 = worst, 9 = best), matching the TinyTroupe evaluation scale. For the **Convergence** dimension specifically, higher scores mean agents **better maintain distinct voices** (i.e., less convergence / more divergence in style). Conceptually this is a "voice divergence" score stored under the `convergence` dimension name — treat it as such in aggregation and regression logic.
+The first four dimensions are scored 0–9 (0 = worst, 9 = best), matching the TinyTroupe evaluation scale. Ideas Quantity is an integer count. For the **Convergence** dimension specifically, higher scores mean agents **better maintain distinct voices** (i.e., less convergence / more divergence in style). Conceptually this is a "voice divergence" score stored under the `convergence` dimension name — treat it as such in aggregation and regression logic.
+
+## Proposition Engine
+
+Propositions support:
+- **`include_personas`**: Whether agent persona spec is included in judge context (default: true)
+- **`target_type`**: `agent` (single agent evaluation) or `environment` (full channel/group evaluation)
+- **`double_check`**: Judge reconsiders evaluation for stricter scoring (use for experiments, not CI)
+- **Scoring rubric**: 0–9 scale with detailed band descriptions included in every judge prompt
+- **Individual and batch evaluation**: Individual mode for experiment accuracy, batch (up to 10) for CI cost efficiency
 
 ## Data Model
 
@@ -141,39 +151,48 @@ Each dimension has a dedicated scorer function that:
 
 | Scorer | Input | LLM Calls | Key Logic |
 |--------|-------|-----------|-----------|
-| `scoreAdherence()` | Agent messages + persona spec | Yes (batched) | Judge scores message vs. persona claim |
-| `scoreConsistency()` | Current + historical message pairs | Yes (batched) | Judge scores whether paired messages come from same character |
-| `scoreFluency()` | Agent's recent messages | Partial (structural only) | N-gram overlap (algorithmic) + structural variety (LLM) |
-| `scoreConvergence()` | All agent messages in a channel | Yes (batched) | Vocabulary stats (algorithmic) + voice distinctiveness (LLM) |
+| `scoreAdherence()` | Agent messages + persona spec | Yes | Judge scores message vs. persona claim (`include_personas: true`) |
+| `scoreConsistency()` | Current + historical message pairs | Yes | Judge scores whether paired messages come from same character (`include_personas: false`) |
+| `scoreFluency()` | Agent's recent messages + n-gram stats | Yes | LLM judge primary with n-gram overlap as supplementary evidence (`include_personas: false`) |
+| `scoreConvergence()` | Full channel conversation trajectory | Yes | LLM judge on environment trajectory with vocab stats as supplementary (`target_type: environment`) |
+| `scoreIdeasQuantity()` | Full channel conversation trajectory | Yes | LLM judge enumerates distinct ideas, returns integer count (`target_type: environment`) |
 
 ## Runtime Corrections
 
 Three mechanisms, all configurable per-agent, all disabled by default:
 
-### Action Correction Gate
+### Action Correction Gate (Multi-Dimension)
 
-Hooks into `send_message` tool handler. After agent generates message text, before DB commit:
-
-```
-Agent → send_message(text) → Gate → [score >= threshold?] → commit
-                                  → [score < threshold?] → feedback → retry (max 2)
-                                                                    → force-through after max retries
-```
-
-- **Fail-open**: 5s timeout on judge call → pass through. Max 2 retries → force-through.
-- **Cost**: ~$0.00003 per check (Claude Haiku, ~100 tokens)
-
-### Anti-Convergence Intervention
-
-Hooks into orchestrator, pre-invocation. Checks agreement ratio in last 10 channel messages:
+Hooks into `send_message` tool handler. After agent generates message text, before DB commit, evaluates on multiple dimensions independently:
 
 ```
-Orchestrator → [agreement ratio > threshold?] → inject nudge into system prompt
-             → [ratio OK?] → proceed normally
+Agent → send_message(text) → Gate → [all enabled dimensions >= threshold?] → commit
+                                  → [any dimension < threshold?] → per-dimension feedback → retry (max 2)
+                                                                                          → commit best-scoring attempt
 ```
+
+- **Dimensions**: persona adherence (include_personas: true), self-consistency (include_personas: false), fluency (include_personas: false)
+- **Per-dimension enable/disable**: Each dimension toggled independently per agent
+- **Fail-open**: 5s timeout per dimension → that dimension passes. Max 2 retries → best-scoring attempt committed.
+- **Cost**: ~$0.00003–$0.00009 per check (1–3 Claude Haiku calls)
+- **Statistics**: Tracks regeneration failure rate, per-dimension failure counts, mean scores
+
+### Intervention Framework
+
+General-purpose system with composable preconditions and effects, matching TinyTroupe's `Intervention` class (Section 3.6.2):
+
+**Precondition types** (all must be true to fire):
+- **Textual**: LLM evaluates a natural language claim against conversation state
+- **Functional**: TypeScript function returning boolean (e.g., message count threshold)
+- **Propositional**: M6 Proposition object with optional score threshold
+
+**Built-in interventions**:
+1. **Anti-convergence**: Detects agreement patterns (LLM precondition), injects character-aware diversity nudge
+2. **Variety intervention**: Detects idea stagnation (functional + textual preconditions), injects "propose completely new ideas" thought
 
 - Character-aware nudges (Michael: "tell a story", Dwight: "assert authority", Jim: "witty observation")
 - Transient: nudge not stored in memory, single-use
+- `InterventionBatch.createForEach(agents)` for group application
 
 ### Repetition Suppression
 
@@ -211,6 +230,38 @@ JSON files committed to `src/features/evaluation/baselines/`. Regression = score
 ### CI Workflow
 
 GitHub Actions on PRs touching persona-related files. Runs mock-judge mode (<60s). Posts PR comment with scores table. Fails on regressions.
+
+## Experiment Infrastructure (Table 1 Reproduction)
+
+Infrastructure for reproducing TinyTroupe Table 1 experiments with treatment vs. control groups and statistical testing.
+
+### Agent Factory
+
+Generates large populations (96–200 agents) from demographic profiles:
+- **Average customers**: Diverse US demographics, varied Big Five traits
+- **Difficult customers**: Low agreeableness, confrontational, skeptical
+- **Political compass**: Left/right, libertarian/authoritarian orientations
+
+Deterministic mode (fixed seed) for reproducibility. LLM mode for richer personas.
+
+### Scenario Library
+
+Four pre-defined scenarios matching TinyTroupe experiments:
+
+| Scenario | Type | N_a | N_e | Treatment |
+|----------|------|-----|-----|-----------|
+| brainstorming-average | Brainstorming | 200 | 40 | Action correction + variety intervention |
+| brainstorming-difficult-full | Brainstorming | 96 | 24 | Action correction + variety intervention |
+| brainstorming-difficult-variety | Brainstorming | 96 | 24 | Variety intervention only |
+| debate-controversial | Debate | 120 | 24 | Action correction only |
+
+### Experiment Runner
+
+Executes T/C experiments: generates agents, runs conversations, evaluates all dimensions, computes Welch's t-test (mean, sd, p-value, Cohen's d). Produces Table 1-format reports.
+
+### Table 1 Reproduction
+
+Runs all four experiments, compares results against paper's published values. Validates **directional trends** (not exact values — different LLM, different agents). Scale factor flag (`--scale 0.1`) for quick validation.
 
 ## Related
 
