@@ -62,8 +62,9 @@ export default function MessageList() {
     loadMessages(channelId);
   }, [channelId, loadMessages]);
 
-  // Scroll to bottom on channel change (instant)
+  // Scroll to bottom on channel change (instant) and reset length tracker
   useEffect(() => {
+    prevLengthRef.current = 0;
     bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [channelId]);
 

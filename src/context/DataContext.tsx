@@ -110,7 +110,7 @@ export function DataProvider({
         setMessages(prev => ({ ...prev, [channelId]: data }));
       })
       .catch(() => {
-        setMessages(prev => ({ ...prev, [channelId]: [] }));
+        // Preserve existing messages on transient errors
       })
       .finally(() => {
         setMessagesLoading(prev => ({ ...prev, [channelId]: false }));

@@ -34,6 +34,7 @@ export function useSSE(onEvent: SSEEventHandler): void {
       eventSource.onerror = () => {
         eventSource?.close();
         if (!disposed) {
+          if (reconnectTimer) clearTimeout(reconnectTimer);
           reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
         }
       };

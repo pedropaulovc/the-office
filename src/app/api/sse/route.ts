@@ -1,11 +1,13 @@
 import { connectionRegistry } from "@/messages/sse-registry";
-import { logInfo } from "@/lib/telemetry";
+import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const encoder = new TextEncoder();
 
 export function GET(request: Request): Response {
-  const connectionId = crypto.randomUUID();
+  return withSpan("sse.connect", "http.server", () => {
+    const connectionId = crypto.randomUUID();
+    countMetric("sse.connections", 1);
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -39,11 +41,12 @@ export function GET(request: Request): Response {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
-    },
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+      },
+    });
   });
 }
