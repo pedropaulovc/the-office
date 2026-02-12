@@ -118,7 +118,7 @@ As a developer, I want the server to auto-generate an OpenAPI 3.1 spec from Zod 
 All Zod request/response schemas from API routes are registered with a central `OpenAPIRegistry`. The `/api/openapi.json` endpoint generates the full spec at runtime. `/api/docs` serves a Scalar UI page for interactive exploration.
 
 ### Acceptance Criteria
-- [ ] [AC-3.2.1] `@asteasolutions/zod-to-openapi` and `@scalar/nextjs` installed
+- [ ] [AC-3.2.1] `zod-openapi` and `@scalar/nextjs-api-reference` installed
 - [ ] [AC-3.2.2] Central `OpenAPIRegistry` in `src/api/openapi.ts` with all route schemas registered
 - [ ] [AC-3.2.3] `GET /api/openapi.json` returns a valid OpenAPI 3.1 document
 - [ ] [AC-3.2.4] `GET /api/docs` renders an interactive Scalar API explorer
