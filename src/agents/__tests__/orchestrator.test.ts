@@ -568,7 +568,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logWarn).toHaveBeenCalledWith(
-      "sdk.compact",
+      "sdk.compact.michael",
       expect.objectContaining({ trigger: "auto", preTokens: 50000 }),
     );
     expect(countMetric).toHaveBeenCalledWith("sdk.compaction", 1, { agentId: "michael" });
@@ -585,7 +585,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logError).toHaveBeenCalledWith(
-      "sdk.auth_status",
+      "sdk.auth_status.michael",
       expect.objectContaining({ error: "token expired" }),
     );
   });
@@ -601,7 +601,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logWarn).toHaveBeenCalledWith(
-      "sdk.auth_status",
+      "sdk.auth_status.michael",
       expect.objectContaining({ isAuthenticating: true }),
     );
   });
@@ -658,7 +658,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logInfo).toHaveBeenCalledWith(
-      "sdk.init",
+      "sdk.init.michael",
       expect.objectContaining({
         model: "claude-sonnet-4-5-20250929",
         permissionMode: "bypassPermissions",
@@ -673,7 +673,7 @@ describe("orchestrator", () => {
     await executeRun(RUN);
 
     expect(logError).toHaveBeenCalledWith(
-      "sdk.result.error",
+      "sdk.result.error.michael",
       expect.objectContaining({ error: "something failed" }),
     );
   });
