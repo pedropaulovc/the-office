@@ -6,11 +6,13 @@
 
 ```mermaid
 graph TD
-    S60[S-6.0 Evaluation Schema & Proposition Engine] --> S61[S-6.1 Persona Adherence Scorer]
-    S60 --> S62[S-6.2 Self-Consistency Scorer]
-    S60 --> S63[S-6.3 Fluency Scorer]
-    S60 --> S64[S-6.4 Convergence/Divergence Scorer]
-    S60 --> S66[S-6.6 Ideas Quantity Scorer]
+    S60a[S-6.0a Evaluation DB Schema & Types] --> S60b[S-6.0b Proposition YAML Loader]
+    S60b --> S60c[S-6.0c Proposition Scoring Engine & API]
+    S60c --> S61[S-6.1 Persona Adherence Scorer]
+    S60c --> S62[S-6.2 Self-Consistency Scorer]
+    S60c --> S63[S-6.3 Fluency Scorer]
+    S60c --> S64[S-6.4 Convergence/Divergence Scorer]
+    S60c --> S66[S-6.6 Ideas Quantity Scorer]
     S61 --> S65[S-6.5 Baseline Capture]
     S62 --> S65
     S63 --> S65
@@ -20,13 +22,15 @@ graph TD
 
 ---
 
-## [S-6.0] Evaluation Schema & Proposition Engine
+## [S-6.0a] Evaluation Database Schema & Types
 
-As a developer, I want a proposition evaluation engine and database schema so that I can define natural language claims about agent behavior and have them scored by an LLM judge.
+As a developer, I need the database schema and TypeScript types for the persona evaluation system.
 
 ### Description
 
-This is the foundation for all persona drift measurement. A **proposition** is a natural language statement that can be evaluated against agent output. For example: "Michael Scott would make this conversation about himself" or "Dwight would reference his authority as Assistant Regional Manager." Propositions are defined in YAML definition files, loaded at evaluation time, and scored by Claude Haiku (cheap, fast) as the LLM judge.
+This is the foundation for all persona drift measurement. The original S-6.0 has been split into three sub-stories (S-6.0a, S-6.0b, S-6.0c) for incremental implementation. The full background context is documented here for reference.
+
+A **proposition** is a natural language statement that can be evaluated against agent output. For example: "Michael Scott would make this conversation about himself" or "Dwight would reference his authority as Assistant Regional Manager." Propositions are defined in YAML definition files, loaded at evaluation time, and scored by Claude Haiku (cheap, fast) as the LLM judge.
 
 The proposition engine:
 1. Loads proposition definitions from YAML files in `src/features/evaluation/propositions/`
@@ -107,41 +111,81 @@ Each proposition supports an optional `inverted` boolean (default `false`). When
 |------|---------|
 | `src/db/schema/evaluations.ts` | `evaluation_runs`, `evaluation_scores` tables |
 | `src/features/evaluation/types.ts` | Types: `Proposition`, `PropositionResult`, `EvaluationDimension`, `EvaluationRun`, `EvaluationScore`, `TargetType`, `TrajectoryWindow`, `PreconditionFn` |
-| `src/features/evaluation/proposition-engine.ts` | `scoreProposition(prop, context)` (0–9), `checkProposition(prop, context)` (boolean), `scorePropositions(props, context)`, `batchScore(batches)` |
-| `src/features/evaluation/proposition-loader.ts` | YAML loader: reads `.yaml` files, validates with Zod, fills template variables |
 | `src/features/evaluation/schemas.ts` | Zod schemas for proposition YAML format, evaluation API request/response |
-| `src/features/evaluation/propositions/README.md` | Documentation for the proposition YAML format |
 | `src/db/queries/evaluations.ts` | `createEvaluationRun()`, `recordScore()`, `getEvaluationRun()`, `listEvaluationRuns()`, `getAgentScoreHistory()` |
+
+### Acceptance Criteria
+- [ ] [AC-6.0a.1] Two tables defined: `evaluation_runs` (id, agent_id, status, dimensions, window_start, window_end, sample_size, overall_score, token_usage, timestamps), `evaluation_scores` (id, evaluation_run_id, dimension, proposition_id, score 0–9, reasoning, context_snippet)
+- [ ] [AC-6.0a.2] Migration generated and applied — both tables queryable
+- [ ] [AC-6.0a.3] Types defined: `Proposition`, `PropositionResult`, `EvaluationDimension`, `EvaluationRun`, `EvaluationScore`, `TargetType`, `TrajectoryWindow`, `PreconditionFn`
+- [ ] [AC-6.0a.4] Zod schemas for proposition YAML format and evaluation API request/response
+- [ ] [AC-6.0a.5] DB queries: `createEvaluationRun()`, `recordScore()`, `getEvaluationRun()`, `listEvaluationRuns()`, `getAgentScoreHistory()`
+- [ ] [AC-6.0a.6] Unit tests for DB queries
+
+### Demo
+1. Show the evaluation tables are queryable
+2. Create and retrieve an evaluation run via queries
+
+---
+
+## [S-6.0b] Proposition YAML Loader & Template Engine
+
+As a developer, I want to load proposition definitions from YAML files and fill template variables so that propositions can be defined declaratively and reused across agents.
+
+### Files to create
+
+| File | Purpose |
+|------|---------|
+| `src/features/evaluation/proposition-loader.ts` | YAML loader: reads `.yaml` files, validates with Zod, fills template variables |
+| `src/features/evaluation/propositions/README.md` | Documentation for the proposition YAML format |
+
+### Acceptance Criteria
+- [ ] [AC-6.0b.1] Proposition YAML loader reads files from `src/features/evaluation/propositions/`, validates with Zod, supports optional `inverted` boolean per proposition
+- [ ] [AC-6.0b.2] Template variables (`{{agent_name}}`, `{{channel_name}}`, `{{action}}`) filled at evaluation time from agent/context data
+- [ ] [AC-6.0b.3] Inverted propositions (anti-patterns) have their raw LLM score flipped (`9 - raw`) before aggregation
+- [ ] [AC-6.0b.4] `include_personas` flag: when `true` (default), agent persona specification included in judge context; when `false`, persona is omitted
+- [ ] [AC-6.0b.5] `target_type` support: `agent` targets evaluate a single agent's messages; `environment` targets evaluate the full channel conversation
+- [ ] [AC-6.0b.6] `first_n` and `last_n` trajectory windowing: controls how many actions from the beginning and end of the agent's history are included as context; defaults: `first_n: 10, last_n: 100` for evaluation, `first_n: 5, last_n: 10` for action-level
+- [ ] [AC-6.0b.7] Hard evaluation mode: when `hard: true`, a 20% penalty is applied to the raw score for ANY detected flaw
+- [ ] [AC-6.0b.8] Optional `recommendations_for_improvement` per proposition — text guidance returned when score is below threshold
+- [ ] [AC-6.0b.9] Create a sample proposition YAML file for testing (e.g., `adherence/_default.yaml`)
+- [ ] [AC-6.0b.10] Unit tests for YAML loading, template variable replacement, inverted score handling, hard mode penalty
+
+### Demo
+1. Load a sample proposition YAML for Michael
+2. Show template variables filled correctly
+3. Show inverted proposition score flipping
+
+---
+
+## [S-6.0c] Proposition Scoring Engine & Evaluation API
+
+As a developer, I want the LLM judge scoring engine and evaluation API routes so that propositions can be scored programmatically and results stored/queried.
+
+### Files to create
+
+| File | Purpose |
+|------|---------|
+| `src/features/evaluation/proposition-engine.ts` | `scoreProposition(prop, context)` (0–9), `checkProposition(prop, context)` (boolean), `scorePropositions(props, context)`, `batchScore(batches)` |
 | `src/app/api/evaluations/route.ts` | GET (list evaluation runs, filterable by agentId), POST (trigger new evaluation run) |
 | `src/app/api/evaluations/[runId]/route.ts` | GET (single evaluation run with all scores) |
 
 ### Acceptance Criteria
-- [ ] [AC-6.0.1] Two tables defined: `evaluation_runs` (id, agent_id, status, dimensions, window_start, window_end, sample_size, overall_score, token_usage, timestamps), `evaluation_scores` (id, evaluation_run_id, dimension, proposition_id, score 0–9, reasoning, context_snippet)
-- [ ] [AC-6.0.2] Proposition YAML loader reads files from `src/features/evaluation/propositions/`, validates with Zod, supports optional `inverted` boolean per proposition
-- [ ] [AC-6.0.3] Template variables (`{{agent_name}}`, `{{channel_name}}`, `{{action}}`) filled at evaluation time from agent/context data
-- [ ] [AC-6.0.3a] Inverted propositions (anti-patterns) have their raw LLM score flipped (`9 - raw`) before aggregation
-- [ ] [AC-6.0.4] Two evaluation modes: `scoreProposition()` returns integer 0–9 with reasoning + confidence; `checkProposition()` returns boolean true/false (used by intervention preconditions in S-7.1). Both share the same LLM judge infrastructure. `scorePropositions()` supports batch mode grouping up to 10 per call.
-- [ ] [AC-6.0.5] Scoring rubric (0–9 with band descriptions) included in every judge system prompt
-- [ ] [AC-6.0.6] Single LLM judge prompt instructs the model to score each proposition independently and return structured JSON per proposition with `score` (0–9), `reasoning`, and `confidence` fields; `score` maps to `evaluation_scores.score`, `reasoning` maps to `evaluation_scores.reasoning`, `confidence` is used transiently for logging but not persisted
-- [ ] [AC-6.0.7] Evaluation API: GET list runs (filterable by `agentId`), POST trigger new run, GET single run with scores
-- [ ] [AC-6.0.8] Migration generated and applied — both tables queryable
-- [ ] [AC-6.0.9] `include_personas` flag: when `true` (default), agent persona specification included in judge context; when `false`, persona is omitted (used for self-consistency and fluency where persona should not bias evaluation)
-- [ ] [AC-6.0.10] `target_type` support: `agent` targets evaluate a single agent's messages; `environment` targets evaluate the full channel conversation with all agents' trajectories
-- [ ] [AC-6.0.11] `double_check` mode: when enabled, judge is asked "Are you sure? Please revise your evaluation to make it as correct as possible." in a follow-up message; revised score used if different
-- [ ] [AC-6.0.12] `first_n` and `last_n` trajectory windowing: controls how many actions from the beginning and end of the agent's history are included as context; defaults: `first_n: 10, last_n: 100` for evaluation, `first_n: 5, last_n: 10` for action-level
-- [ ] [AC-6.0.13] Trajectory formatted as `"Agent acts: [MESSAGE]"` for agent actions and `"--> Agent: [STIMULUS]"` for incoming messages, matching TinyTroupe's format
-- [ ] [AC-6.0.14] Optional `recommendations_for_improvement` per proposition — text guidance returned when score is below threshold
-- [ ] [AC-6.0.15] Precondition function support: `precondition(target, additionalContext, claimVariables) => boolean`; if `false`, proposition evaluates as trivially true (score 9)
-- [ ] [AC-6.0.16] Hard evaluation mode: when `hard: true` on a proposition, a 20% penalty is applied to the raw score for ANY detected flaw (matching TinyTroupe's `hard_action_persona_adherence` which states "apply a 20% penalty for each detected flaw"). Hard mode is used in experiments for stricter persona checks.
-- [ ] [AC-6.0.17] Unit tests for YAML loading, template variable replacement, LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow, trajectory formatting, precondition gating, check() vs score() modes, hard evaluation penalty
-- [ ] [AC-6.0.18] Sentry spans for evaluation runs and LLM judge calls
+- [ ] [AC-6.0c.1] Two evaluation modes: `scoreProposition()` returns integer 0–9 with reasoning + confidence; `checkProposition()` returns boolean true/false. Both share the same LLM judge infrastructure. `scorePropositions()` supports batch mode grouping up to 10 per call.
+- [ ] [AC-6.0c.2] Scoring rubric (0–9 with band descriptions) included in every judge system prompt
+- [ ] [AC-6.0c.3] Single LLM judge prompt returns structured JSON per proposition with `score` (0–9), `reasoning`, and `confidence` fields
+- [ ] [AC-6.0c.4] `double_check` mode: judge asked to revise evaluation for stricter scoring
+- [ ] [AC-6.0c.5] Precondition function support: `precondition(target, additionalContext, claimVariables) => boolean`; if `false`, proposition evaluates as trivially true (score 9)
+- [ ] [AC-6.0c.6] Trajectory formatted as `"Agent acts: [MESSAGE]"` for actions and `"--> Agent: [STIMULUS]"` for stimuli
+- [ ] [AC-6.0c.7] Evaluation API: GET list runs (filterable by `agentId`), POST trigger new run, GET single run with scores
+- [ ] [AC-6.0c.8] Unit tests for LLM response parsing, batch grouping logic, scoring rubric presence, double-check flow, trajectory formatting, precondition gating, check() vs score() modes
+- [ ] [AC-6.0c.9] Sentry spans for evaluation runs and LLM judge calls
 
 ### Demo
-1. Create a sample proposition YAML for Michael
-2. Feed a sample `send_message` tool call from `run_messages` into the proposition engine
-3. Show the LLM judge returns scores (0–9) with reasoning and confidence
-4. Show the evaluation run and scores stored in the DB
-5. Demonstrate an environment-level proposition scoring a channel conversation
+1. Feed a sample `send_message` tool call from `run_messages` into the proposition engine
+2. Show the LLM judge returns scores (0–9) with reasoning and confidence
+3. Show the evaluation run and scores stored in the DB
+4. Demonstrate an environment-level proposition scoring a channel conversation
 
 ---
 

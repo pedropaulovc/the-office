@@ -6,18 +6,30 @@
 
 ```mermaid
 graph TD
-    S70[S-7.0 Action Correction Gate] --> S72[S-7.2 Repetition Suppression]
-    S71[S-7.1 Intervention Framework] --> S72
-    S70 --> S73[S-7.3 Configuration & Cost Tracking]
-    S71 --> S73
+    S70a[S-7.0a Action Quality Check & Similarity] --> S70b[S-7.0b Two-Stage Correction Pipeline & Integration]
+    S71a[S-7.1a Intervention Framework Core] --> S71b[S-7.1b Built-in Interventions & Orchestrator Integration]
+    S70b --> S72[S-7.2 Repetition Suppression]
+    S71b --> S72
+    S70b --> S73[S-7.3 Configuration & Cost Tracking]
+    S71b --> S73
     S72 --> S73
 ```
 
 ---
 
-## [S-7.0] Action Correction Gate
+## [S-7.0a] Action Quality Check & Similarity
+
+As a developer, I need the multi-dimension quality check and action similarity functions for the action correction gate. This is part 1 of the original S-7.0, covering per-dimension scoring and Jaccard similarity.
+
+## [S-7.0b] Two-Stage Correction Pipeline & send_message Integration
+
+As a developer, I want the full two-stage correction pipeline (regeneration + direct correction) integrated into the send_message tool. This is part 2 of the original S-7.0, covering the correction pipeline, logging, statistics, and tool integration.
+
+## [S-7.0] Action Correction Gate (Full Reference)
 
 As a developer, I want a pre-commit multi-dimension quality check on agent messages so that off-character, inconsistent, or repetitive responses are caught and regenerated before they reach the chat.
+
+> **Note**: This story has been split into **S-7.0a** (quality check dimensions + similarity) and **S-7.0b** (two-stage correction pipeline + send_message integration) for incremental implementation. The full specification below applies across both sub-stories.
 
 ### Description
 
@@ -137,9 +149,19 @@ This is faster than regeneration (one LLM call vs. full agent turn) and can succ
 
 ---
 
-## [S-7.1] Intervention Framework
+## [S-7.1a] Intervention Framework Core
+
+As a developer, I want the core intervention system with composable preconditions, effects, and the chaining API. This is part 1 of S-7.1, covering the `Intervention` class, precondition types, `InterventionBatch`, and the `intervention_logs` table.
+
+## [S-7.1b] Built-in Interventions & Orchestrator Integration
+
+As a developer, I want anti-convergence and variety interventions integrated into the orchestrator pipeline. This is part 2 of S-7.1, covering the built-in intervention types, nudge templates, and wiring into orchestrator + prompt-builder.
+
+## [S-7.1] Intervention Framework (Full Reference)
 
 As a developer, I want a general-purpose intervention system with composable preconditions and effects so that I can implement anti-convergence nudges, variety interventions, and other simulation steering mechanisms.
+
+> **Note**: This story has been split into **S-7.1a** (framework core: Intervention class, preconditions, chaining API, DB table) and **S-7.1b** (built-in interventions, nudge templates, orchestrator integration) for incremental implementation. The full specification below applies across both sub-stories.
 
 ### Description
 
