@@ -1,8 +1,12 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
+import { useSSE } from '@/hooks/use-sse';
+import { fetchChannelMessages } from '@/api/client';
+import type { Message } from '@/types';
+import type { SSEEvent } from '@/messages/sse-registry';
 import { DataContext, type AgentView } from './data-context-def';
 
 function toAgentView(agent: Agent): AgentView {
@@ -95,6 +99,90 @@ export function DataProvider({
     [initialUnreads],
   );
 
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [messagesLoading, setMessagesLoading] = useState<Record<string, boolean>>({});
+  const [typingAgents, setTypingAgents] = useState<Record<string, string[]>>({});
+
+  const loadMessages = useCallback((channelId: string) => {
+    setMessagesLoading(prev => ({ ...prev, [channelId]: true }));
+    fetchChannelMessages(channelId)
+      .then(data => {
+        setMessages(prev => ({ ...prev, [channelId]: data }));
+      })
+      .catch(() => {
+        // Preserve existing messages on transient errors
+      })
+      .finally(() => {
+        setMessagesLoading(prev => ({ ...prev, [channelId]: false }));
+      });
+  }, []);
+
+  const handleSSEEvent = useCallback((event: SSEEvent) => {
+    switch (event.type) {
+      case 'message_created': {
+        const dbMsg = event.data as Record<string, unknown>;
+        const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+
+        // Thread reply — update parent's threadReplyCount
+        if (dbMsg.parentMessageId) {
+          setMessages(prev => {
+            const channelMsgs = prev[channelId];
+            if (!channelMsgs) return prev;
+            return {
+              ...prev,
+              [channelId]: channelMsgs.map(m =>
+                m.id === dbMsg.parentMessageId
+                  ? { ...m, threadReplyCount: m.threadReplyCount + 1 }
+                  : m
+              ),
+            };
+          });
+          return;
+        }
+
+        // Top-level message — append to channel
+        const newMessage: Message = {
+          id: dbMsg.id as string,
+          channelId,
+          userId: dbMsg.userId as string,
+          text: dbMsg.text as string,
+          timestamp: dbMsg.createdAt as string,
+          reactions: [],
+          threadReplyCount: 0,
+        };
+
+        setMessages(prev => ({
+          ...prev,
+          [channelId]: [...(prev[channelId] ?? []), newMessage],
+        }));
+        break;
+      }
+
+      case 'agent_typing': {
+        const agentId = event.agentId;
+        if (!agentId) return;
+        setTypingAgents(prev => {
+          const current = prev[event.channelId] ?? [];
+          if (current.includes(agentId)) return prev;
+          return { ...prev, [event.channelId]: [...current, agentId] };
+        });
+        break;
+      }
+
+      case 'agent_done': {
+        const agentId = event.agentId;
+        if (!agentId) return;
+        setTypingAgents(prev => {
+          const current = prev[event.channelId] ?? [];
+          return { ...prev, [event.channelId]: current.filter(id => id !== agentId) };
+        });
+        break;
+      }
+    }
+  }, []);
+
+  useSSE(handleSSEEvent);
+
   const value = useMemo(
     () => ({
       agents,
@@ -104,8 +192,12 @@ export function DataProvider({
       getDmsForUser,
       getDmOtherParticipant,
       getUnreadCount,
+      messages,
+      messagesLoading,
+      loadMessages,
+      typingAgents,
     }),
-    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount],
+    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount, messages, messagesLoading, loadMessages, typingAgents],
   );
 
   return (

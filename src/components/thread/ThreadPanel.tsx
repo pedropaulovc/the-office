@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchChannelMessages, fetchThreadReplies } from '@/api/client';
+import { fetchThreadReplies } from '@/api/client';
+import { useData } from '@/context/useData';
 import ThreadHeader from './ThreadHeader';
 import MessageItem from '@/components/chat/MessageItem';
 import ThreadComposeBox from './ThreadComposeBox';
@@ -13,20 +14,17 @@ interface ThreadPanelProps {
 }
 
 export default function ThreadPanel({ parentMessageId, channelId }: ThreadPanelProps) {
-  const [parentMessage, setParentMessage] = useState<Message | null>(null);
+  const { messages: allMessages } = useData();
   const [replyMessages, setReplyMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadThread = useCallback(async () => {
+  const channelMsgs = allMessages[channelId] ?? [];
+  const parentMessage = channelMsgs.find((m) => m.id === parentMessageId) ?? null;
+
+  const loadReplies = useCallback(async () => {
     setLoading(true);
     try {
-      const [channelMsgs, replies] = await Promise.all([
-        fetchChannelMessages(channelId),
-        fetchThreadReplies(parentMessageId),
-      ]);
-
-      const parent = channelMsgs.find((m) => m.id === parentMessageId) ?? null;
-      setParentMessage(parent);
+      const replies = await fetchThreadReplies(parentMessageId);
 
       // Convert thread replies to Message shape for reuse of MessageItem
       setReplyMessages(
@@ -41,7 +39,6 @@ export default function ThreadPanel({ parentMessageId, channelId }: ThreadPanelP
         })),
       );
     } catch {
-      setParentMessage(null);
       setReplyMessages([]);
     } finally {
       setLoading(false);
@@ -49,8 +46,8 @@ export default function ThreadPanel({ parentMessageId, channelId }: ThreadPanelP
   }, [parentMessageId, channelId]);
 
   useEffect(() => {
-    void loadThread();
-  }, [loadThread]);
+    void loadReplies();
+  }, [loadReplies]);
 
   if (loading) {
     return (

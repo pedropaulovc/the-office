@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { fetchChannelMessages } from '@/api/client';
+import { useData } from '@/context/useData';
 import { formatDateDivider } from '@/utils/format-time';
 import MessageGroup from './MessageGroup';
 import type { Message } from '@/types';
@@ -50,32 +50,33 @@ function groupMessages(msgs: Message[]): { date: string; groups: MessageGroupDat
 
 export default function MessageList() {
   const { activeView } = useApp();
+  const { messages, messagesLoading, loadMessages } = useData();
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelId = activeView.id;
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  const channelMessages = useMemo(() => messages[channelId] ?? [], [messages, channelId]);
+  const loading = messagesLoading[channelId] ?? true;
+  const prevLengthRef = useRef(channelMessages.length);
 
-  const loadMessages = useCallback(async (id: string) => {
-    setLoading(true);
-    try {
-      const data = await fetchChannelMessages(id);
-      setMessages(data);
-    } catch {
-      setMessages([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Load messages on channel change
   useEffect(() => {
-    void loadMessages(channelId);
+    loadMessages(channelId);
   }, [channelId, loadMessages]);
 
-  const grouped = useMemo(() => groupMessages(messages), [messages]);
-
+  // Scroll to bottom on channel change (instant) and reset length tracker
   useEffect(() => {
+    prevLengthRef.current = 0;
     bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [channelId]);
+
+  // Scroll to bottom when new messages arrive via SSE (smooth)
+  useEffect(() => {
+    if (channelMessages.length > prevLengthRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevLengthRef.current = channelMessages.length;
+  }, [channelMessages.length]);
+
+  const grouped = useMemo(() => groupMessages(channelMessages), [channelMessages]);
 
   if (loading) {
     return (
@@ -85,7 +86,7 @@ export default function MessageList() {
     );
   }
 
-  if (messages.length === 0) {
+  if (channelMessages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         No messages yet
