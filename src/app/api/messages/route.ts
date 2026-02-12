@@ -1,8 +1,8 @@
-import { createMessage } from "@/db/queries";
+import { createMessage, getChannel } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { CreateMessageSchema } from "@/messages/schemas";
 import { resolveTargetAgents } from "@/agents/resolver";
-import { enqueueRun } from "@/agents/mailbox";
+import { enqueueRun, enqueueSequentialRuns } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
 import { jsonResponse } from "@/lib/api-response";
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
@@ -33,15 +33,40 @@ export async function POST(request: Request) {
     // Fire-and-forget: resolve target agents and enqueue runs
     void (async () => {
       const targets = await resolveTargetAgents(dbMessage);
-      for (const agentId of targets) {
-        await enqueueRun(
-          {
-            agentId,
-            channelId: dbMessage.channelId,
-            triggerMessageId: dbMessage.id,
-          },
-          executeRun,
+      if (targets.length === 0) return;
+
+      const channel = await getChannel(dbMessage.channelId);
+      const isGroupChannel = channel?.kind === "public" || channel?.kind === "private";
+
+      if (isGroupChannel && targets.length > 1) {
+        // Group channel: process agents sequentially so each sees prior responses
+        logInfo("group channel sequential processing", {
+          channelId: dbMessage.channelId,
+          channelKind: channel.kind,
+          targetCount: targets.length,
+        });
+        await enqueueSequentialRuns(
+          targets.map((agentId) => ({
+            input: {
+              agentId,
+              channelId: dbMessage.channelId,
+              triggerMessageId: dbMessage.id,
+            },
+            executor: executeRun,
+          })),
         );
+      } else {
+        // DM or single target: fire-and-forget as before
+        for (const agentId of targets) {
+          await enqueueRun(
+            {
+              agentId,
+              channelId: dbMessage.channelId,
+              triggerMessageId: dbMessage.id,
+            },
+            executeRun,
+          );
+        }
       }
     })();
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DbMessage } from "@/db/schema";
+import type { DbMessage, Channel } from "@/db/schema";
 
 const MOCK_MESSAGE: DbMessage = {
   id: "msg-001",
@@ -10,13 +10,30 @@ const MOCK_MESSAGE: DbMessage = {
   createdAt: new Date("2025-06-01T12:00:00Z"),
 };
 
+const MOCK_PUBLIC_CHANNEL: Channel = {
+  id: "general",
+  name: "general",
+  kind: "public",
+  topic: "",
+};
+
+const MOCK_DM_CHANNEL: Channel = {
+  id: "dm-michael-dwight",
+  name: "dm-michael-dwight",
+  kind: "dm",
+  topic: "",
+};
+
 const mockCreateMessage = vi.fn<() => Promise<DbMessage>>();
+const mockGetChannel = vi.fn<() => Promise<Channel | undefined>>();
 const mockBroadcast = vi.fn<() => void>();
 const mockResolveTargetAgents = vi.fn<() => Promise<string[]>>();
 const mockEnqueueRun = vi.fn<() => Promise<unknown>>();
+const mockEnqueueSequentialRuns = vi.fn<() => Promise<unknown[]>>();
 
 vi.mock("@/db/queries", () => ({
   createMessage: (...args: unknown[]) => mockCreateMessage(...(args as [])),
+  getChannel: (...args: unknown[]) => mockGetChannel(...(args as [])),
 }));
 
 vi.mock("@/messages/sse-registry", () => ({
@@ -29,6 +46,7 @@ vi.mock("@/agents/resolver", () => ({
 
 vi.mock("@/agents/mailbox", () => ({
   enqueueRun: (...args: unknown[]) => mockEnqueueRun(...(args as [])),
+  enqueueSequentialRuns: (...args: unknown[]) => mockEnqueueSequentialRuns(...(args as [])),
 }));
 
 vi.mock("@/agents/orchestrator", () => ({
@@ -112,10 +130,11 @@ describe("POST /api/messages", () => {
     }));
   });
 
-  it("enqueues runs for each resolved target agent", async () => {
+  it("uses sequential runs for group channel with multiple targets", async () => {
     mockCreateMessage.mockResolvedValue(MOCK_MESSAGE);
     mockResolveTargetAgents.mockResolvedValue(["dwight", "jim"]);
-    mockEnqueueRun.mockResolvedValue({ id: "run-1" });
+    mockGetChannel.mockResolvedValue(MOCK_PUBLIC_CHANNEL);
+    mockEnqueueSequentialRuns.mockResolvedValue([]);
 
     const { POST } = await import("../route");
     const request = new Request("http://localhost/api/messages", {
@@ -131,14 +150,69 @@ describe("POST /api/messages", () => {
     // Fire-and-forget is async, give it a tick to resolve
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockEnqueueRun).toHaveBeenCalledTimes(2);
+    expect(mockEnqueueSequentialRuns).toHaveBeenCalledTimes(1);
+    const args = mockEnqueueSequentialRuns.mock.calls[0] as unknown[][];
+    const runInputs = args[0] as { input: { agentId: string } }[];
+    expect(runInputs).toHaveLength(2);
+    expect(runInputs[0].input.agentId).toBe("dwight");
+    expect(runInputs[1].input.agentId).toBe("jim");
+
+    // enqueueRun should NOT be called for group channels
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
+  });
+
+  it("uses fire-and-forget enqueueRun for DM channels", async () => {
+    const dmMessage: DbMessage = {
+      ...MOCK_MESSAGE,
+      channelId: "dm-michael-dwight",
+    };
+    mockCreateMessage.mockResolvedValue(dmMessage);
+    mockResolveTargetAgents.mockResolvedValue(["dwight"]);
+    mockGetChannel.mockResolvedValue(MOCK_DM_CHANNEL);
+    mockEnqueueRun.mockResolvedValue({ id: "run-1" });
+
+    const { POST } = await import("../route");
+    const request = new Request("http://localhost/api/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        channelId: "dm-michael-dwight",
+        userId: "michael",
+        text: "Hey Dwight",
+      }),
+    });
+    await POST(request);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockEnqueueRun).toHaveBeenCalledTimes(1);
     expect(mockEnqueueRun).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: "dwight", channelId: "general" }),
+      expect.objectContaining({ agentId: "dwight", channelId: "dm-michael-dwight" }),
       expect.any(Function),
     );
-    expect(mockEnqueueRun).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: "jim", channelId: "general" }),
-      expect.any(Function),
-    );
+    expect(mockEnqueueSequentialRuns).not.toHaveBeenCalled();
+  });
+
+  it("uses fire-and-forget for group channel with single target", async () => {
+    mockCreateMessage.mockResolvedValue(MOCK_MESSAGE);
+    mockResolveTargetAgents.mockResolvedValue(["dwight"]);
+    mockGetChannel.mockResolvedValue(MOCK_PUBLIC_CHANNEL);
+    mockEnqueueRun.mockResolvedValue({ id: "run-1" });
+
+    const { POST } = await import("../route");
+    const request = new Request("http://localhost/api/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        channelId: "general",
+        userId: "michael",
+        text: "Hey everyone",
+      }),
+    });
+    await POST(request);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Single target in group channel still uses fire-and-forget
+    expect(mockEnqueueRun).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueSequentialRuns).not.toHaveBeenCalled();
   });
 });

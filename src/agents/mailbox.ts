@@ -7,6 +7,11 @@ import {
   countMetric,
 } from "@/lib/telemetry";
 
+export interface SequentialRunInput {
+  input: NewRun;
+  executor: RunExecutor;
+}
+
 export interface RunResult {
   status?: Run["status"];
   stopReason?: Run["stopReason"];
@@ -75,6 +80,56 @@ export async function processNextRun(
 
     // Recurse to drain the queue
     return processNextRun(agentId, executor);
+  });
+}
+
+/**
+ * Enqueues multiple runs and processes them sequentially, awaiting each
+ * completion before starting the next. Used for group channel responses
+ * so each agent sees prior agent responses in their context.
+ *
+ * Unlike fire-and-forget enqueueRun, this function blocks until all
+ * runs have completed (or failed).
+ */
+export async function enqueueSequentialRuns(
+  runs: SequentialRunInput[],
+): Promise<Run[]> {
+  return withSpan("enqueueSequentialRuns", "agent.mailbox.sequential", async () => {
+    logInfo("sequential runs starting", {
+      count: runs.length,
+      agentIds: runs.map((r) => r.input.agentId).join(","),
+    });
+    countMetric("mailbox.sequential.batch", 1, { count: String(runs.length) });
+
+    const completedRuns: Run[] = [];
+
+    for (const { input, executor } of runs) {
+      const run = await createRun(input);
+      logInfo("sequential run enqueued", {
+        runId: run.id,
+        agentId: run.agentId,
+        position: completedRuns.length + 1,
+        total: runs.length,
+      });
+      countMetric("mailbox.enqueue", 1, { agentId: run.agentId });
+
+      // Process synchronously — await completion before next agent
+      await processNextRun(run.agentId, executor);
+
+      completedRuns.push(run);
+      logInfo("sequential run finished", {
+        runId: run.id,
+        agentId: run.agentId,
+        position: completedRuns.length,
+        total: runs.length,
+      });
+    }
+
+    logInfo("sequential runs completed", {
+      count: completedRuns.length,
+    });
+
+    return completedRuns;
   });
 }
 
