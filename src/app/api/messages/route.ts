@@ -5,7 +5,8 @@ import { resolveTargetAgents } from "@/agents/resolver";
 import { enqueueRun } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
 import { jsonResponse } from "@/lib/api-response";
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import * as Sentry from "@sentry/nextjs";
+import { withSpan, logInfo, logError, countMetric } from "@/lib/telemetry";
 
 export async function POST(request: Request) {
   return withSpan("api.messages.create", "http.server", async () => {
@@ -32,16 +33,32 @@ export async function POST(request: Request) {
 
     // Fire-and-forget: resolve target agents and enqueue runs
     void (async () => {
-      const targets = await resolveTargetAgents(dbMessage);
-      for (const agentId of targets) {
-        await enqueueRun(
-          {
-            agentId,
-            channelId: dbMessage.channelId,
-            triggerMessageId: dbMessage.id,
-          },
-          executeRun,
-        );
+      try {
+        const targets = await resolveTargetAgents(dbMessage);
+        logInfo("agent targets resolved", {
+          messageId: dbMessage.id,
+          channelId: dbMessage.channelId,
+          targetCount: targets.length,
+          targets: targets.join(","),
+        });
+
+        for (const agentId of targets) {
+          await enqueueRun(
+            {
+              agentId,
+              channelId: dbMessage.channelId,
+              triggerMessageId: dbMessage.id,
+            },
+            executeRun,
+          );
+        }
+      } catch (err) {
+        logError("fire-and-forget agent dispatch failed", {
+          messageId: dbMessage.id,
+          channelId: dbMessage.channelId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        Sentry.captureException(err);
       }
     })();
 

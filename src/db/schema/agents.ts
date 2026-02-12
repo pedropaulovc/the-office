@@ -7,7 +7,7 @@ export const agents = pgTable("agents", {
   avatarColor: text("avatar_color").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   modelId: text("model_id").notNull().default("claude-sonnet-4-5-20250929"),
-  maxTurns: integer("max_turns").notNull().default(5),
+  maxTurns: integer("max_turns").notNull().default(50),
   maxBudgetUsd: real("max_budget_usd").notNull().default(0.1),
   sessionId: text("session_id"),
   isActive: boolean("is_active").notNull().default(true),

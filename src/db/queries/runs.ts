@@ -34,14 +34,17 @@ export function createRun(data: NewRun): Promise<Run> {
 
 /**
  * Atomically claims the next queued run for an agent.
- * Uses FOR UPDATE SKIP LOCKED to prevent concurrent claims.
+ * Uses an optimistic CAS (compare-and-swap) pattern compatible with
+ * Neon's HTTP driver, which doesn't support FOR UPDATE SKIP LOCKED.
+ * The outer `AND status = 'created'` ensures no double-claim if a
+ * concurrent request selects the same row.
  * Returns null if no run is available or another run is already running.
  */
 export function claimNextRun(agentId: string): Promise<Run | null> {
   return withSpan("claimNextRun", "db.query", async () => {
     const result = await db.execute(sql`
       UPDATE runs SET status = 'running', started_at = now()
-      WHERE id IN (
+      WHERE id = (
         SELECT id FROM runs
         WHERE agent_id = ${agentId} AND status = 'created'
           AND NOT EXISTS (
@@ -49,9 +52,9 @@ export function claimNextRun(agentId: string): Promise<Run | null> {
             WHERE r2.agent_id = ${agentId} AND r2.status = 'running'
           )
         ORDER BY created_at
-        FOR UPDATE SKIP LOCKED
         LIMIT 1
       )
+      AND status = 'created'
       RETURNING *
     `);
 

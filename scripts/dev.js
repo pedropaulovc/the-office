@@ -1,5 +1,5 @@
-import { execSync, execFileSync } from "child_process";
-import { existsSync, rmSync } from "fs";
+import { execSync, execFileSync, spawn } from "child_process";
+import { existsSync, rmSync, mkdirSync, createWriteStream } from "fs";
 import { basename, join } from "path";
 import { createServer } from "net";
 import { platform } from "os";
@@ -203,13 +203,42 @@ async function main() {
 }
 
 function startNextDev(port) {
-  try {
-    execSync(`npx next dev --turbopack --port ${port}`, {
-      stdio: "inherit",
-      env: { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, "--no-experimental-webstorage"].filter(Boolean).join(" ") },
-    });
-  } catch (error) {
-    process.exit(error.status ?? 1);
+  // Create log file: logs/run-dev-<timestamp>.log
+  const logsDir = join(process.cwd(), "logs");
+  mkdirSync(logsDir, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+  const logPath = join(logsDir, `run-dev-${timestamp}.log`);
+  const logStream = createWriteStream(logPath, { flags: "a" });
+
+  console.log(`Logging to ${logPath}`);
+  logStream.write(`=== Dev server started at ${new Date().toISOString()} on port ${port} ===\n`);
+
+  const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, "--no-experimental-webstorage"].filter(Boolean).join(" ") };
+  const child = spawn("npx", ["next", "dev", "--turbopack", "--port", String(port)], {
+    env,
+    stdio: ["inherit", "pipe", "pipe"],
+    shell: true,
+  });
+
+  // Tee stdout and stderr to both console and log file
+  child.stdout.on("data", (chunk) => {
+    process.stdout.write(chunk);
+    logStream.write(chunk);
+  });
+  child.stderr.on("data", (chunk) => {
+    process.stderr.write(chunk);
+    logStream.write(chunk);
+  });
+
+  child.on("close", (code) => {
+    logStream.write(`\n=== Dev server exited with code ${code} at ${new Date().toISOString()} ===\n`);
+    logStream.end();
+    process.exit(code ?? 1);
+  });
+
+  // Forward SIGINT/SIGTERM to child
+  for (const sig of ["SIGINT", "SIGTERM"]) {
+    process.on(sig, () => child.kill(sig));
   }
 }
 
