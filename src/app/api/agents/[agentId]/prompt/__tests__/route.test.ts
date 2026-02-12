@@ -9,7 +9,7 @@ const MOCK_AGENT: Agent = {
   avatarColor: "#4A90D9",
   systemPrompt: "You are Michael Scott.",
   modelId: "claude-sonnet-4-5-20250929",
-  maxTurns: 5,
+  maxTurns: 10,
   maxBudgetUsd: 0.1,
   sessionId: null,
   isActive: true,

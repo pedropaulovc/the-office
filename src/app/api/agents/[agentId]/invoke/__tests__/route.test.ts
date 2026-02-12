@@ -11,11 +11,17 @@ vi.mock("@/db/queries", () => ({
 
 vi.mock("@/agents/mailbox", () => ({
   enqueueRun: (...args: unknown[]) => mockEnqueueRun(...args),
+  processNextRun: vi.fn(),
 }));
 
 vi.mock("@/agents/orchestrator", () => ({
   executeRun: vi.fn(),
 }));
+
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: vi.fn() };
+});
 
 const MOCK_AGENT = createMockAgent({ id: "michael" });
 const MOCK_RUN = createMockRun({ agentId: "michael", channelId: "general" });

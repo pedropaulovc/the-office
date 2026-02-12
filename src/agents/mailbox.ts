@@ -21,20 +21,15 @@ const stubExecutor: RunExecutor = (run: Run) => {
 };
 
 /**
- * Enqueues a new run for an agent and fire-and-forgets processing.
+ * Enqueues a new run for an agent.
+ * Callers should use `after()` to schedule `processNextRun` so the
+ * serverless function stays alive until processing completes.
  */
-export async function enqueueRun(
-  input: NewRun,
-  executor?: RunExecutor,
-): Promise<Run> {
+export async function enqueueRun(input: NewRun): Promise<Run> {
   return withSpan("enqueueRun", "agent.mailbox.enqueue", async () => {
     const run = await createRun(input);
     logInfo("run enqueued", { runId: run.id, agentId: run.agentId });
     countMetric("mailbox.enqueue", 1, { agentId: run.agentId });
-
-    // Fire-and-forget: start processing the queue
-    void processNextRun(run.agentId, executor);
-
     return run;
   });
 }

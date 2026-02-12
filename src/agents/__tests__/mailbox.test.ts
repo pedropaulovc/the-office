@@ -29,7 +29,6 @@ describe("mailbox", () => {
   it("enqueueRun creates run with status created", async () => {
     const run = createMockRun();
     mockCreateRun.mockResolvedValue(run);
-    mockClaimNextRun.mockResolvedValue(null);
 
     const { enqueueRun } = await import("../mailbox");
     const result = await enqueueRun({ agentId: "michael" });

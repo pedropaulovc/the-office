@@ -1,6 +1,7 @@
+import { after } from "next/server";
 import { z } from "zod/v4";
 import { listRuns } from "@/db/queries";
-import { enqueueRun } from "@/agents/mailbox";
+import { enqueueRun, processNextRun } from "@/agents/mailbox";
 import { jsonResponse } from "@/lib/api-response";
 
 const VALID_STATUSES = [
@@ -53,5 +54,6 @@ export async function POST(request: Request) {
   }
 
   const run = await enqueueRun(parsed.data);
+  after(() => processNextRun(run.agentId));
   return jsonResponse(run, { status: 201 });
 }

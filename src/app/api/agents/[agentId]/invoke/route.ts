@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod/v4";
 import { getAgent } from "@/db/queries";
-import { enqueueRun } from "@/agents/mailbox";
+import { enqueueRun, processNextRun } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
 import { jsonResponse } from "@/lib/api-response";
 import { withSpan, logInfo, logWarn, countMetric } from "@/lib/telemetry";
@@ -35,10 +35,12 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const run = await enqueueRun(
-      { agentId, channelId: parsed.data.channelId },
-      executeRun,
-    );
+    const run = await enqueueRun({
+      agentId,
+      channelId: parsed.data.channelId,
+    });
+
+    after(() => processNextRun(agentId, executeRun));
 
     countMetric("api.invoke", 1, { agentId, status: run.status });
     logInfo("invoke: run enqueued", { agentId, runId: run.id, status: run.status });

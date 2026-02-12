@@ -23,7 +23,7 @@ const FALLBACK_AGENT: AgentView = {
   avatarColor: '#999',
   systemPrompt: '',
   modelId: '',
-  maxTurns: 5,
+  maxTurns: 10,
   maxBudgetUsd: 0.1,
   sessionId: null,
   isActive: false,

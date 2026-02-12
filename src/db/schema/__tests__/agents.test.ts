@@ -49,7 +49,7 @@ describe("agents schema", () => {
       avatarColor: "#000",
       systemPrompt: "test",
       modelId: "claude-sonnet-4-5-20250929",
-      maxTurns: 5,
+      maxTurns: 10,
       maxBudgetUsd: 0.1,
       sessionId: null,
       isActive: true,
