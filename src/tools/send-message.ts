@@ -18,7 +18,7 @@ export function createSendMessageTool(
     },
     async (args) => {
       return withSpan("tool.send_message", "agent.tool", async () => {
-        const targetChannelId = args.channelId || channelId;
+        const targetChannelId = args.channelId ?? channelId;
         if (!targetChannelId) {
           return { content: [{ type: "text" as const, text: JSON.stringify({ error: "No channel specified" }) }] };
         }

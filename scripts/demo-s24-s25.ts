@@ -11,9 +11,10 @@ config({ path: ".env.local" });
 // ── Helpers ──
 
 function header(title: string) {
-  console.log(`\n${"═".repeat(60)}`);
+  const line = "═".repeat(60);
+  console.log(`\n${line}`);
   console.log(`  ${title}`);
-  console.log(`${"═".repeat(60)}`);
+  console.log(line);
 }
 
 function section(title: string) {
@@ -74,7 +75,7 @@ async function demoResolver() {
   // 4. Thread reply
   section("4. Thread reply in #general");
   const allGeneral = await getChannelMessages("general");
-  const threadParent = allGeneral.find((m) => (m.threadReplyCount ?? 0) > 0);
+  const threadParent = allGeneral.find((m) => m.threadReplyCount > 0);
   if (!threadParent) {
     console.log("  ⚠ No threads found. Run db:seed first.");
     return;

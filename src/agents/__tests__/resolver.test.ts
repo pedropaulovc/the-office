@@ -100,6 +100,25 @@ describe("resolveTargetAgents", () => {
     expect(targets).toEqual([]);
   });
 
+  it("thread reply handles missing parent message gracefully", async () => {
+    mockGetMessage.mockResolvedValue(undefined);
+    mockGetThreadReplies.mockResolvedValue([
+      { id: "r1", parentMessageId: "parent-deleted", userId: "dwight", text: "reply", timestamp: "2025-01-01", reactions: [] },
+    ]);
+
+    const message = createMockMessage({
+      userId: "dwight",
+      channelId: "general",
+      parentMessageId: "parent-deleted",
+    });
+
+    const { resolveTargetAgents } = await import("../resolver");
+    const targets = await resolveTargetAgents(message);
+
+    // Only thread participants minus sender — no parent author since parent is missing
+    expect(targets).toEqual([]);
+  });
+
   it("thread reply deduplicates participants", async () => {
     const parentMessage = createMockMessage({ id: "parent-2", userId: "jim", channelId: "general" });
     mockGetMessage.mockResolvedValue(parentMessage);
