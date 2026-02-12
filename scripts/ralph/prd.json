@@ -14,6 +14,7 @@
         "GET /api/docs renders an interactive Scalar API explorer",
         "All existing routes (agents, memory, archival, channels, messages, reactions, runs, scheduled) appear in the spec with correct request/response schemas",
         "Spec validates via an OpenAPI validator (no schema errors)",
+        "DEMO: Open /api/docs in a browser — show the full API explorer with all routes, try-it-out for a GET endpoint, and download the OpenAPI JSON",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -36,7 +37,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "M3 story. Depends on S-3.2 (US-001)."
+      "notes": "M3 story. Depends on S-3.2 (US-001). No demo — cleanup only."
     },
     {
       "id": "US-003",
@@ -49,6 +50,7 @@
         "Unit tests for chain depth enforcement",
         "Integration test for a 2-agent exchange",
         "Sentry traces show the full chain with linked spans",
+        "DEMO: Send a DM to Dwight as Michael — watch Dwight auto-respond, then Michael auto-responds (chain depth 2), show it stops at depth 3",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -66,6 +68,7 @@
         "Each agent sees previous agent responses in their conversation context",
         "Unit test for sequential ordering logic",
         "Sentry traces show sequential processing",
+        "DEMO: Post in #general — watch 2-3 agents respond one after another with natural delays",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -85,6 +88,7 @@
         "GET /api/skills/[name] returns full skill content",
         "Unit tests for skills API filesystem reading",
         "Sentry span for skill listing and fetch",
+        "DEMO: Show an agent invocation where a skill is loaded into the prompt — compare response quality with and without the skill",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -105,6 +109,7 @@
         "Rate limit: max 1 scheduled fire per agent per 5 minutes",
         "Unit tests for scheduler logic, integration test for fire-and-mark flow",
         "Sentry spans for scheduler loop iterations and fires",
+        "DEMO: Create a scheduled message for 10 seconds from now — wait — show the agent posts autonomously in the UI",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -122,6 +127,7 @@
         "Create src/features/evaluation/schemas.ts with Zod schemas for proposition YAML format and evaluation API request/response",
         "Migration generated and applied — both tables queryable",
         "Create src/db/queries/evaluations.ts with createEvaluationRun(), recordScore(), getEvaluationRun(), listEvaluationRuns(), getAgentScoreHistory()",
+        "DEMO: Show the evaluation tables are queryable — create and retrieve an evaluation run via queries",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -144,6 +150,7 @@
         "Create src/features/evaluation/propositions/README.md documenting the YAML format",
         "Create a sample proposition YAML file for testing (e.g., adherence/_default.yaml)",
         "Unit tests for YAML loading, template variable replacement, inverted score handling, hard mode penalty",
+        "DEMO: Load a sample proposition YAML for Michael — show template variables filled correctly and inverted proposition score flipping",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -165,6 +172,7 @@
         "Create GET/POST /api/evaluations and GET /api/evaluations/[runId] routes",
         "Unit tests for LLM response parsing, batch grouping, scoring rubric presence, double-check flow, trajectory formatting, precondition gating, check() vs score() modes",
         "Sentry spans for evaluation runs and LLM judge calls",
+        "DEMO: Feed a sample send_message tool call into the proposition engine — show LLM judge returns scores (0-9) with reasoning and confidence, show evaluation run stored in DB, demonstrate environment-level proposition scoring",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -188,6 +196,7 @@
         "Add getRecentAgentMessages(agentId, window) to src/db/queries/evaluations.ts",
         "Unit tests with mocked LLM responses verifying score aggregation, message sampling, hard vs normal mode",
         "Sentry span wraps adherence scoring",
+        "DEMO: Seed run_messages with send_message tool calls for Michael — run scoreAdherence('michael', { last24Hours }) — show per-proposition scores and overall adherence score — show a low-scoring message and explain why",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -210,6 +219,7 @@
         "Handles cold-start case: returns null if no historical messages exist",
         "Unit tests with mocked messages and LLM responses",
         "Sentry span wraps consistency scoring",
+        "DEMO: Seed messages for Jim across two time periods (some consistent, some drifted) — run scoreConsistency — show paired comparisons and scores — demonstrate that deliberate drift (Jim using Dwight-like language) produces a low score",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -231,6 +241,7 @@
         "Returns score (0-9) from LLM judge with reasoning",
         "Unit tests for n-gram extraction, overlap computation, and mocked LLM evaluation",
         "Sentry span wraps fluency scoring",
+        "DEMO: Generate messages with high repetition and natural variety — run scoreFluency() on both sets — show repetitive set scores low, varied set scores high — show n-gram statistics in judge context",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -253,6 +264,7 @@
         "Returns single divergence score (0-9) with reasoning plus per-agent-pair similarity metrics",
         "Unit tests for vocabulary stats, pairwise similarity, mocked LLM evaluation",
         "Sentry span wraps convergence scoring",
+        "DEMO: Seed a channel with 3 agents (some distinctly different, some converging) — run scoreConvergence('general', timeWindow) — show full conversation trajectory, divergence score, vocabulary statistics, and which agent pairs are most similar",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -272,6 +284,7 @@
         "Duplicate/overlapping ideas collapsed by the judge",
         "Unit tests with mocked conversations and LLM responses",
         "Sentry span wraps ideas quantity scoring",
+        "DEMO: Seed a brainstorming channel with ~10 messages with some repeated ideas — run scoreIdeasQuantity — show the judge's enumerated list and total count — demonstrate repeated ideas are correctly collapsed",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -296,6 +309,7 @@
         "Add eval:baseline script to package.json",
         "Unit tests for compareToBaseline() delta computation",
         "Sentry trace wraps baseline capture",
+        "DEMO: Run npm run eval:baseline -- --agents michael,dwight,jim — show baseline scores for all 5 dimensions — show baselines API returns stored scores — run a regular evaluation and show the delta comparison",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -319,6 +333,7 @@
         "LLM judge calls have 5-second timeout per dimension; on timeout, that dimension passes (fail-open)",
         "Unit tests for each dimension, similarity check, timeout behavior, no-op when disabled",
         "Sentry spans for gate evaluation and each dimension check",
+        "DEMO: Enable all four quality dimensions for Michael (threshold=7) — show a normal response passing all checks (adherence, consistency, fluency, suitability) — show gate is a no-op when all checks disabled",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -342,6 +357,7 @@
         "Statistics tracking: total_actions, original_pass_count/rate, regeneration counts/rates/scores, direct_correction counts/rates/scores, forced_through_count, similarity_failure_count, per-dimension stats",
         "getGateStatistics(agentId, timeWindow) returns aggregated statistics",
         "Unit tests: single dimension fails with regeneration, direct correction after regeneration failure, both stages disabled, best-scoring selection, forced-through, statistics aggregation, BadActionInjector",
+        "DEMO: Use BadActionInjector to produce a persona-violating response — show Stage 1 (Regeneration) catching failures with reasoning + recommendations, show escalating 'be more radical' instruction — show Stage 2 (Direct Correction) rewriting action text — show correction_logs entries with per-dimension scores and stages — show getGateStatistics() output",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -364,6 +380,7 @@
         "InterventionBatch.createForEach(agents) creates one per agent with shared template",
         "Add intervention_logs table to DB schema",
         "Unit tests for textual, functional, propositional preconditions, inverted threshold logic, batch creation, chaining API",
+        "DEMO: Create an Intervention with all three precondition types using chaining API — show AND logic combining preconditions — show InterventionBatch.createForEach() producing one intervention per agent",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -387,6 +404,7 @@
         "Interventions evaluated once per orchestrator step, BEFORE agents act",
         "Unit tests for anti-convergence detection, variety intervention, nudge selection, prompt injection",
         "Sentry spans and logs for intervention evaluation and nudge injection",
+        "DEMO: Seed a channel where 4 agents all agree — enable anti-convergence for the next agent — show textual precondition triggering (LLM detects agreement) — show character-aware nudge injected into system prompt — show agent's diverse response — demonstrate variety intervention firing after 7 messages",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -410,6 +428,7 @@
         "No LLM call required — purely algorithmic n-gram analysis",
         "Unit tests for repetition detection, context building, prompt injection",
         "Sentry spans for repetition checks",
+        "DEMO: Have an agent send 5 messages starting with 'Hey everyone, just wanted to...' — show checkRepetition() detecting the repeated 3-gram — show suppression context being injected — show the next message avoids the repeated pattern",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -433,6 +452,7 @@
         "Seed default configs for all 16 agents",
         "Unit tests for config resolution, cost aggregation",
         "Sentry spans for config loading",
+        "DEMO: Show all agents have default config (everything disabled) — enable all four quality dimensions for Michael via PATCH API (threshold=7) — send Michael a message showing multi-dimension gate activating — disable gates via PATCH and show pass-through — show cost summary API returning per-dimension token counts",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -453,6 +473,7 @@
         "Each character has at least 1 anti-pattern proposition (inverted: true)",
         "Proposition loader correctly loads and merges agent-specific + default propositions",
         "Unit tests verify all YAML files load without errors and pass schema validation",
+        "DEMO: Run the proposition loader for all 16 agents — show merged proposition set for Michael (agent-specific + default) — show total proposition count — manually evaluate 2-3 propositions against a sample message to verify sensible scores",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -478,6 +499,7 @@
         "Human-readable summary printed to stderr alongside JSON to stdout",
         "Add eval:run script to package.json",
         "Unit tests for report generation, CLI argument parsing, mock judge behavior",
+        "DEMO: Run npm run eval:run -- --agents michael,dwight --mock-judge — show JSON report with scores and pass/fail — run with --threshold 9.0 to force failures — show exit code 1 and failed agents in summary",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -499,6 +521,7 @@
         "Exit code 1 if any regressions detected",
         "Commit initial golden baselines for at least Michael, Dwight, Jim",
         "Unit tests for regression detection logic with various delta values",
+        "DEMO: Run npm run eval:run -- --agents michael --mock-judge --update-baseline to capture golden baseline — show JSON file created in src/features/evaluation/baselines/michael.json — modify Michael's persona to introduce drift — run evaluation again without --update-baseline — show regression detected in report",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -520,6 +543,7 @@
         "Workflow skips cleanly for PRs that don't touch persona files",
         "Workflow completes in under 60 seconds (mock-judge mode)",
         "Unit tests for CI reporter markdown generation",
+        "DEMO: Create a branch modifying Michael's system prompt — push and open a PR — show GitHub Actions workflow triggering — show PR comment with evaluation results — show check passing or failing based on regression detection",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -544,6 +568,7 @@
         "Parallel generation supported (concurrent persona generation)",
         "Unit tests: deterministic sampling with same seed, profile distributions, all required fields, parallel generation",
         "Sentry spans for persona generation",
+        "DEMO: Generate 10 'average customer' personas with fixed seed — show diversity (ages, occupations, personality traits) — re-run with same seed and show identical output — generate 5 'difficult customer' personas showing low agreeableness — generate 5 'political compass' personas showing left/right/libertarian/authoritarian positions",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -566,6 +591,7 @@
         "Treatment config specifies which correction mechanisms are active",
         "Unit tests: all scenarios load, config validation, facilitator prompt sequencing, environment step execution order",
         "Sentry spans for scenario loading and environment step execution",
+        "DEMO: List all available scenarios — load 'brainstorming-average' showing full config (population, environments, treatments) — load 'debate-controversial' showing different population profile and treatment config — show facilitator prompt sequence for a brainstorming session",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -594,6 +620,7 @@
         "Add experiment:run script to package.json",
         "Unit tests for Welch's t-test against known values, Cohen's d, result aggregation, deterministic seeding",
         "Sentry traces wrapping full experiment execution",
+        "DEMO: Run npm run experiment:run -- --scenario brainstorming-average --dry-run to show full config — run small-scale experiment (10 agents, 2 environments) — show Table 1-format report with T vs C means, deltas, p-values — re-run with same seed and show identical results",
         "Typecheck passes",
         "Tests pass"
       ],
@@ -619,6 +646,7 @@
         "Add experiment:table1 script to package.json",
         "Unit tests for reference value loading, comparison logic, trend matching",
         "Sentry trace wrapping full reproduction run",
+        "DEMO: Run npm run experiment:table1 -- --scale 0.1 for quick 10%-scale validation — show comparison report with our results vs paper results side by side — show which trends match and which diverge — explain any differences (different LLM, different agent populations)",
         "Typecheck passes",
         "Tests pass"
       ],
