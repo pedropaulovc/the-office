@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { getAgent } from "@/db/queries";
 import { enqueueRun } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
+import { jsonResponse } from "@/lib/api-response";
 
 interface RouteContext {
   params: Promise<{ agentId: string }>;
@@ -35,5 +36,5 @@ export async function POST(request: Request, context: RouteContext) {
     executeRun,
   );
 
-  return NextResponse.json({ runId: run.id, status: run.status });
+  return jsonResponse({ runId: run.id, status: run.status });
 }

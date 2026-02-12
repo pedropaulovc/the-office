@@ -114,6 +114,17 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       { name: "sdk.query", op: "ai.agent" },
       async (querySpan) => {
 
+        // Log inputs inside sdk.query span so they're linked to it
+        logInfo(`sdk.input.system_prompt | ${truncate(systemPrompt)}`, {
+          runId: run.id,
+          agentId: run.agentId,
+          length: systemPrompt.length,
+        });
+        logInfo(`sdk.input.trigger | ${prompt}`, {
+          runId: run.id,
+          agentId: run.agentId,
+        });
+
         for await (const msg of sdkQuery) {
           // Re-establish querySpan as active — the for-await over the SDK subprocess
           // loses Node.js async context, so child spans/logs would otherwise be orphaned.
@@ -142,6 +153,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   });
 
                   const content = extractAssistantContent(msg);
+                  const thinking = extractThinkingContent(msg);
                   await createRunMessage({
                     runId: run.id,
                     stepId: newStep.id,
@@ -149,7 +161,19 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                     content,
                   });
 
+                  if (thinking) {
+                    logInfo(`sdk.thinking | ${truncate(thinking)}`, {
+                      runId: run.id,
+                      step,
+                    });
+                  }
+                  logInfo(`sdk.response | ${truncate(content)}`, {
+                    runId: run.id,
+                    step,
+                  });
+
                   for (const toolUse of extractToolUseBlocks(msg)) {
+                    const inputStr = JSON.stringify(toolUse.input);
                     await createRunMessage({
                       runId: run.id,
                       stepId: newStep.id,
@@ -158,7 +182,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                       toolName: toolUse.name,
                       toolInput: toolUse.input as Record<string, unknown>,
                     });
-                    logInfo("sdk.tool_call", {
+                    logInfo(`sdk.tool_call | ${toolUse.name} ${truncate(inputStr)}`, {
                       runId: run.id,
                       toolName: toolUse.name,
                       toolUseId: toolUse.id,
@@ -174,11 +198,15 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
             if (msg.type === "user") {
               if ("isReplay" in msg) return;
+              const userContent = extractUserContent(msg);
               await createRunMessage({
                 runId: run.id,
                 stepId: loopState.currentStep?.id ?? null,
                 messageType: "user_message",
-                content: extractUserContent(msg),
+                content: userContent,
+              });
+              logInfo(`sdk.user_message | ${truncate(userContent)}`, {
+                runId: run.id,
               });
               if (msg.tool_use_result != null) {
                 const toolResult =
@@ -191,8 +219,10 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   messageType: "tool_return_message",
                   content: toolResult,
                 });
+                logInfo(`sdk.tool_return | ${truncate(toolResult)}`, {
+                  runId: run.id,
+                });
               }
-              logInfo("sdk.user_message", { runId: run.id });
               return;
             }
 
@@ -324,6 +354,13 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
 // --- Private helpers ---
 
+const LOG_MAX_CHARS = 8000;
+
+function truncate(value: string, max = LOG_MAX_CHARS): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max) + "…";
+}
+
 function formatTriggerPrompt(run: Run): string {
   if (run.triggerMessageId) {
     return `A new message was posted (trigger: ${run.triggerMessageId}). Review the recent conversation and decide how to respond.`;
@@ -445,6 +482,19 @@ function extractAssistantContent(msg: SDKAssistantMessage): string {
     }
   }
   return parts.join("\n") || "[no text content]";
+}
+
+function extractThinkingContent(msg: SDKAssistantMessage): string | null {
+  const message = msg.message as unknown as { content: unknown };
+  const content = message.content;
+  if (!Array.isArray(content)) return null;
+  const parts: string[] = [];
+  for (const block of content as { type: string; thinking?: string }[]) {
+    if (block.type === "thinking" && block.thinking) {
+      parts.push(block.thinking);
+    }
+  }
+  return parts.length > 0 ? parts.join("\n") : null;
 }
 
 function buildTokenUsage(result: SDKResultMessage): Record<string, unknown> {
