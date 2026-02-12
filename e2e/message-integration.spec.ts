@@ -318,6 +318,7 @@ test.describe("message integration", () => {
 
   test("SSE message_created reflects in UI after compose", async ({
     page,
+    request,
   }) => {
     await page.goto("/");
 
@@ -331,9 +332,16 @@ test.describe("message integration", () => {
     await textarea.fill(unique);
     await textarea.press("Enter");
 
-    // Verify input clears and message appears via SSE
+    // Verify input clears and message appears (optimistic update)
     await expect(textarea).toHaveValue("");
     await expect(page.getByText(unique)).toBeVisible();
+
+    // Cleanup: delete the created message
+    const msgsRes = await request.get("/api/channels/general/messages");
+    const msgs = (await msgsRes.json()) as { id: string; text: string }[];
+    await Promise.all(
+      msgs.filter((m) => m.text === unique).map((m) => request.delete(`/api/messages/${m.id}`)),
+    );
   });
 
   test("validation boundary tests", async ({ request }) => {

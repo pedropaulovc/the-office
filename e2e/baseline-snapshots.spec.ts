@@ -1,6 +1,24 @@
 import { test, expect } from "@playwright/test";
 
+// Clean up stale test messages left by other test runs (or parallel tests).
+// Test messages always match patterns like "compose-*", "lifecycle-*", etc.
+const TEST_MSG_PATTERN =
+  /^(compose|lifecycle|thread|react|rapid|cascade|gen-|sales-|edit|sse-edit|valid|SSE test)/;
+
 test.describe("baseline snapshots", () => {
+  // Clean stale test messages before each test to prevent cross-test pollution.
+  // Uses beforeEach (not beforeAll) because `request` is a test-scoped fixture.
+  test.beforeEach(async ({ request }) => {
+    const res = await request.get("/api/channels/general/messages");
+    const msgs = (await res.json()) as { id: string; text: string }[];
+    const stale = msgs.filter((m) => TEST_MSG_PATTERN.test(m.text));
+    if (stale.length > 0) {
+      await Promise.all(
+        stale.map((m) => request.delete(`/api/messages/${m.id}`)),
+      );
+    }
+  });
+
   test("general channel", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("Good morning everyone!")).toBeVisible();
@@ -97,8 +115,8 @@ test.describe("baseline snapshots", () => {
       - paragraph: That's what she said! ...wait, that doesn't work there. Or does it? 🤔
       - text: 😂 3 🤦 3
       - 'textbox "Message #general"'
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:
@@ -185,8 +203,8 @@ test.describe("baseline snapshots", () => {
       - text: /😑 1 AM Angela Martin \\d+:\\d+ (?:A|P)M/
       - paragraph: I am filing a formal complaint. This is the third time this quarter.
       - 'textbox "Message #accounting"'
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:
@@ -231,8 +249,8 @@ test.describe("baseline snapshots", () => {
       - text: /MS Michael Scott \\d+:\\d+ (?:A|P)M/
       - paragraph: Deal! You're paying though. Boss privileges. 😎
       - textbox "Message Jim Halpert"
-      - button "bold" [disabled]
-      - button "italic" [disabled]
+      - button "bold" [disabled]: B
+      - button "italic" [disabled]: I
       - button "code" [disabled]:
         - img
       - button "link" [disabled]:

@@ -42,6 +42,7 @@ test.describe("compose flow", () => {
 
   test("type message + Enter clears input and message appears", async ({
     page,
+    request,
   }) => {
     await page.goto("/");
 
@@ -57,8 +58,15 @@ test.describe("compose flow", () => {
     // Input should clear
     await expect(textarea).toHaveValue("");
 
-    // Message should appear in the chat via SSE
+    // Message should appear in the chat (optimistic update)
     await expect(page.getByText(unique)).toBeVisible();
+
+    // Cleanup: delete the created message
+    const msgsRes = await request.get("/api/channels/general/messages");
+    const msgs = (await msgsRes.json()) as { id: string; text: string }[];
+    await Promise.all(
+      msgs.filter((m) => m.text === unique).map((m) => request.delete(`/api/messages/${m.id}`)),
+    );
   });
 
   test("send button disabled when textarea is empty", async ({ page }) => {
