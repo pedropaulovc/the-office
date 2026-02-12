@@ -55,18 +55,21 @@ describe("ConnectionRegistry", () => {
     expect(enqueue2).toHaveBeenCalledOnce();
 
     // Verify SSE format: "data: {...}\n\n"
-    const payload = new TextDecoder().decode(enqueue1.mock.calls[0]![0] as Uint8Array);
+    const raw = enqueue1.mock.calls[0]?.[0] as Uint8Array | undefined;
+    expect(raw).toBeDefined();
+    const payload = new TextDecoder().decode(raw);
     expect(payload).toContain("data: ");
     expect(payload.endsWith("\n\n")).toBe(true);
-    const parsed = JSON.parse(payload.replace("data: ", "").trim());
+    const parsed = JSON.parse(payload.replace("data: ", "").trim()) as { type: string };
     expect(parsed.type).toBe("message_created");
   });
 
   it("broadcast() removes controllers that throw on enqueue", async () => {
     const { connectionRegistry } = await import("../sse-registry");
-    const good = { enqueue: vi.fn(), close: vi.fn() } as unknown as ReadableStreamDefaultController<Uint8Array>;
+    const goodEnqueue = vi.fn();
+    const good = { enqueue: goodEnqueue, close: vi.fn() } as unknown as ReadableStreamDefaultController<Uint8Array>;
     const bad = {
-      enqueue: vi.fn().mockImplementation(() => { throw new Error("closed"); }),
+      enqueue: vi.fn().mockImplementation(() => { throw new Error("closed"); }) as () => void,
       close: vi.fn(),
     } as unknown as ReadableStreamDefaultController<Uint8Array>;
 
@@ -76,6 +79,6 @@ describe("ConnectionRegistry", () => {
     connectionRegistry.broadcast("ch", { type: "agent_typing", channelId: "ch", agentId: "michael" });
 
     expect(connectionRegistry.size).toBe(1);
-    expect(good.enqueue).toHaveBeenCalledOnce();
+    expect(goodEnqueue).toHaveBeenCalledOnce();
   });
 });
