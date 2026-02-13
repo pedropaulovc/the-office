@@ -125,7 +125,7 @@ describe("facilitator", () => {
 });
 
 describe("environment", () => {
-  it("runs all steps and produces trajectory", () => {
+  it("runs all steps and produces trajectory", async () => {
     const scenario = getScenario("brainstorming-average");
     expect(scenario).toBeDefined();
     if (!scenario) return;
@@ -134,7 +134,7 @@ describe("environment", () => {
     const agents = factory.generate(scenario.agents_per_environment, averageCustomer, { seed: 42 });
 
     const env = new ExperimentEnvironment(scenario, agents, 0);
-    const result = env.run(42);
+    const result = await env.run(42);
 
     expect(result.environmentId).toBe(0);
     expect(result.steps).toHaveLength(scenario.steps_per_environment);
@@ -142,28 +142,28 @@ describe("environment", () => {
     expect(result.agents).toHaveLength(scenario.agents_per_environment);
   });
 
-  it("facilitator prompts fire at correct steps", () => {
+  it("facilitator prompts fire at correct steps", async () => {
     const scenario = getScenario("brainstorming-average");
     if (!scenario) return;
 
     const factory = new AgentFactory();
     const agents = factory.generate(5, averageCustomer, { seed: 42 });
     const env = new ExperimentEnvironment(scenario, agents, 0);
-    const result = env.run(42);
+    const result = await env.run(42);
 
     // Step 0 should have a facilitator action
     expect(result.steps[0]?.facilitatorActions.length).toBeGreaterThan(0);
     expect(result.steps[0]?.facilitatorActions[0]?.message).toContain("WanderLux");
   });
 
-  it("sequential_random produces randomized agent order", () => {
+  it("sequential_random produces randomized agent order", async () => {
     const scenario = getScenario("brainstorming-average");
     if (!scenario) return;
 
     const factory = new AgentFactory();
     const agents = factory.generate(5, averageCustomer, { seed: 42 });
     const env = new ExperimentEnvironment(scenario, agents, 0);
-    const result = env.run(42);
+    const result = await env.run(42);
 
     // Different steps should potentially have different orders
     const order0 = result.steps[0]?.agentOrder;
@@ -174,14 +174,14 @@ describe("environment", () => {
     expect(order0?.sort()).toEqual(order1?.sort());
   });
 
-  it("each agent acts once per step", () => {
+  it("each agent acts once per step", async () => {
     const scenario = getScenario("brainstorming-average");
     if (!scenario) return;
 
     const factory = new AgentFactory();
     const agents = factory.generate(5, averageCustomer, { seed: 42 });
     const env = new ExperimentEnvironment(scenario, agents, 0);
-    const result = env.run(42);
+    const result = await env.run(42);
 
     for (const step of result.steps) {
       expect(step.agentActions).toHaveLength(5);

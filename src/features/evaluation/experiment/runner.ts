@@ -8,6 +8,8 @@ import { welchTTest, cohensD, mean, standardDeviation } from "./statistical-test
 import { generateExperimentReport } from "./experiment-report";
 import type { MetricResult, ExperimentReport } from "./experiment-report";
 import type { ScenarioConfig } from "./types";
+import type { ExperimentMode } from "./environment";
+import { scoreTrajectory } from "./llm-scorer";
 
 interface RunnerOptions {
   scenario: string;
@@ -15,6 +17,7 @@ interface RunnerOptions {
   runs?: number;
   dryRun?: boolean;
   scale?: number;
+  mode?: ExperimentMode;
 }
 
 interface DryRunResult {
@@ -29,7 +32,7 @@ interface DryRunResult {
  * Score all agents in all environments for a given group (treatment or control).
  * In template mode (no real LLM), uses deterministic placeholder scores based on trajectory length.
  */
-function scoreEnvironments(
+function scoreEnvironmentsTemplate(
   pairs: EnvironmentPairResult[],
   group: "treatment" | "control",
   dimensions: string[],
@@ -56,10 +59,40 @@ function scoreEnvironments(
   return scores;
 }
 
-function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult {
-  return withSpan("experiment.run", "evaluation.experiment", () => {
+/**
+ * Score environments using LLM-backed trajectory scorer.
+ * Calls scoreTrajectory for each agent's actions in each environment pair.
+ */
+async function scoreEnvironmentsLlm(
+  pairs: EnvironmentPairResult[],
+  group: "treatment" | "control",
+  dimensions: string[],
+): Promise<Record<string, number[]>> {
+  const scores: Record<string, number[]> = {};
+  for (const dim of dimensions) {
+    scores[dim] = [];
+  }
+
+  for (const pair of pairs) {
+    const result = pair[group];
+    for (const agent of result.agents) {
+      const agentActions = result.trajectory.filter((a) => a.agentName === agent.name);
+      const trajectoryResult = await scoreTrajectory(agent, agentActions, dimensions);
+
+      for (const dim of dimensions) {
+        scores[dim]!.push(trajectoryResult.scores[dim] ?? 5);
+      }
+    }
+  }
+
+  return scores;
+}
+
+async function runExperiment(options: RunnerOptions): Promise<ExperimentReport | DryRunResult> {
+  return withSpan("experiment.run", "evaluation.experiment", async () => {
     const seed = options.seed ?? 42;
     const scale = options.scale ?? 1.0;
+    const mode = options.mode ?? "template";
     const scenario = getScenario(options.scenario);
     if (!scenario) {
       throw new Error(`Unknown scenario: ${options.scenario}`);
@@ -76,6 +109,7 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
       scenario: options.scenario,
       seed,
       scale,
+      mode,
       dryRun: options.dryRun ?? false,
     });
 
@@ -123,11 +157,12 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
       });
 
       // 2. Create and run environments (T/C pairs)
-      const envResult = createAndRunEnvironments(scaledScenario, agents, runSeed);
+      const envResult = await createAndRunEnvironments(scaledScenario, agents, runSeed, mode);
 
       // 3. Score all environments
-      const tScores = scoreEnvironments(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
-      const cScores = scoreEnvironments(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
+      const scoreFn = mode === "llm" ? scoreEnvironmentsLlm : scoreEnvironmentsTemplate;
+      const tScores = await scoreFn(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
+      const cScores = await scoreFn(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
 
       for (const dim of scaledScenario.evaluation_dimensions) {
         allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
@@ -165,5 +200,8 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
   });
 }
 
-export { runExperiment, scoreEnvironments };
+/** @deprecated Use scoreEnvironmentsTemplate directly. Kept for backward compatibility. */
+const scoreEnvironments = scoreEnvironmentsTemplate;
+
+export { runExperiment, scoreEnvironments, scoreEnvironmentsLlm };
 export type { RunnerOptions, DryRunResult };

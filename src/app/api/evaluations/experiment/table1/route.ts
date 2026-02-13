@@ -33,6 +33,7 @@ const postSchema = z.object({
   experiments: z.array(z.string()).optional(),
   scale: z.number().min(0.01).max(1.0).optional().default(1.0),
   seed: z.number().int().optional().default(42),
+  mode: z.enum(["template", "llm"]).optional().default("template"),
 });
 
 export async function POST(request: NextRequest) {
@@ -48,19 +49,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { experiments, scale, seed } = parsed.data;
+    const { experiments, scale, seed, mode } = parsed.data;
 
     logInfo("Table 1 reproduction requested", {
       experiments: experiments?.join(",") ?? "all",
       scale,
       seed,
+      mode,
     });
     countMetric("api.evaluations.experiment.table1.reproduction.requested", 1);
 
     const options = experiments
-      ? { experiments, scale, seed }
-      : { scale, seed };
-    const report = reproduceTable1(options);
+      ? { experiments, scale, seed, mode }
+      : { scale, seed, mode };
+    const report = await reproduceTable1(options);
     return jsonResponse(report);
   });
 }

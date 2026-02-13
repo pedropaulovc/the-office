@@ -56,52 +56,52 @@ describe("runner", () => {
   });
 
   describe("runExperiment — dry run", () => {
-    it("returns scenario config without running environments", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", dryRun: true });
+    it("returns scenario config without running environments", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", dryRun: true });
       expect(result).toHaveProperty("dryRun", true);
       expect(result).toHaveProperty("scenario");
     });
 
-    it("includes correct totalAgents and totalEnvironments", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", dryRun: true }) as DryRunResult;
+    it("includes correct totalAgents and totalEnvironments", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", dryRun: true }) as DryRunResult;
       // brainstorming-average: 5 agents/env * 40 envs = 200
       expect(result.totalAgents).toBe(200);
       expect(result.totalEnvironments).toBe(40);
       expect(result.seed).toBe(42); // default seed
     });
 
-    it("uses provided seed", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 123, dryRun: true }) as DryRunResult;
+    it("uses provided seed", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 123, dryRun: true }) as DryRunResult;
       expect(result.seed).toBe(123);
     });
   });
 
   describe("runExperiment — errors", () => {
-    it("throws for unknown scenario", () => {
-      expect(() => runExperiment({ scenario: "nonexistent-scenario" })).toThrow(
+    it("throws for unknown scenario", async () => {
+      await expect(runExperiment({ scenario: "nonexistent-scenario" })).rejects.toThrow(
         "Unknown scenario: nonexistent-scenario",
       );
     });
   });
 
   describe("runExperiment — full run", () => {
-    it("returns an ExperimentReport with metrics", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 });
+    it("returns an ExperimentReport with metrics", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 });
       expect(result).toHaveProperty("scenario", "brainstorming-average");
       expect(result).toHaveProperty("metrics");
       expect(result).toHaveProperty("timestamp");
     });
 
-    it("report has all evaluation dimensions from scenario", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report has all evaluation dimensions from scenario", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       const expectedDimensions = ["adherence", "consistency", "fluency", "convergence", "ideas_quantity"];
       for (const dim of expectedDimensions) {
         expect(result.metrics).toHaveProperty(dim);
       }
     });
 
-    it("report metrics have treatment and control groups", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report metrics have treatment and control groups", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       for (const metric of Object.values(result.metrics)) {
         expect(metric).toHaveProperty("treatment");
         expect(metric.treatment).toHaveProperty("mean");
@@ -112,8 +112,8 @@ describe("runner", () => {
       }
     });
 
-    it("report includes t-test results for each metric", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report includes t-test results for each metric", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       for (const metric of Object.values(result.metrics)) {
         expect(metric).toHaveProperty("tTest");
         expect(metric.tTest).toHaveProperty("tStatistic");
@@ -123,17 +123,17 @@ describe("runner", () => {
       }
     });
 
-    it("is deterministic with the same seed", () => {
-      const result1 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
-      const result2 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("is deterministic with the same seed", async () => {
+      const result1 = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+      const result2 = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       // Compare metrics (timestamps will differ)
       expect(result1.metrics).toEqual(result2.metrics);
       expect(result1.agentsCount).toEqual(result2.agentsCount);
       expect(result1.environmentsCount).toEqual(result2.environmentsCount);
     });
 
-    it("with runs > 1 averages across multiple runs", () => {
-      const result = runExperiment({ scenario: "debate-controversial", seed: 42, runs: 2 });
+    it("with runs > 1 averages across multiple runs", async () => {
+      const result = await runExperiment({ scenario: "debate-controversial", seed: 42, runs: 2 });
       expect(result).toHaveProperty("metrics");
       if (!("metrics" in result)) return;
       const report = result;
