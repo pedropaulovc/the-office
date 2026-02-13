@@ -8,6 +8,12 @@ const timeout = previewUrl ? 15000 : 5000;
 const actionTimeout = previewUrl ? 5000 : 2000;
 const expectTimeout = previewUrl ? 5000 : 2000;
 
+const timestamp = new Date()
+  .toISOString()
+  .replace(/[:.]/g, "-")
+  .replace("T", "_")
+  .slice(0, 19);
+
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "e2e/**/*.spec.ts",
@@ -15,6 +21,7 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: 0,
   timeout,
+  outputDir: `test-results/${timestamp}`,
   expect: {
     timeout: expectTimeout,
   },
