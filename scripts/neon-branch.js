@@ -15,7 +15,7 @@ function log(msg) {
 function neonctl(args) {
   const cmd = `npx neonctl ${args} ${NEONCTL_FLAGS}`;
   log(`> ${cmd}`);
-  return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+  return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] });
 }
 
 function neonctlSafe(args) {
