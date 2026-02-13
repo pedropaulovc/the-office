@@ -331,10 +331,10 @@ describe("orchestrator", () => {
 
     expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", 0, expect.any(Function), expect.objectContaining({
       sendMessage: expect.objectContaining({
-        gateConfig: expect.any(Object),
+        gateConfig: expect.any(Object) as unknown,
         agentName: AGENT.displayName,
         persona: AGENT.systemPrompt,
-      }),
+      }) as unknown,
     }));
   });
 
@@ -760,8 +760,8 @@ describe("orchestrator", () => {
     expect(mockGetToolServer).toHaveBeenCalledWith(
       "michael", run.id, "general", 1, expect.any(Function), expect.objectContaining({
         sendMessage: expect.objectContaining({
-          gateConfig: expect.any(Object),
-        }),
+          gateConfig: expect.any(Object) as unknown,
+        }) as unknown,
       }),
     );
   });
