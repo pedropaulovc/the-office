@@ -6,7 +6,7 @@ Sentry.init({
   enableLogs: true,
   environment: process.env.NODE_ENV,
   beforeSendSpan(span) {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development" || process.env.SENTRY_TRACE_LOG === "1") {
       const duration =
         span.timestamp && span.start_timestamp
           ? ((span.timestamp - span.start_timestamp) * 1000).toFixed(1)
