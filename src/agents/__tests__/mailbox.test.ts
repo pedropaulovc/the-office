@@ -317,6 +317,34 @@ describe("mailbox", () => {
     });
   });
 
+  it("enqueueAndAwaitRun rejects on timeout when claimNextRun fails silently", async () => {
+    vi.useFakeTimers();
+
+    const run = createMockRun({ agentId: "dwight" });
+    mockCreateRun.mockResolvedValue(run);
+
+    // claimNextRun throws — processNextRun catches internally and returns null,
+    // so notifyRunCompletion is never called and the promise would hang forever
+    // without the timeout safety net.
+    mockClaimNextRun.mockRejectedValue(new Error("db error"));
+
+    const { enqueueAndAwaitRun, RUN_COMPLETION_TIMEOUT_MS } = await import("../mailbox");
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockResolvedValue(undefined);
+
+    const promise = enqueueAndAwaitRun({ agentId: "dwight" }, executor);
+
+    // Attach rejection handler BEFORE advancing timers to avoid unhandled rejection
+    const assertion = expect(promise).rejects.toThrow(
+      `enqueueAndAwaitRun timed out for run ${run.id}`,
+    );
+
+    // Advance past the timeout
+    await vi.advanceTimersByTimeAsync(RUN_COMPLETION_TIMEOUT_MS + 1);
+    await assertion;
+
+    vi.useRealTimers();
+  });
+
   it("sequential enqueueAndAwaitRun calls process agents in order", async () => {
     const executionOrder: string[] = [];
 

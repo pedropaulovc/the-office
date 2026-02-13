@@ -17,6 +17,9 @@ export interface RunResult {
 
 export type RunExecutor = (run: Run) => Promise<RunResult | undefined>;
 
+/** Timeout for awaiting run completion (5 minutes). */
+export const RUN_COMPLETION_TIMEOUT_MS = 5 * 60 * 1000;
+
 /** In-memory registry for awaiting run completion (used by enqueueAndAwaitRun). */
 const completionResolvers = new Map<string, () => void>();
 
@@ -65,8 +68,17 @@ export async function enqueueAndAwaitRun(
     countMetric("mailbox.enqueue_await", 1, { agentId: run.agentId });
 
     // Register completion listener BEFORE starting processing to avoid race
-    const completionPromise = new Promise<void>((resolve) => {
+    const completionPromise = new Promise<void>((resolve, reject) => {
       completionResolvers.set(run.id, resolve);
+
+      // Safety timeout: if processNextRun silently fails (e.g. claimNextRun
+      // throws), the resolver would never fire. 5 min is well above any
+      // legitimate agent invocation duration.
+      setTimeout(() => {
+        if (!completionResolvers.has(run.id)) return; // already resolved
+        completionResolvers.delete(run.id);
+        reject(new Error(`enqueueAndAwaitRun timed out for run ${run.id}`));
+      }, RUN_COMPLETION_TIMEOUT_MS);
     });
 
     // Fire-and-forget: start processing the queue
