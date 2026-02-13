@@ -9,15 +9,15 @@ const DISPLAY_LABELS: Record<string, string> = {
   ideas_quantity: "ideas_qty",
 };
 
-type MetricResult = {
+interface MetricResult {
   treatment: { mean: number; sd: number };
   control: { mean: number; sd: number };
   delta: number;
   tTest: TTestResult;
   effectSize: number;
-};
+}
 
-type ExperimentReport = {
+interface ExperimentReport {
   scenario: string;
   seed: number;
   agentsCount: number;
@@ -25,7 +25,7 @@ type ExperimentReport = {
   metrics: Record<string, MetricResult>;
   displayLabels: Record<string, string>;
   timestamp: string;
-};
+}
 
 function generateExperimentReport(options: {
   scenario: string;
