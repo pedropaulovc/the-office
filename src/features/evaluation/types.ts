@@ -21,6 +21,16 @@ export interface TrajectoryWindow {
   last_n: number;
 }
 
+export const EVALUATION_WINDOW_DEFAULTS: TrajectoryWindow = {
+  first_n: 10,
+  last_n: 100,
+};
+
+export const ACTION_LEVEL_WINDOW_DEFAULTS: TrajectoryWindow = {
+  first_n: 5,
+  last_n: 10,
+};
+
 export type PreconditionFn = (
   target: unknown,
   additionalContext: unknown,
@@ -32,8 +42,19 @@ export interface Proposition {
   claim: string;
   weight: number;
   inverted: boolean;
-  recommendations_for_improvement?: string;
-  precondition?: PreconditionFn;
+  recommendations_for_improvement?: string | undefined;
+  precondition?: PreconditionFn | undefined;
+}
+
+export interface PropositionFile {
+  dimension: EvaluationDimension;
+  agent_id?: string | undefined;
+  include_personas: boolean;
+  hard: boolean;
+  target_type: TargetType;
+  first_n?: number | undefined;
+  last_n?: number | undefined;
+  propositions: Proposition[];
 }
 
 export interface PropositionResult {
