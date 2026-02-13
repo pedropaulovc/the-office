@@ -39,11 +39,12 @@ test.describe("golden baselines API", () => {
     expect(response.status()).toBe(200);
 
     const result = (await response.json()) as HarnessResult;
-    const michael = result.agents["michael"]!;
+    const michael = result.agents.michael;
+    expect(michael).toBeDefined();
 
     // Should have baselineDelta since michael.json exists
-    expect(michael.baselineDelta).toBeDefined();
-    expect(typeof michael.baselineDelta!["adherence"]).toBe("number");
+    expect(michael?.baselineDelta).toBeDefined();
+    expect(typeof michael?.baselineDelta?.adherence).toBe("number");
   });
 
   test("no regressions when current matches baseline within delta", async ({ request }) => {
@@ -59,10 +60,11 @@ test.describe("golden baselines API", () => {
     expect(response.status()).toBe(200);
 
     const result = (await response.json()) as HarnessResult;
-    const michael = result.agents["michael"]!;
+    const michael = result.agents.michael;
+    expect(michael).toBeDefined();
 
     // With generous delta, no regressions expected
-    expect(michael.regressions?.length ?? 0).toBe(0);
+    expect(michael?.regressions?.length ?? 0).toBe(0);
   });
 
   test("agents without baselines have no regressions field", async ({ request }) => {
@@ -77,11 +79,12 @@ test.describe("golden baselines API", () => {
     expect(response.status()).toBe(200);
 
     const result = (await response.json()) as HarnessResult;
-    const stanley = result.agents["stanley"]!;
+    const stanley = result.agents.stanley;
+    expect(stanley).toBeDefined();
 
     // Stanley has no golden baseline, so no delta or regressions
-    expect(stanley.baselineDelta).toBeUndefined();
-    expect(stanley.regressions).toBeUndefined();
+    expect(stanley?.baselineDelta).toBeUndefined();
+    expect(stanley?.regressions).toBeUndefined();
   });
 
   test("regression detection with tight delta flags failures", async ({ request }) => {
@@ -98,18 +101,19 @@ test.describe("golden baselines API", () => {
     expect(response.status()).toBe(200);
 
     const result = (await response.json()) as HarnessResult;
-    const michael = result.agents["michael"]!;
+    const michael = result.agents.michael;
+    expect(michael).toBeDefined();
 
     // With 0.01 delta, any score variation will trigger regression
     // The exact behavior depends on the baseline value matching mock scores
     // Just verify the structure is correct
-    expect(michael.baselineDelta).toBeDefined();
-    if (michael.regressions && michael.regressions.length > 0) {
-      const reg = michael.regressions[0]!;
-      expect(reg.dimension).toBeTruthy();
-      expect(typeof reg.baseline).toBe("number");
-      expect(typeof reg.current).toBe("number");
-      expect(typeof reg.delta).toBe("number");
-    }
+    expect(michael?.baselineDelta).toBeDefined();
+
+    // Verify regression structure if present
+    const firstRegression = michael?.regressions?.[0];
+    expect(firstRegression === undefined || typeof firstRegression.dimension === "string").toBe(true);
+    expect(firstRegression === undefined || typeof firstRegression.baseline === "number").toBe(true);
+    expect(firstRegression === undefined || typeof firstRegression.current === "number").toBe(true);
+    expect(firstRegression === undefined || typeof firstRegression.delta === "number").toBe(true);
   });
 });

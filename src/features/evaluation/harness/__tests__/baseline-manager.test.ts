@@ -18,8 +18,8 @@ describe("baseline-manager", () => {
 
       expect(baseline).not.toBeNull();
       expect(baseline?.agentId).toBe("michael");
-      expect(baseline?.dimensions["adherence"]).toBeDefined();
-      expect(typeof baseline?.dimensions["adherence"]).toBe("number");
+      expect(baseline?.dimensions.adherence).toBeDefined();
+      expect(typeof baseline?.dimensions.adherence).toBe("number");
     });
 
     it("returns null for agent without baseline", async () => {
@@ -63,8 +63,9 @@ describe("baseline-manager", () => {
       );
 
       expect(regressions.length).toBe(1);
-      expect(regressions[0]!.dimension).toBe("adherence");
-      expect(regressions[0]!.delta).toBe(-2.0);
+      const reg = regressions[0];
+      expect(reg?.dimension).toBe("adherence");
+      expect(reg?.delta).toBe(-2.0);
     });
 
     it("ignores improvement (positive delta)", async () => {
@@ -90,7 +91,7 @@ describe("baseline-manager", () => {
 
       // adherence regressed (-4.0), consistency improved (+1.0)
       expect(regressions.length).toBe(1);
-      expect(regressions[0]!.dimension).toBe("adherence");
+      expect(regressions[0]?.dimension).toBe("adherence");
     });
 
     it("handles missing dimensions gracefully", async () => {

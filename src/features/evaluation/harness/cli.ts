@@ -42,8 +42,8 @@ function parseCliArgs() {
     threshold: parseFloat(values.threshold),
     window: values.window,
     mockJudge: values["mock-judge"],
-    updateBaseline: values["update-baseline"] ?? false,
-    regressionDelta: parseFloat(values["regression-delta"]!),
+    updateBaseline: values["update-baseline"],
+    regressionDelta: parseFloat(values["regression-delta"]),
     output: values.output ?? null,
   };
 }
