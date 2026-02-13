@@ -60,6 +60,7 @@ export function updateEvaluationRunStatus(
     status: EvaluationRun["status"];
     overallScore?: number | null;
     tokenUsage?: EvaluationRun["tokenUsage"];
+    sampleSize?: number;
   },
 ): Promise<EvaluationRun | undefined> {
   return withSpan("updateEvaluationRunStatus", "db.query", async () => {
@@ -75,6 +76,9 @@ export function updateEvaluationRunStatus(
     }
     if (update.tokenUsage !== undefined) {
       sets.tokenUsage = update.tokenUsage;
+    }
+    if (update.sampleSize !== undefined) {
+      sets.sampleSize = update.sampleSize;
     }
     if (update.status === "completed" || update.status === "failed") {
       sets.completedAt = new Date();
