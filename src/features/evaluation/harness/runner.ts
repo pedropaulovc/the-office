@@ -4,6 +4,8 @@ import { scorePropositions, type BatchScoreResult, type TrajectoryEntry } from "
 import { createMockScorer } from "./mock-judge";
 import { getMockScores } from "./mock-scores";
 import { applyInvertedScore } from "@/features/evaluation/proposition-loader";
+import { loadGoldenBaseline, saveGoldenBaseline, detectRegressions } from "./baseline-manager";
+import type { Regression } from "./baseline-manager";
 import { withSpan, logInfo, logWarn, countMetric } from "@/lib/telemetry";
 import { getAgentMessagesInWindow } from "@/db/queries/messages";
 
@@ -13,6 +15,8 @@ export interface HarnessOptions {
   threshold: number;
   mockJudge: boolean;
   window?: string;
+  updateBaseline?: boolean;
+  regressionDelta?: number;
 }
 
 export interface DimensionResult {
@@ -25,6 +29,8 @@ export interface AgentResult {
   overall: number;
   pass: boolean;
   dimensions: Record<string, DimensionResult | { count: number }>;
+  baselineDelta?: Record<string, number>;
+  regressions?: Regression[];
 }
 
 export interface HarnessResult {
@@ -128,7 +134,56 @@ async function evaluateAgent(agentId: string, options: HarnessOptions): Promise<
     return d.pass;
   });
 
-  return { overall, pass, dimensions };
+  const agentResult: AgentResult = { overall, pass, dimensions };
+
+  // Baseline handling
+  const currentDimScores: Record<string, number> = {};
+  for (const [dim, d] of Object.entries(dimensions)) {
+    if ("score" in d) {
+      currentDimScores[dim] = d.score;
+    }
+  }
+
+  const currentPropScores: Record<string, number> = {};
+  for (const d of Object.values(dimensions)) {
+    if ("propositionScores" in d) {
+      Object.assign(currentPropScores, d.propositionScores);
+    }
+  }
+
+  if (options.updateBaseline) {
+    saveGoldenBaseline(agentId, {
+      agentId,
+      capturedAt: new Date().toISOString(),
+      dimensions: currentDimScores,
+      propositionScores: currentPropScores,
+    });
+    return agentResult;
+  }
+
+  const baseline = loadGoldenBaseline(agentId);
+  if (baseline) {
+    const delta = options.regressionDelta ?? 1.0;
+
+    const baselineDelta: Record<string, number> = {};
+    for (const [dim, currentScore] of Object.entries(currentDimScores)) {
+      const baselineScore = baseline.dimensions[dim];
+      if (baselineScore !== undefined) {
+        baselineDelta[dim] = currentScore - baselineScore;
+      }
+    }
+    agentResult.baselineDelta = baselineDelta;
+
+    const regressions = detectRegressions(currentDimScores, baseline.dimensions, delta);
+    if (regressions.length > 0) {
+      agentResult.regressions = regressions;
+      agentResult.pass = false;
+      logInfo("regressions detected", { agentId, regressionCount: regressions.length });
+      countMetric("evaluation.regressions_detected", regressions.length, { agentId });
+    }
+  }
+
+  return agentResult;
 }
 
 async function evaluateDimension(
@@ -181,9 +236,7 @@ async function evaluateDimension(
   let weightedSum = 0;
   let weightSum = 0;
 
-  for (let i = 0; i < propositions.length; i++) {
-    const prop = propositions[i];
-    if (!prop) continue;
+  for (const [i, prop] of propositions.entries()) {
     const rawScore = batchResult.results[i]?.score ?? 7;
     const finalScore = applyInvertedScore(rawScore, prop.inverted);
     propositionScores[prop.id] = finalScore;

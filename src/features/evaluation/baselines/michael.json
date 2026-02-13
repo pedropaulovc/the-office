@@ -1,0 +1,23 @@
+{
+  "agentId": "michael",
+  "capturedAt": "2026-02-13T00:00:00Z",
+  "dimensions": {
+    "adherence": 7.23
+  },
+  "propositionScores": {
+    "adheres-to-persona": 7,
+    "uses-characteristic-language": 7,
+    "generic-corporate-response": 7,
+    "appropriate-emotional-tone": 7,
+    "michael-self-centered-humor": 8,
+    "michael-thats-what-she-said": 7,
+    "michael-needs-to-be-liked": 8,
+    "michael-avoids-conflict": 7,
+    "michael-pop-culture-references": 6,
+    "michael-coworkers-as-family": 8,
+    "michael-inappropriate-without-realizing": 7,
+    "michael-worlds-best-boss": 6,
+    "michael-malapropisms": 6,
+    "michael-dry-corporate-antipattern": 7
+  }
+}
