@@ -10,9 +10,12 @@ import { logError } from "@/lib/telemetry";
  */
 export function jsonResponse<T>(data: T, init?: ResponseInit): NextResponse<T> {
   const response = NextResponse.json(data, init);
-  const traceId = Sentry.getActiveSpan()?.spanContext().traceId;
-  if (traceId) {
-    response.headers.set("x-sentry-trace-id", traceId);
+  const spanContext = Sentry.getActiveSpan()?.spanContext();
+  if (spanContext?.traceId) {
+    response.headers.set("x-sentry-trace-id", spanContext.traceId);
+  }
+  if (spanContext?.spanId) {
+    response.headers.set("x-sentry-span-id", spanContext.spanId);
   }
   return response;
 }
@@ -22,9 +25,12 @@ export function jsonResponse<T>(data: T, init?: ResponseInit): NextResponse<T> {
  */
 export function emptyResponse(init?: ResponseInit): NextResponse {
   const response = new NextResponse(null, init);
-  const traceId = Sentry.getActiveSpan()?.spanContext().traceId;
-  if (traceId) {
-    response.headers.set("x-sentry-trace-id", traceId);
+  const spanContext = Sentry.getActiveSpan()?.spanContext();
+  if (spanContext?.traceId) {
+    response.headers.set("x-sentry-trace-id", spanContext.traceId);
+  }
+  if (spanContext?.spanId) {
+    response.headers.set("x-sentry-span-id", spanContext.spanId);
   }
   return response;
 }

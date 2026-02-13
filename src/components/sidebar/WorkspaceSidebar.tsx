@@ -5,6 +5,7 @@ import { useData } from '@/context/useData';
 import { getInitials } from '@/utils/get-initials';
 import { TelemetryTestButton } from '@/components/debug/TelemetryTestButton';
 import { InvokeAgentButton } from '@/components/debug/InvokeAgentButton';
+import { EvalTestButton } from '@/components/debug/EvalTestButton';
 
 export default function WorkspaceSidebar() {
   const { currentUserId, switchUser } = useApp();
@@ -67,6 +68,7 @@ export default function WorkspaceSidebar() {
         <div className="flex flex-col items-center gap-2">
           <InvokeAgentButton />
           <TelemetryTestButton />
+          <EvalTestButton />
         </div>
       )}
     </aside>

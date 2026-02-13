@@ -4,7 +4,7 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   integrations: [Sentry.browserTracingIntegration()],
   tracesSampleRate: 1.0,
-  tracePropagationTargets: ["localhost", /^https:\/\/.*\.vercel\.app\/api/],
+  tracePropagationTargets: [/^https:\/\/.*\.vercel\.app\/api/],
   enableLogs: true,
   environment: process.env.NODE_ENV,
 });

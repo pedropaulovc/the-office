@@ -23,6 +23,7 @@ describe("OpenAPI document generation", () => {
         "Reactions",
         "Runs",
         "Unreads",
+        "Evaluations",
         "SSE",
       ]),
     );
@@ -55,6 +56,9 @@ describe("OpenAPI document generation", () => {
       "/api/runs/{runId}/cancel",
       "/api/unreads",
       "/api/unreads/mark-read",
+      "/api/evaluations",
+      "/api/evaluations/{runId}",
+      "/api/evaluations/{runId}/scores",
       "/api/sse",
     ];
 
@@ -98,6 +102,9 @@ describe("OpenAPI document generation", () => {
       "RunWithSteps",
       "UnreadCount",
       "HealthResponse",
+      "EvaluationRun",
+      "EvaluationScore",
+      "EvaluationRunWithScores",
     ];
 
     for (const name of expected) {
