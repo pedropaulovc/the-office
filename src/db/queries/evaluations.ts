@@ -165,6 +165,57 @@ export function recordScore(
   });
 }
 
+export function markRunAsBaseline(
+  id: string,
+): Promise<EvaluationRun | undefined> {
+  return withSpan("markRunAsBaseline", "db.query", async () => {
+    logInfo("markRunAsBaseline", { runId: id });
+    const rows = await db
+      .update(evaluationRuns)
+      .set({ isBaseline: true })
+      .where(eq(evaluationRuns.id, id))
+      .returning();
+    return rows[0];
+  });
+}
+
+export function getLatestBaselineRuns(
+  agentId: string,
+): Promise<EvaluationRun[]> {
+  return withSpan("getLatestBaselineRuns", "db.query", async () => {
+    return db
+      .select()
+      .from(evaluationRuns)
+      .where(
+        and(
+          eq(evaluationRuns.agentId, agentId),
+          eq(evaluationRuns.isBaseline, true),
+          eq(evaluationRuns.status, "completed"),
+        ),
+      )
+      .orderBy(desc(evaluationRuns.createdAt));
+  });
+}
+
+export function clearBaselineRuns(
+  agentId: string,
+): Promise<EvaluationRun[]> {
+  return withSpan("clearBaselineRuns", "db.query", async () => {
+    logInfo("clearBaselineRuns", { agentId });
+    const rows = await db
+      .update(evaluationRuns)
+      .set({ isBaseline: false })
+      .where(
+        and(
+          eq(evaluationRuns.agentId, agentId),
+          eq(evaluationRuns.isBaseline, true),
+        ),
+      )
+      .returning();
+    return rows;
+  });
+}
+
 export function deleteEvaluationRun(
   id: string,
 ): Promise<EvaluationRun | undefined> {
