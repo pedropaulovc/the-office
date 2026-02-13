@@ -46,13 +46,17 @@ interface EvaluationScoreResponse {
 }
 
 test.describe("proposition engine demo", () => {
-  // Sequential — each test is a demo step
+  // Sequential — each test is a demo step, requires live LLM
   test.describe.configure({ mode: "default" });
 
-  test("step 1: score a single proposition (score mode)", async ({ request }) => {
-    test.skip(!process.env.ANTHROPIC_API_KEY, "requires ANTHROPIC_API_KEY");
-    test.setTimeout(30_000);
+  test.beforeEach(({}, testInfo) => {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      testInfo.skip(true, "requires ANTHROPIC_API_KEY");
+    }
+    testInfo.setTimeout(30_000);
+  });
 
+  test("step 1: score a single proposition (score mode)", async ({ request }) => {
     const res = await request.post("/api/evaluations/score", {
       data: {
         mode: "score",
@@ -82,9 +86,6 @@ test.describe("proposition engine demo", () => {
   });
 
   test("step 2: check a proposition (boolean mode)", async ({ request }) => {
-    test.skip(!process.env.ANTHROPIC_API_KEY, "requires ANTHROPIC_API_KEY");
-    test.setTimeout(30_000);
-
     const res = await request.post("/api/evaluations/score", {
       data: {
         mode: "check",
@@ -111,9 +112,6 @@ test.describe("proposition engine demo", () => {
   });
 
   test("step 3: batch score multiple propositions", async ({ request }) => {
-    test.skip(!process.env.ANTHROPIC_API_KEY, "requires ANTHROPIC_API_KEY");
-    test.setTimeout(30_000);
-
     const res = await request.post("/api/evaluations/score", {
       data: {
         mode: "batch",
@@ -146,9 +144,6 @@ test.describe("proposition engine demo", () => {
   });
 
   test("step 4: double-check mode produces revised score", async ({ request }) => {
-    test.skip(!process.env.ANTHROPIC_API_KEY, "requires ANTHROPIC_API_KEY");
-    test.setTimeout(30_000);
-
     const res = await request.post("/api/evaluations/score", {
       data: {
         mode: "score",
@@ -168,15 +163,11 @@ test.describe("proposition engine demo", () => {
     expect(body.score).toBeGreaterThanOrEqual(0);
     expect(body.score).toBeLessThanOrEqual(9);
     expect(body.reasoning).toBeTruthy();
-    // Token usage should be higher than single call (2 LLM calls)
     expect(body.tokenUsage.input_tokens).toBeGreaterThan(0);
     expect(body.tokenUsage.output_tokens).toBeGreaterThan(0);
   });
 
   test("step 5: full pipeline — score + store + retrieve", async ({ request }) => {
-    test.skip(!process.env.ANTHROPIC_API_KEY, "requires ANTHROPIC_API_KEY");
-    test.setTimeout(30_000);
-
     // 1. Score via engine
     const scoreRes = await request.post("/api/evaluations/score", {
       data: {
@@ -216,7 +207,9 @@ test.describe("proposition engine demo", () => {
     expect(getRes.status()).toBe(200);
     const runWithScores = (await getRes.json()) as EvaluationRunResponse;
     expect(runWithScores.scores).toHaveLength(1);
-    expect(runWithScores.scores![0].score).toBe(scoreResult.score);
+    const firstScore = runWithScores.scores?.at(0);
+    expect(firstScore).toBeDefined();
+    expect(firstScore?.score).toBe(scoreResult.score);
 
     // 5. Cleanup
     await request.delete(`/api/evaluations/${run.id}`);

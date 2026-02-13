@@ -76,7 +76,8 @@ test.describe("proposition engine API pipeline", () => {
     const runWithScores = (await getRes.json()) as EvaluationRunResponse;
     expect(runWithScores.scores).toHaveLength(3);
 
-    for (const score of runWithScores.scores!) {
+    const scores = runWithScores.scores ?? [];
+    for (const score of scores) {
       expect(score.id).toBeTruthy();
       expect(score.evaluationRunId).toBe(run.id);
       expect(score.dimension).toBeTruthy();
