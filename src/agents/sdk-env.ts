@@ -1,4 +1,4 @@
-import { logInfo, logWarn } from "@/lib/telemetry";
+import { logInfo, logWarn, logError, countMetric } from "@/lib/telemetry";
 
 /**
  * Builds environment variables for the Claude Agent SDK subprocess.
@@ -41,9 +41,25 @@ export function buildSdkEnv(): Record<string, string | undefined> {
 
 /**
  * Creates a stderr handler that forwards SDK subprocess output to Sentry structured logs.
+ * Detects process exit errors from the Claude Agent SDK and logs them at error level.
  */
 export function createSdkStderrHandler(runId: string, agentId: string) {
   return (data: string) => {
-    logInfo("sdk.stderr", { runId, agentId, output: data.trim() });
+    const trimmed = data.trim();
+    if (!trimmed) return;
+
+    if (trimmed.includes("process exited with code")) {
+      logError("sdk.process_exit", { runId, agentId, output: trimmed });
+      countMetric("sdk.process_exit", 1, { agentId });
+      return;
+    }
+
+    if (trimmed.includes("terminated by signal")) {
+      logError("sdk.process_signal", { runId, agentId, output: trimmed });
+      countMetric("sdk.process_signal", 1, { agentId });
+      return;
+    }
+
+    logInfo("sdk.stderr", { runId, agentId, output: trimmed });
   };
 }
