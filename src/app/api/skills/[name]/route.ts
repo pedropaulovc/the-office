@@ -4,6 +4,8 @@ import { getSkill } from "../skills-loader";
 
 export type { SkillDetail } from "../skills-loader";
 
+const VALID_SKILL_NAME = /^[a-z0-9-]+$/;
+
 interface RouteContext {
   params: Promise<{ name: string }>;
 }
@@ -11,7 +13,11 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   const { name } = await context.params;
 
-  return withSpan("GET /api/skills/[name]", "http.handler", async () => {
+  if (!VALID_SKILL_NAME.test(name)) {
+    return jsonResponse({ error: "Invalid skill name" }, { status: 400 });
+  }
+
+  return withSpan("api.skills.get", "http.server", async () => {
     const skill = await getSkill(name);
 
     if (!skill) {

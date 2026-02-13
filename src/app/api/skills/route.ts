@@ -5,7 +5,7 @@ import { listSkills } from "./skills-loader";
 export type { SkillSummary } from "./skills-loader";
 
 export async function GET() {
-  return withSpan("GET /api/skills", "http.handler", async () => {
+  return withSpan("api.skills.list", "http.server", async () => {
     const skills = await listSkills();
     return jsonResponse(skills);
   });

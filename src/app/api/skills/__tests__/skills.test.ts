@@ -9,6 +9,12 @@ vi.mock("../skills-loader", () => ({
   getSkill: (...args: unknown[]) => mockGetSkill(...(args as [string])),
 }));
 
+vi.mock("@/lib/telemetry", () => ({
+  withSpan: (_n: string, _o: string, fn: () => unknown) => fn(),
+  logInfo: vi.fn(),
+  countMetric: vi.fn(),
+}));
+
 const MOCK_SKILLS: SkillSummary[] = [
   {
     name: "character-voice",
@@ -126,6 +132,19 @@ describe("GET /api/skills/[name]", () => {
     expect(response.status).toBe(404);
     const body = (await response.json()) as { error: string };
     expect(body.error).toBe("Skill not found");
+  });
+
+  it("returns 400 for invalid skill name", async () => {
+    const routeModule = await import("../[name]/route");
+    const response = await routeModule.GET(
+      new Request("http://localhost/api/skills/../secret"),
+      { params: Promise.resolve({ name: "../secret" }) },
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("Invalid skill name");
+    expect(mockGetSkill).not.toHaveBeenCalled();
   });
 
   it("content does not include YAML frontmatter", async () => {
