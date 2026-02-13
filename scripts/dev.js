@@ -192,7 +192,7 @@ async function main() {
     updateEnvLocal(connStr);
 
     console.log("Pushing schema to branch...");
-    execSync("echo y | npx drizzle-kit push", { stdio: "inherit", shell: true });
+    execSync("npx drizzle-kit push --force", { stdio: "inherit" });
 
     console.log("Seeding branch...");
     execSync("npx tsx src/db/seed.ts", { stdio: "inherit" });

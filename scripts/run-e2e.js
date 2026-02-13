@@ -13,7 +13,7 @@ if (letter) {
   process.env.DATABASE_URL_UNPOOLED = connStr;
 
   console.log("Pushing schema to e2e branch...");
-  execSync("echo y | npx drizzle-kit push", { stdio: "inherit", shell: true });
+  execSync("npx drizzle-kit push --force", { stdio: "inherit" });
 
   console.log("Seeding e2e branch...");
   execSync("npx tsx src/db/seed.ts", { stdio: "inherit" });
