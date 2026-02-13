@@ -1,0 +1,100 @@
+name: Persona Evaluation
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "src/features/evaluation/**"
+      - "src/agents/prompt-builder.ts"
+      - "src/agents/orchestrator.ts"
+      - "src/tools/send-message.ts"
+      - "src/db/seed.ts"
+      - ".skills/**"
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+concurrency:
+  group: persona-eval-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        timeout-minutes: 1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        timeout-minutes: 2
+        run: for i in 1 2 3; do npm ci && break || sleep 15; done || exit 1
+
+      - name: Run persona evaluation (mock judge)
+        timeout-minutes: 1
+        id: eval
+        run: |
+          npm run eval:run -- --mock-judge --agents all --dimensions adherence > eval-result.json 2>eval-stderr.txt || true
+          cat eval-stderr.txt >&2
+
+          # Parse result for exit code
+          FAILED=$(node -e "const r = JSON.parse(require('fs').readFileSync('eval-result.json','utf8')); console.log(r.summary.failed)")
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Generate PR comment
+        timeout-minutes: 1
+        id: comment
+        run: |
+          node -e "
+            const { formatPrComment } = require('./src/features/evaluation/harness/ci-reporter');
+            const result = JSON.parse(require('fs').readFileSync('eval-result.json', 'utf8'));
+            const comment = formatPrComment(result);
+            require('fs').writeFileSync('eval-comment.md', comment);
+          " 2>/dev/null || npx tsx -e "
+            import { formatPrComment } from './src/features/evaluation/harness/ci-reporter';
+            import { readFileSync, writeFileSync } from 'fs';
+            const result = JSON.parse(readFileSync('eval-result.json', 'utf8'));
+            writeFileSync('eval-comment.md', formatPrComment(result));
+          "
+
+      - name: Post or update PR comment
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY=$(cat eval-comment.md)
+          MARKER="<!-- persona-evaluation-report -->"
+
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" 2>/dev/null || true)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+              -X PATCH -f body="$BODY"
+            echo "Updated existing comment $COMMENT_ID"
+          else
+            gh api "repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments" \
+              -f body="$BODY"
+            echo "Created new comment"
+          fi
+
+      - name: Check for regressions
+        run: |
+          FAILED="${{ steps.eval.outputs.failed }}"
+          if [ "$FAILED" != "0" ] && [ -n "$FAILED" ]; then
+            echo "::error::Persona evaluation detected regressions ($FAILED agents failed)"
+            exit 1
+          fi
+          echo "No regressions detected"
