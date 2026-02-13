@@ -17,7 +17,7 @@ const mockGetAgentEvalConfig = vi.fn();
 
 vi.mock("@/db/queries", () => ({
   getAgentEvalConfig: (...args: unknown[]) =>
-    mockGetAgentEvalConfig(...args),
+    mockGetAgentEvalConfig(...args) as Promise<unknown>,
 }));
 
 // ---------------------------------------------------------------------------
