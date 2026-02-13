@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { HarnessResult } from "../runner";
 
 const mockStartSpan = vi.fn();
 const mockLoggerInfo = vi.fn();
@@ -39,11 +40,13 @@ describe("evaluation harness", () => {
 
       const result = await scorer(
         [{ id: "test-prop", claim: "test", weight: 1, inverted: false }],
-        {},
       );
 
-      expect(result.results[0]!.score).toBe(8);
-      expect(result.results[0]!.reasoning).toBe("great");
+      const first = result.results[0];
+      expect(first).toBeDefined();
+      if (!first) throw new Error("missing result");
+      expect(first.score).toBe(8);
+      expect(first.reasoning).toBe("great");
       expect(result.tokenUsage.input_tokens).toBe(0);
     });
 
@@ -53,10 +56,12 @@ describe("evaluation harness", () => {
       const scorer = createMockScorer({});
       const result = await scorer(
         [{ id: "unknown-prop", claim: "test", weight: 1, inverted: false }],
-        {},
       );
 
-      expect(result.results[0]!.score).toBe(7);
+      const first = result.results[0];
+      expect(first).toBeDefined();
+      if (!first) throw new Error("missing result");
+      expect(first.score).toBe(7);
     });
   });
 
@@ -89,10 +94,12 @@ describe("evaluation harness", () => {
       });
 
       expect(result.timestamp).toBeTruthy();
-      expect(result.agents["michael"]).toBeDefined();
+      expect(result.agents.michael).toBeDefined();
       expect(result.summary.total).toBe(1);
 
-      const michael = result.agents["michael"]!;
+      const michael = result.agents.michael;
+      expect(michael).toBeDefined();
+      if (!michael) throw new Error("michael missing");
       expect(michael.overall).toBeGreaterThanOrEqual(0);
       expect(michael.overall).toBeLessThanOrEqual(9);
       expect(typeof michael.pass).toBe("boolean");
@@ -155,8 +162,9 @@ describe("evaluation harness", () => {
         summary: { total: 1, passed: 1, failed: 0, failedAgents: [] },
       });
 
-      const parsed = JSON.parse(report);
-      expect(parsed.agents.michael.overall).toBe(7.2);
+      const parsed = JSON.parse(report) as HarnessResult;
+      expect(parsed.agents.michael).toBeDefined();
+      expect(parsed.agents.michael?.overall).toBe(7.2);
     });
 
     it("generateHumanReport returns formatted string with agent results", async () => {

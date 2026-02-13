@@ -1,4 +1,4 @@
-import type { EvaluationDimension, Proposition } from "@/features/evaluation/types";
+import type { EvaluationDimension } from "@/features/evaluation/types";
 import { loadPropositionsForDimension } from "@/features/evaluation/proposition-loader";
 import { scorePropositions, type BatchScoreResult } from "@/features/evaluation/proposition-engine";
 import { createMockScorer } from "./mock-judge";
@@ -121,7 +121,8 @@ async function evaluateDimension(
   let weightSum = 0;
 
   for (let i = 0; i < propositions.length; i++) {
-    const prop = propositions[i] as Proposition;
+    const prop = propositions[i];
+    if (!prop) continue;
     const rawScore = batchResult.results[i]?.score ?? 7;
     const finalScore = applyInvertedScore(rawScore, prop.inverted);
     propositionScores[prop.id] = finalScore;

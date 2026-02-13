@@ -13,9 +13,8 @@ export type MockScoreMap = Record<string, MockScoreEntry>;
  * Falls back to a default score of 7 for unknown propositions.
  */
 export function createMockScorer(scores: MockScoreMap) {
-  return async function mockScorePropositions(
+  return function mockScorePropositions(
     propositions: Proposition[],
-    _context: unknown,
   ): Promise<BatchScoreResult> {
     const results: ScorePropositionResult[] = propositions.map((prop) => {
       const entry = scores[prop.id];
@@ -27,9 +26,9 @@ export function createMockScorer(scores: MockScoreMap) {
       };
     });
 
-    return {
+    return Promise.resolve({
       results,
       tokenUsage: { input_tokens: 0, output_tokens: 0 },
-    };
+    });
   };
 }
