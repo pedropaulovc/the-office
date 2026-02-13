@@ -1,10 +1,21 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { createMessage, createRunMessage, getChannel, listChannelMembers } from "@/db/queries";
+import { createMessage, createRunMessage, getChannel, getRecentMessages, listChannelMembers } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { enqueueRun, type RunExecutor } from "@/agents/mailbox";
 import { MAX_CHAIN_DEPTH } from "@/agents/constants";
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import {
+  runCorrectionPipeline,
+  formatFeedbackForAgent,
+} from "@/features/evaluation/gates/correction-pipeline";
+import type { CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
+
+export interface SendMessageToolOptions {
+  gateConfig?: CorrectionPipelineConfig;
+  agentName?: string;
+  persona?: string;
+}
 
 export function createSendMessageTool(
   agentId: string,
@@ -12,6 +23,7 @@ export function createSendMessageTool(
   channelId: string | null,
   chainDepth = 0,
   executor?: RunExecutor,
+  toolOptions?: SendMessageToolOptions,
 ) {
   return tool(
     "send_message",
@@ -36,10 +48,34 @@ export function createSendMessageTool(
           content: JSON.stringify(args),
         });
 
+        // --- Quality Gate (S-7.0b) ---
+        const gateResult = await runQualityGate(
+          agentId,
+          runId,
+          targetChannelId,
+          args.text,
+          toolOptions,
+        );
+
+        if (gateResult.type === "feedback") {
+          // Return feedback to agent for regeneration retry
+          await createRunMessage({
+            runId,
+            stepId: null,
+            messageType: "tool_return_message",
+            toolName: "send_message",
+            content: gateResult.feedbackText,
+          });
+          return { content: [{ type: "text" as const, text: gateResult.feedbackText }] };
+        }
+
+        // Use the (possibly corrected) text
+        const finalText = gateResult.text;
+
         const message = await createMessage({
           channelId: targetChannelId,
           userId: agentId,
-          text: args.text,
+          text: finalText,
         });
 
         connectionRegistry.broadcast(targetChannelId, {
@@ -66,6 +102,79 @@ export function createSendMessageTool(
     },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Quality gate integration
+// ---------------------------------------------------------------------------
+
+type GateOutcome =
+  | { type: "pass"; text: string }
+  | { type: "feedback"; feedbackText: string };
+
+async function runQualityGate(
+  agentId: string,
+  runId: string,
+  channelId: string,
+  messageText: string,
+  toolOptions?: SendMessageToolOptions,
+): Promise<GateOutcome> {
+  const config = toolOptions?.gateConfig;
+  if (!config) return { type: "pass", text: messageText };
+
+  // Check if any dimension or similarity is enabled
+  const anyEnabled =
+    config.dimensions.persona_adherence.enabled ||
+    config.dimensions.self_consistency.enabled ||
+    config.dimensions.fluency.enabled ||
+    config.dimensions.suitability.enabled ||
+    config.similarity.enabled;
+
+  if (!anyEnabled) return { type: "pass", text: messageText };
+
+  // Gather context for quality check
+  const recentMessages = await getRecentMessages(channelId, 10);
+  const conversationContext = recentMessages.map((m) => m.text);
+  const agentRecentMessages = recentMessages
+    .filter((m) => m.userId === agentId)
+    .slice(-5)
+    .map((m) => m.text);
+
+  const pipelineResult = await runCorrectionPipeline(
+    agentId,
+    messageText,
+    conversationContext,
+    config,
+    {
+      runId,
+      channelId,
+      agentName: toolOptions?.agentName ?? agentId,
+      persona: toolOptions?.persona,
+      recentMessages: agentRecentMessages,
+    },
+  );
+
+  // If pipeline returned feedback for regeneration, ask agent to retry
+  if (pipelineResult.feedback) {
+    logInfo("tool.send_message.gateRegeneration", { agentId, channelId });
+    countMetric("tool.send_message.gate_regeneration", 1, { agentId });
+    return {
+      type: "feedback",
+      feedbackText: formatFeedbackForAgent(pipelineResult.feedback),
+    };
+  }
+
+  logInfo("tool.send_message.gateComplete", {
+    agentId,
+    outcome: pipelineResult.outcome,
+    usedCorrectedText: pipelineResult.finalText !== messageText,
+  });
+
+  return { type: "pass", text: pipelineResult.finalText };
+}
+
+// ---------------------------------------------------------------------------
+// DM chain trigger
+// ---------------------------------------------------------------------------
 
 async function triggerDmChain(
   agentId: string,
