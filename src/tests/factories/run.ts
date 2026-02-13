@@ -11,6 +11,7 @@ export function createMockRun(overrides?: Partial<Run>): Run {
     stopReason: null,
     triggerMessageId: null,
     channelId: null,
+    triggerPrompt: null,
     chainDepth: 0,
     createdAt: new Date("2025-01-01"),
     startedAt: null,

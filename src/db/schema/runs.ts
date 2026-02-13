@@ -36,6 +36,7 @@ export const runs = pgTable(
     }),
     triggerMessageId: uuid("trigger_message_id"),
     channelId: text("channel_id"),
+    triggerPrompt: text("trigger_prompt"),
     chainDepth: integer("chain_depth").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

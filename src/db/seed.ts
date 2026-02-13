@@ -302,7 +302,7 @@ const unreadTargets: Record<string, Record<string, number>> = {
 
 async function seed() {
   const { db } = await import("./client");
-  const { agents, channels, channelMembers, messages, reactions, memoryBlocks, channelReads, runs, runSteps, runMessages } = await import("./schema");
+  const { agents, channels, channelMembers, messages, reactions, memoryBlocks, channelReads, runs, runSteps, runMessages, scheduledMessages } = await import("./schema");
   const { sql } = await import("drizzle-orm");
 
   const allChannelDefs = [...channelDefs, ...dmDefs];
@@ -465,6 +465,36 @@ async function seed() {
   }
   console.log(`  ${readRows.length} channel reads`);
 
+  // 9. Scheduled messages — seed demo schedules
+  console.log("Seeding scheduled messages...");
+  await db.delete(scheduledMessages);
+
+  const tomorrow9am = new Date();
+  tomorrow9am.setDate(tomorrow9am.getDate() + 1);
+  tomorrow9am.setHours(9, 0, 0, 0);
+
+  const tomorrow830am = new Date();
+  tomorrow830am.setDate(tomorrow830am.getDate() + 1);
+  tomorrow830am.setHours(8, 30, 0, 0);
+
+  const scheduledDefs = [
+    {
+      agentId: "michael",
+      triggerAt: tomorrow9am,
+      prompt: "Good morning! Start the day by posting an enthusiastic greeting in #general. Comment on something happening this week.",
+      targetChannelId: "general",
+    },
+    {
+      agentId: "dwight",
+      triggerAt: tomorrow830am,
+      prompt: "Post your daily security briefing in #general. Report on any suspicious activity, check fire exits, and remind everyone about safety protocols.",
+      targetChannelId: "general",
+    },
+  ];
+
+  await db.insert(scheduledMessages).values(scheduledDefs);
+  console.log(`  ${scheduledDefs.length} scheduled messages`);
+
   // Summary
   const counts = {
     agents: agentRows.length,
@@ -474,6 +504,7 @@ async function seed() {
     reactions: reactionRows.length,
     memoryBlocks: memoryBlockDefs.length,
     channelReads: readRows.length,
+    scheduledMessages: scheduledDefs.length,
   };
   console.log("\nSeed complete:", counts);
 

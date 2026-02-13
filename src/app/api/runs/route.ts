@@ -41,6 +41,7 @@ const CreateRunSchema = z.object({
   agentId: z.string().min(1),
   triggerMessageId: z.uuid().optional(),
   channelId: z.string().min(1).optional(),
+  triggerPrompt: z.string().optional(),
   chainDepth: z.number().int().nonnegative().optional(),
 });
 

@@ -238,6 +238,7 @@ const RunSchema = z
     stopReason: z.string().nullable(),
     triggerMessageId: z.uuid().nullable(),
     channelId: z.string().nullable(),
+    triggerPrompt: z.string().nullable(),
     chainDepth: z.number().int(),
     createdAt: z.iso.datetime(),
     startedAt: z.iso.datetime().nullable(),
@@ -268,6 +269,7 @@ const CreateRunBody = z
     agentId: z.string().min(1),
     triggerMessageId: z.uuid().optional(),
     channelId: z.string().min(1).optional(),
+    triggerPrompt: z.string().optional(),
     chainDepth: z.number().int().nonnegative().optional(),
   })
   .meta({ id: "CreateRunBody" });

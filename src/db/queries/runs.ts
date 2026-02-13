@@ -237,6 +237,7 @@ function mapRowToRun(row: Record<string, unknown>): Run {
     stopReason: (row.stop_reason as Run["stopReason"]) ?? null,
     triggerMessageId: (row.trigger_message_id as string | null) ?? null,
     channelId: (row.channel_id as string | null) ?? null,
+    triggerPrompt: (row.trigger_prompt as string | null) ?? null,
     chainDepth: row.chain_depth as number,
     createdAt: new Date(row.created_at as string),
     startedAt: row.started_at ? new Date(row.started_at as string) : null,
