@@ -435,25 +435,34 @@ describe("proposition-engine", () => {
       expect(result.result).toBe(false);
     });
 
-    it("coerces truthy values to boolean true", () => {
-      const result = parseCheckResponse(
-        '{"result": 1, "reasoning": "test", "confidence": 0.5}',
-      );
-      expect(result.result).toBe(true);
+    it("throws on non-boolean result (number)", () => {
+      const restore = silenceConsole();
+      expect(() =>
+        parseCheckResponse(
+          '{"result": 1, "reasoning": "test", "confidence": 0.5}',
+        ),
+      ).toThrow("Invalid check result type");
+      restore();
     });
 
-    it("coerces falsy values to boolean false", () => {
-      const result = parseCheckResponse(
-        '{"result": 0, "reasoning": "test", "confidence": 0.5}',
-      );
-      expect(result.result).toBe(false);
+    it("throws on non-boolean result (string)", () => {
+      const restore = silenceConsole();
+      expect(() =>
+        parseCheckResponse(
+          '{"result": "false", "reasoning": "test", "confidence": 0.5}',
+        ),
+      ).toThrow("Invalid check result type");
+      restore();
     });
 
-    it("coerces null to boolean false", () => {
-      const result = parseCheckResponse(
-        '{"result": null, "reasoning": "test", "confidence": 0.5}',
-      );
-      expect(result.result).toBe(false);
+    it("throws on null result", () => {
+      const restore = silenceConsole();
+      expect(() =>
+        parseCheckResponse(
+          '{"result": null, "reasoning": "test", "confidence": 0.5}',
+        ),
+      ).toThrow("Invalid check result type");
+      restore();
     });
 
     it("defaults confidence to 0.5 when missing", () => {
@@ -538,6 +547,17 @@ describe("proposition-engine", () => {
       expect(results).toHaveLength(2);
       expect(results.at(0)?.score).toBe(8);
       expect(results.at(1)?.score).toBe(4);
+    });
+
+    it("throws on non-numeric score in batch entry", () => {
+      const restore = silenceConsole();
+      const raw = JSON.stringify([
+        { score: "high", reasoning: "bad type", confidence: 0.5 },
+      ]);
+      expect(() => parseBatchScoreResponse(raw, 1)).toThrow(
+        "Invalid score in batch response at index 0",
+      );
+      restore();
     });
 
     it("throws when response is not an array", () => {

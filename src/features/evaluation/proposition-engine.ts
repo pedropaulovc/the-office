@@ -382,7 +382,15 @@ export function parseCheckResponse(raw: string): CheckResponse {
       }
 
       const obj = parsed as Record<string, unknown>;
-      const result = Boolean(obj.result);
+      if (typeof obj.result !== "boolean") {
+        logError("proposition-engine.parse.failed", {
+          raw: raw.slice(0, 200),
+          error: `expected boolean result, got ${typeof obj.result}: ${String(obj.result)}`,
+        });
+        countMetric("evaluation.parse_error");
+        throw new Error(`Invalid check result type: ${String(obj.result)}`);
+      }
+      const result = obj.result;
       const rawConfidence = typeof obj.confidence === "number" ? obj.confidence : 0.5;
       const confidence = clamp(rawConfidence, 0, 1);
       const reasoning = typeof obj.reasoning === "string" ? obj.reasoning : "";
@@ -462,12 +470,18 @@ export function parseBatchScoreResponse(
         );
       }
 
-      return (parsed as Record<string, unknown>[]).map((obj) => {
-        const score = clamp(
-          Math.round(typeof obj.score === "number" ? obj.score : 0),
-          0,
-          9,
-        );
+      return (parsed as Record<string, unknown>[]).map((obj, index) => {
+        if (typeof obj.score !== "number" || !Number.isFinite(obj.score)) {
+          logError("proposition-engine.parse.failed", {
+            raw: raw.slice(0, 200),
+            error: `invalid score at index ${index}: ${String(obj.score)}`,
+          });
+          countMetric("evaluation.parse_error");
+          throw new Error(
+            `Invalid score in batch response at index ${index}: ${String(obj.score)}`,
+          );
+        }
+        const score = clamp(Math.round(obj.score), 0, 9);
         const rawConfidence =
           typeof obj.confidence === "number" ? obj.confidence : 0.5;
         const confidence = clamp(rawConfidence, 0, 1);
