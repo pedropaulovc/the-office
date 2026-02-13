@@ -15,8 +15,9 @@ const targetType = z.enum(["agent", "environment"]);
 export const propositionYamlSchema = z.object({
   dimension: evaluationDimension,
   agent_id: z.string().optional(),
-  include_personas: z.array(z.string()).optional(),
-  target_type: targetType,
+  include_personas: z.boolean().default(true),
+  hard: z.boolean().default(false),
+  target_type: targetType.default("agent"),
   first_n: z.number().int().nonnegative().optional(),
   last_n: z.number().int().nonnegative().optional(),
   propositions: z.array(
