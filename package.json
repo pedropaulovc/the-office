@@ -19,7 +19,8 @@
     "db:migrate": "npx drizzle-kit migrate",
     "db:nuke": "npx tsx scripts/nuke-db.ts && npx drizzle-kit push --force && npx tsx src/db/seed.ts",
     "eval:baseline": "npx tsx src/features/evaluation/scripts/capture-baseline.ts",
-    "eval:run": "npx tsx src/features/evaluation/harness/cli.ts"
+    "eval:run": "npx tsx src/features/evaluation/harness/cli.ts",
+    "experiment:run": "npx tsx src/features/evaluation/experiment/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.39",
