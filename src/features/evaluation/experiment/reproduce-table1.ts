@@ -9,12 +9,14 @@ import {
 } from "./comparison-report";
 import type { ReferenceExperiment } from "./table1-reference";
 import type { FullComparisonReport } from "./comparison-report";
+import type { ExperimentMode } from "./environment";
 
 interface Table1Options {
   experiments?: string[];
   scale?: number;
   seed?: number;
   output?: string;
+  mode?: ExperimentMode;
 }
 
 function parseTable1Args(args: string[]): Table1Options {
@@ -35,6 +37,9 @@ function parseTable1Args(args: string[]): Table1Options {
     } else if (arg === "--output" && next) {
       options.output = next;
       i++;
+    } else if (arg === "--mode" && next) {
+      options.mode = next as ExperimentMode;
+      i++;
     }
   }
 
@@ -47,10 +52,11 @@ function isDryRunResult(
   return "dryRun" in result && result.dryRun;
 }
 
-function reproduceTable1(options: Table1Options): FullComparisonReport {
-  return withSpan("reproduce-table1", "evaluation.experiment", () => {
+async function reproduceTable1(options: Table1Options): Promise<FullComparisonReport> {
+  return withSpan("reproduce-table1", "evaluation.experiment", async () => {
     const seed = options.seed ?? 42;
     const scale = options.scale ?? 1.0;
+    const mode = options.mode ?? "template";
     const allRefs = getAllReferences();
     const selectedExperiments = options.experiments;
 
@@ -62,16 +68,18 @@ function reproduceTable1(options: Table1Options): FullComparisonReport {
       experiments: references.map((r) => r.scenarioId).join(","),
       scale,
       seed,
+      mode,
     });
 
     const results: { ours: ExperimentReport; reference: ReferenceExperiment }[] =
       [];
 
     for (const ref of references) {
-      const result = runExperiment({
+      const result = await runExperiment({
         scenario: ref.scenarioId,
         seed,
         scale,
+        mode,
       });
 
       if (isDryRunResult(result)) continue;
@@ -85,10 +93,10 @@ function reproduceTable1(options: Table1Options): FullComparisonReport {
   });
 }
 
-function main() {
+async function main() {
   try {
     const options = parseTable1Args(process.argv.slice(2));
-    const report = reproduceTable1(options);
+    const report = await reproduceTable1(options);
 
     // Human-readable to stderr
     console.error(formatComparisonTable(report));

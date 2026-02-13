@@ -1,5 +1,6 @@
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
 import { ExperimentEnvironment } from "./environment";
+import type { ExperimentMode } from "./environment";
 import type { ScenarioConfig, GeneratedPersona } from "./types";
 import type { EnvironmentResult } from "./environment";
 
@@ -67,12 +68,13 @@ export function assignAgents(
 }
 
 /** Creates Treatment/Control environment pairs and runs them. */
-export function createAndRunEnvironments(
+export async function createAndRunEnvironments(
   scenario: ScenarioConfig,
   agents: GeneratedPersona[],
   seed: number,
-): EnvironmentManagerResult {
-  return withSpan("create-run-environments", "experiment", () => {
+  mode: ExperimentMode = "template",
+): Promise<EnvironmentManagerResult> {
+  return withSpan("create-run-environments", "experiment", async () => {
     const controlScenario = createControlScenario(scenario);
     const agentGroups = assignAgents(
       agents,
@@ -87,17 +89,20 @@ export function createAndRunEnvironments(
       agentsPerEnvironment: scenario.agents_per_environment,
     });
 
-    const pairs: EnvironmentPairResult[] = agentGroups.map((groupAgents, index) => {
+    const pairs: EnvironmentPairResult[] = [];
+
+    // In LLM mode, run sequentially to avoid rate limiting
+    for (const [index, groupAgents] of agentGroups.entries()) {
       const envId = index + 1;
-      const treatmentEnv = new ExperimentEnvironment(scenario, groupAgents, envId);
-      const controlEnv = new ExperimentEnvironment(controlScenario, groupAgents, envId);
+      const treatmentEnv = new ExperimentEnvironment(scenario, groupAgents, envId, mode);
+      const controlEnv = new ExperimentEnvironment(controlScenario, groupAgents, envId, mode);
 
       const envSeed = seed + envId;
-      const treatmentResult = treatmentEnv.run(envSeed);
-      const controlResult = controlEnv.run(envSeed);
+      const treatmentResult = await treatmentEnv.run(envSeed);
+      const controlResult = await controlEnv.run(envSeed);
 
-      return { environmentId: envId, treatment: treatmentResult, control: controlResult };
-    });
+      pairs.push({ environmentId: envId, treatment: treatmentResult, control: controlResult });
+    }
 
     countMetric("experiment.environments_created", pairs.length * 2);
 
