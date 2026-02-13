@@ -23,6 +23,11 @@ interface HarnessResult {
   };
 }
 
+function assertDefined<T>(value: T | undefined, name: string): T {
+  if (!value) throw new Error(`${name} is undefined`);
+  return value;
+}
+
 test.describe("evaluation harness API", () => {
   test("POST /api/evaluations/harness with mock judge returns valid report for single agent", async ({ request }) => {
     const response = await request.post("/api/evaluations/harness", {
@@ -37,16 +42,17 @@ test.describe("evaluation harness API", () => {
 
     const result = (await response.json()) as HarnessResult;
     expect(result.timestamp).toBeTruthy();
-    expect(result.agents["michael"]).toBeDefined();
+    expect(result.agents.michael).toBeDefined();
     expect(result.summary.total).toBe(1);
 
-    const michael = result.agents["michael"]!;
+    const michael = assertDefined(result.agents.michael, "michael");
+    expect(michael).toBeDefined();
     expect(michael.overall).toBeGreaterThanOrEqual(0);
     expect(michael.overall).toBeLessThanOrEqual(9);
     expect(typeof michael.pass).toBe("boolean");
 
     // Adherence dimension should exist
-    const adherence = michael.dimensions["adherence"] as DimensionResult;
+    const adherence = michael.dimensions.adherence as DimensionResult;
     expect(adherence.score).toBeGreaterThanOrEqual(0);
     expect(adherence.score).toBeLessThanOrEqual(9);
     expect(typeof adherence.pass).toBe("boolean");
@@ -108,12 +114,9 @@ test.describe("evaluation harness API", () => {
     expect(result.summary.passed + result.summary.failed).toBe(3);
 
     // Count pass/fail manually
-    let manualPassed = 0;
-    let manualFailed = 0;
-    for (const agentResult of Object.values(result.agents)) {
-      if (agentResult.pass) manualPassed++;
-      else manualFailed++;
-    }
+    const passResults = Object.values(result.agents);
+    const manualPassed = passResults.filter((r) => r.pass).length;
+    const manualFailed = passResults.filter((r) => !r.pass).length;
     expect(manualPassed).toBe(result.summary.passed);
     expect(manualFailed).toBe(result.summary.failed);
   });

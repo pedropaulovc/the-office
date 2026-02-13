@@ -19,8 +19,8 @@ function parseCliArgs() {
     },
   });
 
-  const agents = values.agents === "all" ? ["all"] : values.agents!.split(",");
-  const dimensions = values.dimensions!.split(",") as EvaluationDimension[];
+  const agents = values.agents === "all" ? ["all"] : values.agents.split(",");
+  const dimensions = values.dimensions.split(",") as EvaluationDimension[];
 
   // Validate dimensions
   for (const dim of dimensions) {
@@ -33,8 +33,8 @@ function parseCliArgs() {
   return {
     agents,
     dimensions,
-    threshold: parseFloat(values.threshold!),
-    mockJudge: values["mock-judge"] ?? false,
+    threshold: parseFloat(values.threshold),
+    mockJudge: values["mock-judge"],
     output: values.output ?? null,
   };
 }
@@ -67,7 +67,7 @@ async function main() {
   process.exit(result.summary.failed > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error("Evaluation harness failed:", err);
   process.exit(1);
 });
