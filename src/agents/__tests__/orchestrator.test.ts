@@ -316,6 +316,7 @@ describe("orchestrator", () => {
       agent: AGENT,
       memoryBlocks: [memoryBlock],
       recentMessages: [expect.objectContaining({ userId: "dwight" })],
+      interventionNudge: null,
     });
     expect(mockQuery).toHaveBeenCalled();
     expect(result.status).toBe("completed");

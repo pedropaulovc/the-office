@@ -11,6 +11,7 @@ export interface BuildSystemPromptInput {
   agent: PromptAgent;
   memoryBlocks: PromptMemoryBlock[];
   recentMessages: PromptMessage[];
+  interventionNudge?: string | null;
 }
 
 const MAX_RECENT_MESSAGES = 20;
@@ -51,6 +52,11 @@ function assemblePrompt(input: BuildSystemPromptInput): string {
     sections.push(
       `## Recent Conversation\n\nThe following are the most recent messages in the current channel/DM:\n\n${formatted}`,
     );
+  }
+
+  // 5. Intervention nudge (transient — not stored in memory)
+  if (input.interventionNudge) {
+    sections.push(`### Conversation Guidance\n\n${input.interventionNudge}`);
   }
 
   return sections.join("\n\n---\n\n");
