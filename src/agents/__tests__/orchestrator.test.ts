@@ -329,7 +329,13 @@ describe("orchestrator", () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", 0, expect.any(Function));
+    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", 0, expect.any(Function), expect.objectContaining({
+      sendMessage: expect.objectContaining({
+        gateConfig: expect.any(Object),
+        agentName: AGENT.displayName,
+        persona: AGENT.systemPrompt,
+      }),
+    }));
   });
 
   it("passes resume: sessionId when agent has existing session", async () => {
@@ -752,7 +758,11 @@ describe("orchestrator", () => {
     await executeRun(run);
 
     expect(mockGetToolServer).toHaveBeenCalledWith(
-      "michael", run.id, "general", 1, expect.any(Function),
+      "michael", run.id, "general", 1, expect.any(Function), expect.objectContaining({
+        sendMessage: expect.objectContaining({
+          gateConfig: expect.any(Object),
+        }),
+      }),
     );
   });
 });

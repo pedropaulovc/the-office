@@ -5,6 +5,7 @@ import { users, SWITCHABLE_USER_IDS } from "../data/users";
 import { systemPrompts } from "../data/system-prompts";
 import { memoryBlockData } from "../data/memory-blocks";
 import type { NewAgent } from "./schema";
+import { agentEvaluationConfig } from "./schema";
 
 // --- Timestamp helper (relative to "today", matching original mock data) ---
 
@@ -676,6 +677,21 @@ async function seed() {
 
   await db.insert(scheduledMessages).values(scheduledDefs);
   console.log(`  ${scheduledDefs.length} scheduled messages`);
+
+  // 12. Evaluation configs (all mechanisms disabled by default)
+  console.log("Seeding evaluation configs...");
+  const evalAgentIds = [
+    "michael", "jim", "dwight", "pam", "ryan", "stanley",
+    "kevin", "angela", "oscar", "andy", "toby", "creed",
+    "kelly", "phyllis", "meredith", "darryl",
+  ];
+  for (const id of evalAgentIds) {
+    await db
+      .insert(agentEvaluationConfig)
+      .values({ agentId: id })
+      .onConflictDoNothing();
+  }
+  console.log(`  ${evalAgentIds.length} evaluation configs`);
 
   // Summary
   const counts = {
