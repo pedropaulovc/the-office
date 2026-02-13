@@ -76,3 +76,35 @@ export interface FactoryOptions {
   seed?: number;
   templateOnly?: boolean;
 }
+
+// Scenario types
+
+export type ScenarioType = "brainstorming" | "debate";
+export type AgentOrder = "parallel" | "sequential_random";
+
+export interface FacilitatorPrompt {
+  step: number;
+  message: string;
+}
+
+export interface TreatmentConfig {
+  action_correction: boolean;
+  variety_intervention: boolean;
+  correction_dimensions: string[];
+  correction_threshold: number;
+}
+
+export interface ScenarioConfig {
+  id: string;
+  name: string;
+  description: string;
+  type: ScenarioType;
+  population_profile: PopulationProfileId;
+  agents_per_environment: number;
+  total_environments: number;
+  steps_per_environment: number;
+  facilitator_prompts: FacilitatorPrompt[];
+  agent_order: AgentOrder;
+  treatment: TreatmentConfig;
+  evaluation_dimensions: string[];
+}
