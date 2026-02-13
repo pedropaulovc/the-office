@@ -80,7 +80,7 @@ async function scoreEnvironmentsLlm(
       const trajectoryResult = await scoreTrajectory(agent, agentActions, dimensions);
 
       for (const dim of dimensions) {
-        scores[dim]!.push(trajectoryResult.scores[dim] ?? 5);
+        scores[dim]?.push(trajectoryResult.scores[dim] ?? 5);
       }
     }
   }
@@ -200,8 +200,5 @@ async function runExperiment(options: RunnerOptions): Promise<ExperimentReport |
   });
 }
 
-/** @deprecated Use scoreEnvironmentsTemplate directly. Kept for backward compatibility. */
-const scoreEnvironments = scoreEnvironmentsTemplate;
-
-export { runExperiment, scoreEnvironments, scoreEnvironmentsLlm };
+export { runExperiment, scoreEnvironmentsTemplate, scoreEnvironmentsLlm };
 export type { RunnerOptions, DryRunResult };

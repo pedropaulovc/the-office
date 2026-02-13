@@ -3,30 +3,30 @@ import { DISPLAY_LABELS } from "./experiment-report";
 import type { ExperimentReport } from "./experiment-report";
 import type { ReferenceExperiment } from "./table1-reference";
 
-type TrendMatch = {
+interface TrendMatch {
   dimension: string;
   ourDelta: number;
   referenceDelta: number;
   sameDirection: boolean;
   referenceSignificant: boolean;
-};
+}
 
-type ComparisonResult = {
+interface ComparisonResult {
   scenarioId: string;
   experimentLabel: string;
   trends: TrendMatch[];
   matchedCount: number;
   totalSignificant: number;
   reproductionScore: number; // matchedCount / totalSignificant
-};
+}
 
-type FullComparisonReport = {
+interface FullComparisonReport {
   experiments: ComparisonResult[];
   overallMatchedCount: number;
   overallTotalSignificant: number;
   overallReproductionScore: number;
   timestamp: string;
-};
+}
 
 function validateTrends(
   ours: ExperimentReport,
@@ -73,7 +73,7 @@ function generateComparisonResult(
 }
 
 function generateFullComparisonReport(
-  results: Array<{ ours: ExperimentReport; reference: ReferenceExperiment }>,
+  results: { ours: ExperimentReport; reference: ReferenceExperiment }[],
 ): FullComparisonReport {
   return withSpan("generate-comparison-report", "experiment", () => {
     const experiments = results.map((r) =>

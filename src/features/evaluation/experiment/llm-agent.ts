@@ -7,15 +7,15 @@ import {
 } from "@/lib/telemetry";
 import type { GeneratedPersona } from "./types";
 
-type ConversationMessage = {
+interface ConversationMessage {
   role: "facilitator" | "agent";
   name: string;
   text: string;
-};
+}
 
-type GenerateResponseOptions = {
+interface GenerateResponseOptions {
   maxTokens?: number;
-};
+}
 
 async function generateAgentResponse(
   persona: GeneratedPersona,

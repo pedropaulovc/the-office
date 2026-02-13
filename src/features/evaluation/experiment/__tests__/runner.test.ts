@@ -6,7 +6,7 @@ vi.mock("@sentry/nextjs", () => ({
   metrics: { count: vi.fn(), distribution: vi.fn() },
 }));
 
-import { runExperiment, scoreEnvironments } from "../runner";
+import { runExperiment, scoreEnvironmentsTemplate } from "../runner";
 import { parseArgs, isDryRunResult } from "../cli";
 import type { ExperimentReport } from "../experiment-report";
 import type { DryRunResult } from "../runner";
@@ -156,7 +156,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "consistency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions);
+      const scores = scoreEnvironmentsTemplate(pairs, "treatment", dimensions);
 
       // 2 agents in 1 environment = 2 scores per dimension
       expect(scores.adherence).toHaveLength(2);
@@ -172,7 +172,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "fluency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions);
+      const scores = scoreEnvironmentsTemplate(pairs, "treatment", dimensions);
 
       for (const dim of dimensions) {
         const dimScores = scores[dim];

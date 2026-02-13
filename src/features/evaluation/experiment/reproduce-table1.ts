@@ -116,7 +116,7 @@ if (
   process.argv[1]?.endsWith("reproduce-table1.ts") ||
   process.argv[1]?.endsWith("reproduce-table1.js")
 ) {
-  main();
+  void main();
 }
 
 export { parseTable1Args, reproduceTable1 };

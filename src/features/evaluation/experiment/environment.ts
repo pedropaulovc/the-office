@@ -115,7 +115,10 @@ export class ExperimentEnvironment {
     const agentActions: AgentAction[] = [];
     for (const name of agentOrder) {
       const history = this.buildConversationHistory(facilitatorActions, previousActions, agentActions);
-      const persona = this.agents.find((a) => a.name === name)!;
+      const persona = this.agents.find((a) => a.name === name);
+      if (!persona) {
+        throw new Error(`Agent not found: ${name}`);
+      }
       const response = await generateAgentResponse(persona, history);
       agentActions.push({
         agentName: name,

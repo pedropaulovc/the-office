@@ -82,8 +82,9 @@ describe("llm-agent", () => {
     await generateAgentResponse(persona, []);
 
     expect(mockCreate).toHaveBeenCalledOnce();
-    const callArgs = mockCreate.mock.calls[0]![0];
-    expect(callArgs.system).toBe(
+    const callArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(callArgs).toBeDefined();
+    expect(callArgs?.system).toBe(
       "You are Michael Scott, the world's best boss.",
     );
   });
@@ -98,8 +99,10 @@ describe("llm-agent", () => {
 
     await generateAgentResponse(persona, history);
 
-    const callArgs = mockCreate.mock.calls[0]![0];
-    const userContent = callArgs.messages[0].content as string;
+    const callArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(callArgs).toBeDefined();
+    const messages = callArgs?.messages as { content: string }[] | undefined;
+    const userContent = messages?.[0]?.content;
     expect(userContent).toContain("[Facilitator]: What do you think?");
     expect(userContent).toContain("[Dwight]: Bears, beets, Battlestar.");
   });
@@ -121,8 +124,9 @@ describe("llm-agent", () => {
 
     await generateAgentResponse(persona, []);
 
-    const callArgs = mockCreate.mock.calls[0]![0];
-    expect(callArgs.temperature).toBe(0.7);
+    const callArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(callArgs).toBeDefined();
+    expect(callArgs?.temperature).toBe(0.7);
   });
 
   it("respects maxTokens option", async () => {
@@ -131,8 +135,9 @@ describe("llm-agent", () => {
 
     await generateAgentResponse(persona, [], { maxTokens: 256 });
 
-    const callArgs = mockCreate.mock.calls[0]![0];
-    expect(callArgs.max_tokens).toBe(256);
+    const callArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(callArgs).toBeDefined();
+    expect(callArgs?.max_tokens).toBe(256);
   });
 
   it("handles empty response content gracefully", async () => {
