@@ -12,16 +12,21 @@ function parseArgs(args: string[]): { scenario: string; seed: number; runs: numb
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--scenario" && args[i + 1]) {
-      scenario = args[++i]!;
-    } else if (arg === "--seed" && args[i + 1]) {
-      seed = parseInt(args[++i]!, 10);
-    } else if (arg === "--runs" && args[i + 1]) {
-      runs = parseInt(args[++i]!, 10);
+    const next = args[i + 1];
+    if (arg === "--scenario" && next) {
+      scenario = next;
+      i++;
+    } else if (arg === "--seed" && next) {
+      seed = parseInt(next, 10);
+      i++;
+    } else if (arg === "--runs" && next) {
+      runs = parseInt(next, 10);
+      i++;
     } else if (arg === "--dry-run") {
       dryRun = true;
-    } else if (arg === "--output" && args[i + 1]) {
-      output = args[++i]!;
+    } else if (arg === "--output" && next) {
+      output = next;
+      i++;
     }
   }
 
@@ -37,7 +42,7 @@ function parseArgs(args: string[]): { scenario: string; seed: number; runs: numb
 }
 
 function isDryRunResult(result: ExperimentReport | DryRunResult): result is DryRunResult {
-  return "dryRun" in result && result.dryRun === true;
+  return "dryRun" in result && result.dryRun;
 }
 
 function main() {

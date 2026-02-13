@@ -74,27 +74,27 @@ describe("environment-manager", () => {
   describe("createControlScenario", () => {
     it("disables all treatments", () => {
       const scenario = getScenario("brainstorming-average");
-      expect(scenario).toBeDefined();
-      const control = createControlScenario(scenario!);
+      if (!scenario) throw new Error("brainstorming-average not found");
+      const control = createControlScenario(scenario);
       expect(control.treatment.action_correction).toBe(false);
       expect(control.treatment.variety_intervention).toBe(false);
     });
 
     it("preserves all other scenario fields", () => {
       const scenario = getScenario("brainstorming-average");
-      expect(scenario).toBeDefined();
-      const control = createControlScenario(scenario!);
-      expect(control.id).toBe(scenario!.id);
-      expect(control.name).toBe(scenario!.name);
-      expect(control.description).toBe(scenario!.description);
-      expect(control.type).toBe(scenario!.type);
-      expect(control.population_profile).toBe(scenario!.population_profile);
-      expect(control.agents_per_environment).toBe(scenario!.agents_per_environment);
-      expect(control.total_environments).toBe(scenario!.total_environments);
-      expect(control.steps_per_environment).toBe(scenario!.steps_per_environment);
-      expect(control.facilitator_prompts).toEqual(scenario!.facilitator_prompts);
-      expect(control.agent_order).toBe(scenario!.agent_order);
-      expect(control.evaluation_dimensions).toEqual(scenario!.evaluation_dimensions);
+      if (!scenario) throw new Error("brainstorming-average not found");
+      const control = createControlScenario(scenario);
+      expect(control.id).toBe(scenario.id);
+      expect(control.name).toBe(scenario.name);
+      expect(control.description).toBe(scenario.description);
+      expect(control.type).toBe(scenario.type);
+      expect(control.population_profile).toBe(scenario.population_profile);
+      expect(control.agents_per_environment).toBe(scenario.agents_per_environment);
+      expect(control.total_environments).toBe(scenario.total_environments);
+      expect(control.steps_per_environment).toBe(scenario.steps_per_environment);
+      expect(control.facilitator_prompts).toEqual(scenario.facilitator_prompts);
+      expect(control.agent_order).toBe(scenario.agent_order);
+      expect(control.evaluation_dimensions).toEqual(scenario.evaluation_dimensions);
     });
   });
 
