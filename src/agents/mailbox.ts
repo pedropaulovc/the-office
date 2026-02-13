@@ -17,6 +17,16 @@ export interface RunResult {
 
 export type RunExecutor = (run: Run) => Promise<RunResult | undefined>;
 
+/** In-memory registry for awaiting run completion (used by enqueueAndAwaitRun). */
+const completionResolvers = new Map<string, () => void>();
+
+function notifyRunCompletion(runId: string): void {
+  const resolve = completionResolvers.get(runId);
+  if (!resolve) return;
+  resolve();
+  completionResolvers.delete(runId);
+}
+
 const stubExecutor: RunExecutor = (run: Run) => {
   logInfo("stub executor: no-op", { runId: run.id, agentId: run.agentId });
   return Promise.resolve(undefined);
@@ -37,6 +47,32 @@ export async function enqueueRun(
     // Fire-and-forget: start processing the queue
     void processNextRun(run.agentId, executor);
 
+    return run;
+  });
+}
+
+/**
+ * Enqueues a run and waits for it to complete before returning.
+ * Used for sequential channel dispatch so each agent sees prior responses.
+ */
+export async function enqueueAndAwaitRun(
+  input: NewRun,
+  executor?: RunExecutor,
+): Promise<Run> {
+  return withSpan("enqueueAndAwaitRun", "agent.mailbox.enqueue_await", async () => {
+    const run = await createRun(input);
+    logInfo("run enqueued (awaiting)", { runId: run.id, agentId: run.agentId });
+    countMetric("mailbox.enqueue_await", 1, { agentId: run.agentId });
+
+    // Register completion listener BEFORE starting processing to avoid race
+    const completionPromise = new Promise<void>((resolve) => {
+      completionResolvers.set(run.id, resolve);
+    });
+
+    // Fire-and-forget: start processing the queue
+    void processNextRun(run.agentId, executor);
+
+    await completionPromise;
     return run;
   });
 }
@@ -89,6 +125,7 @@ export async function processNextRun(
         durationMs,
       });
       distributionMetric("mailbox.run_duration_ms", durationMs, "millisecond", { agentId });
+      notifyRunCompletion(run.id);
     } catch (err) {
       const durationMs = Date.now() - startTime;
       const message = err instanceof Error ? err.message : String(err);
@@ -104,6 +141,7 @@ export async function processNextRun(
         stopReason: "error",
       });
       countMetric("mailbox.run_error", 1, { agentId });
+      notifyRunCompletion(run.id);
     }
 
     // Recurse to drain the queue

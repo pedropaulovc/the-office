@@ -2,7 +2,7 @@ import { createMessage } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { CreateMessageSchema } from "@/messages/schemas";
 import { resolveTargetAgents } from "@/agents/resolver";
-import { enqueueRun } from "@/agents/mailbox";
+import { enqueueAndAwaitRun } from "@/agents/mailbox";
 import { executeRun } from "@/agents/orchestrator";
 import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 import * as Sentry from "@sentry/nextjs";
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         });
 
         for (const agentId of targets) {
-          await enqueueRun(
+          await enqueueAndAwaitRun(
             {
               agentId,
               channelId: dbMessage.channelId,

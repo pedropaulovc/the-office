@@ -255,4 +255,109 @@ describe("mailbox", () => {
     expect(result).toHaveLength(2);
     expect(mockListRuns).toHaveBeenCalledTimes(2);
   });
+
+  it("enqueueAndAwaitRun waits for run completion before resolving", async () => {
+    const run = createMockRun({ agentId: "dwight" });
+    mockCreateRun.mockResolvedValue(run);
+
+    let executorResolve: () => void;
+    const executorPromise = new Promise<void>((r) => { executorResolve = r; });
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockImplementation(
+      () => executorPromise.then(() => undefined),
+    );
+
+    mockClaimNextRun
+      .mockResolvedValueOnce({ ...run, status: "running" as const })
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "completed" }),
+    );
+
+    const { enqueueAndAwaitRun } = await import("../mailbox");
+
+    let resolved = false;
+    const promise = enqueueAndAwaitRun(
+      { agentId: "dwight" },
+      executor,
+    ).then(() => { resolved = true; });
+
+    // Give fire-and-forget time to start
+    await new Promise((r) => setTimeout(r, 10));
+    expect(resolved).toBe(false);
+
+    // Now let executor finish
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test setup guarantees assignment
+    executorResolve!();
+    await promise;
+    expect(resolved).toBe(true);
+  });
+
+  it("enqueueAndAwaitRun resolves even when run fails", async () => {
+    const run = createMockRun({ agentId: "dwight" });
+    mockCreateRun.mockResolvedValue(run);
+
+    const executor = vi.fn<(r: Run) => Promise<undefined>>().mockRejectedValue(
+      new Error("agent exploded"),
+    );
+
+    mockClaimNextRun
+      .mockResolvedValueOnce({ ...run, status: "running" as const })
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "failed" }),
+    );
+
+    const { enqueueAndAwaitRun } = await import("../mailbox");
+    const result = await enqueueAndAwaitRun({ agentId: "dwight" }, executor);
+
+    expect(result).toEqual(run);
+    expect(mockUpdateRunStatus).toHaveBeenCalledWith(run.id, {
+      status: "failed",
+      stopReason: "error",
+    });
+  });
+
+  it("sequential enqueueAndAwaitRun calls process agents in order", async () => {
+    const executionOrder: string[] = [];
+
+    const runA = createMockRun({ id: "run-a", agentId: "michael" });
+    const runB = createMockRun({ id: "run-b", agentId: "dwight" });
+    const runC = createMockRun({ id: "run-c", agentId: "pam" });
+
+    mockCreateRun
+      .mockResolvedValueOnce(runA)
+      .mockResolvedValueOnce(runB)
+      .mockResolvedValueOnce(runC);
+
+    const makeExecutor = (name: string) =>
+      vi.fn<(r: Run) => Promise<undefined>>().mockImplementation(() => {
+        executionOrder.push(name);
+        return Promise.resolve(undefined);
+      });
+
+    const executorA = makeExecutor("michael");
+    const executorB = makeExecutor("dwight");
+    const executorC = makeExecutor("pam");
+
+    // Each agent's claimNextRun returns their run, then null
+    mockClaimNextRun
+      .mockResolvedValueOnce({ ...runA, status: "running" as const })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...runB, status: "running" as const })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...runC, status: "running" as const })
+      .mockResolvedValueOnce(null);
+    mockUpdateRunStatus.mockResolvedValue(
+      createMockRun({ status: "completed" }),
+    );
+
+    const { enqueueAndAwaitRun } = await import("../mailbox");
+
+    // Sequential dispatch — each must complete before next starts
+    await enqueueAndAwaitRun({ agentId: "michael" }, executorA);
+    await enqueueAndAwaitRun({ agentId: "dwight" }, executorB);
+    await enqueueAndAwaitRun({ agentId: "pam" }, executorC);
+
+    expect(executionOrder).toEqual(["michael", "dwight", "pam"]);
+  });
 });
