@@ -46,7 +46,7 @@ jobs:
         timeout-minutes: 1
         id: eval
         run: |
-          npm run eval:run -- --mock-judge --agents all --dimensions adherence > eval-result.json 2>eval-stderr.txt || true
+          npm run --silent eval:run -- --mock-judge --agents all --dimensions adherence > eval-result.json 2>eval-stderr.txt || true
           cat eval-stderr.txt >&2
 
           # Parse result for exit code
