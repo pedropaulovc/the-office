@@ -3,11 +3,12 @@ import { formatTable1 } from "./experiment-report";
 import type { ExperimentReport } from "./experiment-report";
 import type { DryRunResult } from "./runner";
 
-function parseArgs(args: string[]): { scenario: string; seed: number; runs: number; dryRun: boolean; output?: string } {
+function parseArgs(args: string[]): { scenario: string; seed: number; runs: number; dryRun: boolean; scale?: number; output?: string } {
   let scenario = "";
   let seed = 42;
   let runs = 1;
   let dryRun = false;
+  let scale: number | undefined;
   let output: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -24,6 +25,9 @@ function parseArgs(args: string[]): { scenario: string; seed: number; runs: numb
       i++;
     } else if (arg === "--dry-run") {
       dryRun = true;
+    } else if (arg === "--scale" && next) {
+      scale = parseFloat(next);
+      i++;
     } else if (arg === "--output" && next) {
       output = next;
       i++;
@@ -34,11 +38,7 @@ function parseArgs(args: string[]): { scenario: string; seed: number; runs: numb
     throw new Error("--scenario is required");
   }
 
-  if (output === undefined) {
-    return { scenario, seed, runs, dryRun };
-  }
-
-  return { scenario, seed, runs, dryRun, output };
+  return { scenario, seed, runs, dryRun, ...(scale !== undefined && { scale }), ...(output !== undefined && { output }) };
 }
 
 function isDryRunResult(result: ExperimentReport | DryRunResult): result is DryRunResult {

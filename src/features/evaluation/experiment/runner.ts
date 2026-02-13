@@ -14,6 +14,7 @@ interface RunnerOptions {
   seed?: number;
   runs?: number;
   dryRun?: boolean;
+  scale?: number;
 }
 
 interface DryRunResult {
@@ -58,39 +59,48 @@ function scoreEnvironments(
 function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult {
   return withSpan("experiment.run", "evaluation.experiment", () => {
     const seed = options.seed ?? 42;
+    const scale = options.scale ?? 1.0;
     const scenario = getScenario(options.scenario);
     if (!scenario) {
       throw new Error(`Unknown scenario: ${options.scenario}`);
     }
 
+    // Scale the scenario for reduced runs
+    const scaledScenario = scale < 1.0 ? {
+      ...scenario,
+      agents_per_environment: Math.max(2, Math.round(scenario.agents_per_environment * scale)),
+      total_environments: Math.max(1, Math.round(scenario.total_environments * scale)),
+    } : scenario;
+
     logInfo("Starting experiment", {
       scenario: options.scenario,
       seed,
+      scale,
       dryRun: options.dryRun ?? false,
     });
 
     if (options.dryRun) {
       return {
         dryRun: true as const,
-        scenario,
-        totalAgents: scenario.agents_per_environment * scenario.total_environments,
-        totalEnvironments: scenario.total_environments,
+        scenario: scaledScenario,
+        totalAgents: scaledScenario.agents_per_environment * scaledScenario.total_environments,
+        totalEnvironments: scaledScenario.total_environments,
         seed,
       };
     }
 
-    const profile = getProfile(scenario.population_profile);
+    const profile = getProfile(scaledScenario.population_profile);
     if (!profile) {
-      throw new Error(`Unknown population profile: ${scenario.population_profile}`);
+      throw new Error(`Unknown population profile: ${scaledScenario.population_profile}`);
     }
 
     const runs = options.runs ?? 1;
-    const totalAgents = scenario.agents_per_environment * scenario.total_environments;
+    const totalAgents = scaledScenario.agents_per_environment * scaledScenario.total_environments;
 
     // Accumulate scores across all runs
     const allTreatmentScores: Record<string, number[]> = {};
     const allControlScores: Record<string, number[]> = {};
-    for (const dim of scenario.evaluation_dimensions) {
+    for (const dim of scaledScenario.evaluation_dimensions) {
       allTreatmentScores[dim] = [];
       allControlScores[dim] = [];
     }
@@ -109,17 +119,17 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
         run: run + 1,
         totalRuns: runs,
         count: agents.length,
-        profile: scenario.population_profile,
+        profile: scaledScenario.population_profile,
       });
 
       // 2. Create and run environments (T/C pairs)
-      const envResult = createAndRunEnvironments(scenario, agents, runSeed);
+      const envResult = createAndRunEnvironments(scaledScenario, agents, runSeed);
 
       // 3. Score all environments
-      const tScores = scoreEnvironments(envResult.pairs, "treatment", scenario.evaluation_dimensions);
-      const cScores = scoreEnvironments(envResult.pairs, "control", scenario.evaluation_dimensions);
+      const tScores = scoreEnvironments(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
+      const cScores = scoreEnvironments(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
 
-      for (const dim of scenario.evaluation_dimensions) {
+      for (const dim of scaledScenario.evaluation_dimensions) {
         allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
         allControlScores[dim]?.push(...(cScores[dim] ?? []));
       }
@@ -127,7 +137,7 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
 
     // 4. Compute statistics per dimension across all runs
     const metrics: Record<string, MetricResult> = {};
-    for (const dim of scenario.evaluation_dimensions) {
+    for (const dim of scaledScenario.evaluation_dimensions) {
       const tScores = allTreatmentScores[dim] ?? [];
       const cScores = allControlScores[dim] ?? [];
       const tTest = welchTTest(tScores, cScores);
@@ -144,12 +154,12 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
 
     countMetric("experiment.completed", 1);
 
-    // 5. Generate report
+    // 5. Generate report (use original scenario.id for identification)
     return generateExperimentReport({
       scenario: scenario.id,
       seed,
       agentsCount: totalAgents,
-      environmentsCount: scenario.total_environments,
+      environmentsCount: scaledScenario.total_environments,
       metrics,
     });
   });
