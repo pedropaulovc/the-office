@@ -1,6 +1,6 @@
 import { withSpan } from "@/lib/telemetry";
 
-export type TTestResult = {
+export interface TTestResult {
   tStatistic: number;
   degreesOfFreedom: number;
   pValue: number;
@@ -9,7 +9,7 @@ export type TTestResult = {
   meanB: number;
   sdA: number;
   sdB: number;
-};
+}
 
 /** Arithmetic mean. */
 export function mean(values: number[]): number {
@@ -45,11 +45,12 @@ function lnGamma(x: number): number {
   }
 
   x -= 1;
-  let a = coefficients[0]!;
+  const a = coefficients.reduce((sum, coeff, i) => {
+    if (i === 0) return coeff;
+    if (i > g + 1) return sum;
+    return sum + coeff / (x + i);
+  }, 0);
   const t = x + g + 0.5;
-  for (let i = 1; i < g + 2; i++) {
-    a += coefficients[i]! / (x + i);
-  }
 
   return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
 }

@@ -3,24 +3,24 @@ import { ExperimentEnvironment } from "./environment";
 import type { ScenarioConfig, GeneratedPersona } from "./types";
 import type { EnvironmentResult } from "./environment";
 
-export type EnvironmentPair = {
+export interface EnvironmentPair {
   environmentId: number;
   agents: GeneratedPersona[];
   treatment: ExperimentEnvironment;
   control: ExperimentEnvironment;
-};
+}
 
-export type EnvironmentPairResult = {
+export interface EnvironmentPairResult {
   environmentId: number;
   treatment: EnvironmentResult;
   control: EnvironmentResult;
-};
+}
 
-export type EnvironmentManagerResult = {
+export interface EnvironmentManagerResult {
   pairs: EnvironmentPairResult[];
   totalAgents: number;
   totalEnvironments: number;
-};
+}
 
 /** Creates a control variant of a scenario (all treatments disabled). */
 export function createControlScenario(scenario: ScenarioConfig): ScenarioConfig {
@@ -43,8 +43,8 @@ export function shuffleWithSeed<T>(array: T[], seed: number): T[] {
     state ^= state >> 17;
     state ^= state << 5;
     const j = (state >>> 0) % (i + 1);
-    const tmp = result[i]!;
-    result[i] = result[j]!;
+    const tmp = result[i] as T;
+    result[i] = result[j] as T;
     result[j] = tmp;
   }
   return result;

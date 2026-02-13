@@ -148,9 +148,9 @@ describe("experiment-report", () => {
       const table = formatTable1(report);
       const fluencyLine = table.split("\n").find((l) => l.includes("fluency"));
 
-      expect(fluencyLine).toBeDefined();
+      if (!fluencyLine) throw new Error("fluency line not found in table");
       // The sig column should not have an asterisk
-      const parts = fluencyLine!.split("|");
+      const parts = fluencyLine.split("|");
       const sigCol = parts[5]; // 0-indexed: Metric|T mean|C mean|Delta|p-value|Sig|Cohen
       expect(sigCol?.trim()).toBe("");
     });
