@@ -9,10 +9,10 @@ import type {
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
 
 export interface TemplateVariables {
-  agent_name?: string;
-  action?: string;
-  channel_name?: string;
-  recipient_name?: string;
+  agent_name?: string | undefined;
+  action?: string | undefined;
+  channel_name?: string | undefined;
+  recipient_name?: string | undefined;
 }
 
 const PROPOSITIONS_DIR = resolve(
