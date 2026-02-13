@@ -342,7 +342,61 @@ async function seed() {
   await db.delete(runSteps);
   await db.delete(runs);
 
-  // 5. Messages — truncate reactions first (FK), then messages, then re-insert
+  // 5. Seed run data for evaluation (Michael's send_message tool calls)
+  console.log("Seeding runs + run_messages for evaluation...");
+  const michaelRun = await db
+    .insert(runs)
+    .values({
+      agentId: "michael",
+      status: "completed",
+      stopReason: "end_turn",
+      channelId: "general",
+      triggerPrompt: "Respond to the conversation in #general",
+      chainDepth: 0,
+      startedAt: t(1, 8, 55),
+      completedAt: t(1, 9, 5),
+    })
+    .returning({ id: runs.id });
+
+  const michaelRunId = michaelRun[0]?.id;
+  if (!michaelRunId) throw new Error("Failed to create Michael's run");
+
+  const sendMessageDefs = [
+    {
+      text: "That's what she said! No but seriously, I am the best boss in the world. Would a bad boss bring in donuts? I don't think so.",
+      createdAt: t(1, 9, 0),
+    },
+    {
+      text: "Dwight, you ignorant slut. I'm kidding! But seriously, your sales numbers are almost as impressive as my comedy. Almost.",
+      createdAt: t(1, 9, 1),
+    },
+    {
+      text: "I declare BANKRUPTCY! Just kidding. But if I did, it would be the most stylish bankruptcy this office has ever seen.",
+      createdAt: t(1, 9, 2),
+    },
+    {
+      text: "Sometimes I'll start a sentence and I don't even know where it's going. I just hope I find it along the way.",
+      createdAt: t(1, 9, 3),
+    },
+    {
+      text: "Would I rather be feared or loved? Easy. Both. I want people to be afraid of how much they love me.",
+      createdAt: t(1, 9, 4),
+    },
+  ];
+
+  await db.insert(runMessages).values(
+    sendMessageDefs.map((def) => ({
+      runId: michaelRunId,
+      messageType: "tool_call_message" as const,
+      content: `send_message: ${def.text}`,
+      toolName: "send_message",
+      toolInput: { text: def.text, channel_id: "general" },
+      createdAt: def.createdAt,
+    })),
+  );
+  console.log(`  1 run + ${sendMessageDefs.length} run_messages for Michael`);
+
+  // 6. Messages — truncate reactions first (FK), then messages, then re-insert
   console.log("Seeding messages...");
   await db.delete(reactions);
   await db.delete(messages);
@@ -368,7 +422,7 @@ async function seed() {
   }
   console.log(`  ${messageDefs.length} top-level messages`);
 
-  // 5. Thread replies
+  // 7. Thread replies
   console.log("Seeding thread replies...");
   const replyRows = threadReplyDefs.map((r) => {
     const parentUuid = mockIdToUuid.get(r.parentMockId);
@@ -392,7 +446,7 @@ async function seed() {
   }
   console.log(`  ${threadReplyDefs.length} thread replies`);
 
-  // 6. Reactions — flatten from all messages + replies
+  // 8. Reactions — flatten from all messages + replies
   console.log("Seeding reactions...");
   const allMsgDefs: { mockId: string; reactions: { emoji: string; userIds: string[] }[] }[] = [
     ...messageDefs,
@@ -415,7 +469,7 @@ async function seed() {
   }
   console.log(`  ${reactionRows.length} reactions`);
 
-  // 7. Memory blocks — upsert via unique index (agent_id, label)
+  // 9. Memory blocks — upsert via unique index (agent_id, label)
   console.log("Seeding memory blocks...");
   await db
     .insert(memoryBlocks)
@@ -423,7 +477,7 @@ async function seed() {
     .onConflictDoNothing();
   console.log(`  ${memoryBlockDefs.length} memory blocks`);
 
-  // 8. Channel reads — compute read cursors from unreadTargets
+  // 10. Channel reads — compute read cursors from unreadTargets
   console.log("Seeding channel reads...");
   await db.delete(channelReads);
 
@@ -465,7 +519,7 @@ async function seed() {
   }
   console.log(`  ${readRows.length} channel reads`);
 
-  // 9. Scheduled messages — seed demo schedules
+  // 11. Scheduled messages — seed demo schedules
   console.log("Seeding scheduled messages...");
   await db.delete(scheduledMessages);
 

@@ -236,8 +236,11 @@ jobs:
             exit 0
           fi
 
-          # Reseed to reset messages/reactions/reads to clean state
+          # Push schema first (preview branch may lag behind)
           export DATABASE_URL_UNPOOLED="$CONNECTION_URI"
+          npx drizzle-kit push --force
+
+          # Reseed to reset messages/reactions/reads to clean state
           npm run db:seed
 
       - name: Warm up Vercel preview

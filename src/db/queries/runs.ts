@@ -1,4 +1,4 @@
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   runs,
@@ -220,6 +220,37 @@ export async function updateRunStep(
 }
 
 // --- Run Messages ---
+
+export function getAgentSendMessages(
+  agentId: string,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<RunMessage[]> {
+  return withSpan("getAgentSendMessages", "db.query", () =>
+    db
+      .select({
+        id: runMessages.id,
+        runId: runMessages.runId,
+        stepId: runMessages.stepId,
+        messageType: runMessages.messageType,
+        content: runMessages.content,
+        toolName: runMessages.toolName,
+        toolInput: runMessages.toolInput,
+        createdAt: runMessages.createdAt,
+      })
+      .from(runMessages)
+      .innerJoin(runs, eq(runMessages.runId, runs.id))
+      .where(
+        and(
+          eq(runs.agentId, agentId),
+          eq(runMessages.toolName, "send_message"),
+          gte(runMessages.createdAt, windowStart),
+          lte(runMessages.createdAt, windowEnd),
+        ),
+      )
+      .orderBy(desc(runMessages.createdAt)),
+  );
+}
 
 export async function createRunMessage(data: NewRunMessage): Promise<RunMessage> {
   const rows = await db.insert(runMessages).values(data).returning();
