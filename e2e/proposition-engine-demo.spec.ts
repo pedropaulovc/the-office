@@ -50,9 +50,6 @@ test.describe("proposition engine demo", () => {
   test.describe.configure({ mode: "default" });
 
   test.beforeEach(({}, testInfo) => {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      testInfo.skip(true, "requires ANTHROPIC_API_KEY");
-    }
     testInfo.setTimeout(30_000);
   });
 

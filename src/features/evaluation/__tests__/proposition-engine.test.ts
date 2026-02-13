@@ -259,12 +259,9 @@ describe("proposition-engine", () => {
       expect(prompt).toContain("TRAJECTORY:\nMichael acts: Hello");
     });
 
-    it("includes JSON format instructions with score field", () => {
+    it("asks for evaluation", () => {
       const prompt = buildScoreUserPrompt({ claim: "test" }, "trajectory");
-      expect(prompt).toContain('"score"');
-      expect(prompt).toContain('"reasoning"');
-      expect(prompt).toContain('"confidence"');
-      expect(prompt).toContain("no markdown");
+      expect(prompt).toContain("Respond with your evaluation");
     });
   });
 
@@ -289,10 +286,9 @@ describe("proposition-engine", () => {
       expect(prompt).toContain("Dwight acts: Bears. Beets.");
     });
 
-    it("asks for boolean result in JSON", () => {
+    it("asks for evaluation", () => {
       const prompt = buildCheckUserPrompt({ claim: "test" }, "trajectory");
-      expect(prompt).toContain('"result"');
-      expect(prompt).toContain("true/false");
+      expect(prompt).toContain("Respond with your evaluation");
     });
   });
 
@@ -318,12 +314,12 @@ describe("proposition-engine", () => {
       expect(prompt).toContain("TRAJECTORY:\nMichael acts: Hey");
     });
 
-    it("asks for JSON array", () => {
+    it("asks for evaluation", () => {
       const prompt = buildBatchScoreUserPrompt(
         [{ claim: "test" }],
         "trajectory",
       );
-      expect(prompt).toContain("JSON array");
+      expect(prompt).toContain("Respond with your evaluation");
     });
   });
 
@@ -531,6 +527,19 @@ describe("proposition-engine", () => {
       expect(results.at(0)?.confidence).toBe(0.5);
     });
 
+    it("unwraps { results: [...] } wrapper from strict output", () => {
+      const raw = JSON.stringify({
+        results: [
+          { score: 8, reasoning: "wrapped", confidence: 0.9 },
+          { score: 4, reasoning: "also wrapped", confidence: 0.7 },
+        ],
+      });
+      const results = parseBatchScoreResponse(raw, 2);
+      expect(results).toHaveLength(2);
+      expect(results.at(0)?.score).toBe(8);
+      expect(results.at(1)?.score).toBe(4);
+    });
+
     it("throws when response is not an array", () => {
       const restore = silenceConsole();
       expect(() =>
@@ -568,6 +577,11 @@ describe("proposition-engine", () => {
       expect(callArgs.model).toBe("claude-haiku-4-5-20251001");
       expect(callArgs.max_tokens).toBe(1024);
       expect(callArgs.temperature).toBe(0);
+      const outputConfig = callArgs.output_config as { format: { type: string; schema: Record<string, unknown> } };
+      expect(outputConfig.format.type).toBe("json_schema");
+      expect(outputConfig.format.schema).toHaveProperty("properties.score");
+      expect(outputConfig.format.schema).toHaveProperty("properties.reasoning");
+      expect(outputConfig.format.schema).toHaveProperty("properties.confidence");
     });
 
     it("includes persona in system prompt when provided", async () => {
@@ -652,13 +666,13 @@ describe("proposition-engine", () => {
       const props = Array.from({ length: 5 }, (_, i) =>
         makeProposition({ id: `prop-${i}`, claim: `Claim ${i}` }),
       );
-      const batchResponse = JSON.stringify(
-        Array.from({ length: 5 }, (_, i) => ({
+      const batchResponse = JSON.stringify({
+        results: Array.from({ length: 5 }, (_, i) => ({
           score: i + 3,
           reasoning: `reason-${i}`,
           confidence: 0.8,
         })),
-      );
+      });
       mockMessagesCreate.mockResolvedValueOnce(
         makeLlmResponse(batchResponse),
       );
@@ -676,20 +690,20 @@ describe("proposition-engine", () => {
         makeProposition({ id: `prop-${i}`, claim: `Claim ${i}` }),
       );
 
-      const batch1Response = JSON.stringify(
-        Array.from({ length: 10 }, () => ({
+      const batch1Response = JSON.stringify({
+        results: Array.from({ length: 10 }, () => ({
           score: 7,
           reasoning: "batch1",
           confidence: 0.8,
         })),
-      );
-      const batch2Response = JSON.stringify(
-        Array.from({ length: 2 }, () => ({
+      });
+      const batch2Response = JSON.stringify({
+        results: Array.from({ length: 2 }, () => ({
           score: 5,
           reasoning: "batch2",
           confidence: 0.6,
         })),
-      );
+      });
 
       mockMessagesCreate
         .mockResolvedValueOnce(makeLlmResponse(batch1Response, 500, 200))
@@ -711,26 +725,26 @@ describe("proposition-engine", () => {
       mockMessagesCreate
         .mockResolvedValueOnce(
           makeLlmResponse(
-            JSON.stringify(
-              Array.from({ length: 10 }, () => ({
+            JSON.stringify({
+              results: Array.from({ length: 10 }, () => ({
                 score: 5,
                 reasoning: "r",
                 confidence: 0.5,
               })),
-            ),
+            }),
             400,
             100,
           ),
         )
         .mockResolvedValueOnce(
           makeLlmResponse(
-            JSON.stringify(
-              Array.from({ length: 2 }, () => ({
+            JSON.stringify({
+              results: Array.from({ length: 2 }, () => ({
                 score: 5,
                 reasoning: "r",
                 confidence: 0.5,
               })),
-            ),
+            }),
             80,
             20,
           ),

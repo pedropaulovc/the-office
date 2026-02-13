@@ -135,8 +135,7 @@ CLAIM: ${proposition.claim}
 TRAJECTORY:
 ${trajectory}
 
-Respond with a JSON object (no markdown, no extra text):
-{"score": <0-9>, "reasoning": "<brief explanation>", "confidence": <0.0-1.0>}`;
+Respond with your evaluation.`;
 }
 
 /**
@@ -153,8 +152,7 @@ CLAIM: ${proposition.claim}
 TRAJECTORY:
 ${trajectory}
 
-Respond with a JSON object (no markdown, no extra text):
-{"result": <true/false>, "reasoning": "<brief explanation>", "confidence": <0.0-1.0>}`;
+Respond with your evaluation.`;
 }
 
 /**
@@ -175,9 +173,57 @@ ${numbered}
 TRAJECTORY:
 ${trajectory}
 
-Respond with a JSON array of objects (no markdown, no extra text):
-[{"score": <0-9>, "reasoning": "<brief explanation>", "confidence": <0.0-1.0>}, ...]`;
+Respond with your evaluation for each claim.`;
 }
+
+// ---------------------------------------------------------------------------
+// Strict output schemas — constrained decoding via Anthropic structured outputs
+// ---------------------------------------------------------------------------
+
+const SCORE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    score: { type: "integer" },
+    reasoning: { type: "string" },
+    confidence: { type: "number" },
+  },
+  required: ["score", "reasoning", "confidence"],
+  additionalProperties: false,
+};
+
+const CHECK_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    result: { type: "boolean" },
+    reasoning: { type: "string" },
+    confidence: { type: "number" },
+  },
+  required: ["result", "reasoning", "confidence"],
+  additionalProperties: false,
+};
+
+const BATCH_ITEM_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    score: { type: "integer" },
+    reasoning: { type: "string" },
+    confidence: { type: "number" },
+  },
+  required: ["score", "reasoning", "confidence"],
+  additionalProperties: false,
+};
+
+const BATCH_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    results: {
+      type: "array",
+      items: BATCH_ITEM_SCHEMA,
+    },
+  },
+  required: ["results"],
+  additionalProperties: false,
+};
 
 // ---------------------------------------------------------------------------
 // Pure functions — response parsing
@@ -391,6 +437,11 @@ export function parseBatchScoreResponse(
         }
       }
 
+      // Unwrap { results: [...] } wrapper from strict output schema
+      if (!Array.isArray(parsed) && typeof parsed === "object" && parsed !== null && "results" in parsed) {
+        parsed = (parsed as { results: unknown }).results;
+      }
+
       if (!Array.isArray(parsed)) {
         logError("proposition-engine.parse.failed", {
           raw: raw.slice(0, 200),
@@ -439,6 +490,7 @@ export function parseBatchScoreResponse(
 async function callJudge(
   system: string,
   user: string,
+  outputSchema: Record<string, unknown>,
 ): Promise<{ text: string; tokenUsage: TokenUsage }> {
   return withSpan(
     "proposition-engine.callJudge",
@@ -460,6 +512,12 @@ async function callJudge(
           temperature: 0,
           system,
           messages: [{ role: "user", content: user }],
+          output_config: {
+            format: {
+              type: "json_schema" as const,
+              schema: outputSchema,
+            },
+          },
         });
       } catch (err) {
         const errorMessage =
@@ -554,7 +612,7 @@ export async function scoreProposition(
       const userPrompt = buildScoreUserPrompt(proposition, trajectoryText);
 
       countMetric("evaluation.judge_call", 1, { mode: "score" });
-      const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt);
+      const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt, SCORE_SCHEMA);
       let result = parseScoreResponse(text);
       let totalUsage = tokenUsage;
 
@@ -582,6 +640,12 @@ export async function scoreProposition(
                       "Are you sure? Please revise your evaluation to make it as correct as possible.",
                   },
                 ],
+                output_config: {
+                  format: {
+                    type: "json_schema" as const,
+                    schema: SCORE_SCHEMA,
+                  },
+                },
               },
             );
 
@@ -686,7 +750,7 @@ export async function checkProposition(
       const userPrompt = buildCheckUserPrompt(proposition, trajectoryText);
 
       countMetric("evaluation.judge_call", 1, { mode: "check" });
-      const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt);
+      const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt, CHECK_SCHEMA);
       const parsed = parseCheckResponse(text);
       const durationMs = Date.now() - start;
 
@@ -763,6 +827,7 @@ export async function scorePropositions(
         const { text, tokenUsage } = await callJudge(
           systemPrompt,
           userPrompt,
+          BATCH_SCHEMA,
         );
         const scores = parseBatchScoreResponse(text, chunk.length);
 
