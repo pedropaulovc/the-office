@@ -344,14 +344,16 @@ describe("scoreConvergence", () => {
     expect(mockLoadPropositionsForDimension).toHaveBeenCalledWith("convergence");
   });
 
-  it("uses channelId as agentId in evaluation run", async () => {
-    mockGetChannelSendMessages.mockResolvedValue([]);
+  it("uses first agent ID for evaluation run when messages exist", async () => {
+    mockGetChannelSendMessages.mockResolvedValue([
+      createMockChannelRunMessage("jim", "Hello"),
+    ]);
 
     await scoreConvergence("general", defaultTimeWindow);
 
     expect(mockCreateEvaluationRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        agentId: "general",
+        agentId: "jim",
         dimensions: ["convergence"],
       }),
     );
