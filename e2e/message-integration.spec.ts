@@ -21,6 +21,12 @@ interface ChannelMessage {
 }
 
 test.describe("message integration", () => {
+  // Each test in this file makes 3+ round-trips to Neon (remote DB) plus
+  // page navigations.  Under fullyParallel all 10 tests compete for the
+  // shared Neon websocket and browser resources simultaneously, causing
+  // intermittent timeouts.  Sequential mode keeps the file on one worker.
+  test.describe.configure({ mode: "default" });
+
   test("full message lifecycle: create, edit, verify, delete", async ({
     request,
   }) => {

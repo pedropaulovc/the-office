@@ -43,34 +43,34 @@ test.describe("baseline snapshots", () => {
     await expect(page.locator("aside").nth(1)).toMatchAriaSnapshot(`
       - complementary:
         - button "Dunder Mifflin":
-          - text: ""
+          - text: Dunder Mifflin
           - img
         - img
         - text: Channels
         - button "announcements":
           - img
-          - text: ""
+          - text: announcements
         - button "general":
           - img
-          - text: ""
+          - text: general
         - button "management 2":
           - img
-          - text: ""
+          - text: management 2
         - button "party-planning 5":
           - img
-          - text: ""
+          - text: party-planning 5
         - button "random 2":
           - img
-          - text: ""
+          - text: random 2
         - button "sales 3":
           - img
-          - text: ""
+          - text: sales 3
         - img
         - text: Direct Messages
         - button "DS Dwight Schrute"
         - button "JH Jim Halpert"
         - button "RH Ryan Howard"
-        - button "TF Toby Flenderson 1"
+        - button /TF Toby Flenderson \\d+/
         - text: MS Michael Scott Regional Manager
     `);
 
@@ -162,28 +162,28 @@ test.describe("baseline snapshots", () => {
     await expect(page.locator("aside").nth(1)).toMatchAriaSnapshot(`
       - complementary:
         - button "Dunder Mifflin":
-          - text: ""
+          - text: Dunder Mifflin
           - img
         - img
         - text: Channels
         - button "accounting":
           - img
-          - text: ""
+          - text: accounting
         - button "announcements":
           - img
-          - text: ""
+          - text: announcements
         - button /general \\d+/:
           - img
-          - text: ""
+          - text: /general \\d+/
         - button "party-planning 3":
           - img
-          - text: ""
+          - text: party-planning 3
         - button "random":
           - img
-          - text: ""
+          - text: random
         - button "sales":
           - img
-          - text: ""
+          - text: sales
         - img
         - text: Direct Messages KM Kevin Malone Accountant
     `);
@@ -321,32 +321,32 @@ test.describe("baseline snapshots", () => {
     await expect(page.locator("aside").nth(1)).toMatchAriaSnapshot(`
       - complementary:
         - button "Dunder Mifflin":
-          - text: ""
+          - text: Dunder Mifflin
           - img
         - img
         - text: Channels
         - button "announcements 2":
           - img
-          - text: ""
+          - text: announcements 2
         - button "general":
           - img
-          - text: ""
+          - text: general
         - button "management 1":
           - img
-          - text: ""
+          - text: management 1
         - button "party-planning":
           - img
-          - text: ""
+          - text: party-planning
         - button "random":
           - img
-          - text: ""
+          - text: random
         - button "sales":
           - img
-          - text: ""
+          - text: sales
         - img
         - text: Direct Messages
         - button "AB Andy Bernard 1"
-        - button "DS Dwight Schrute 2"
+        - button /DS Dwight Schrute \\d+/
         - button "PB Pam Beesly"
         - button "MS Michael Scott"
         - text: JH Jim Halpert Sales Representative

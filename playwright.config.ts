@@ -3,8 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 const isCI = !!process.env.CI;
 const previewUrl = process.env.PLAYWRIGHT_BASE_URL;
 
-// Remote preview deployments have network latency + cold starts
-const timeout = previewUrl ? 15000 : 5000;
+// Remote preview deployments have network latency + cold starts.
+// Local dev machines run multiple worktrees, dev servers, and MCP servers
+// concurrently, so newPage() can take >5 s under I/O pressure.  10 s gives
+// enough headroom for browser setup while CI enforces the strict 5 s limit.
+const timeout = previewUrl ? 15000 : isCI ? 5000 : 10000;
 const actionTimeout = previewUrl ? 5000 : 2000;
 const expectTimeout = previewUrl ? 5000 : 2000;
 
@@ -19,7 +22,10 @@ export default defineConfig({
   testMatch: "e2e/**/*.spec.ts",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: 0,
+  // Local dev machines run multiple worktrees sharing CPU/memory.
+  // Browser launch can intermittently exceed the test timeout.
+  // One retry absorbs these infrastructure hiccups; CI stays strict.
+  retries: isCI || previewUrl ? 0 : 1,
   timeout,
   outputDir: `test-results/${timestamp}`,
   expect: {
@@ -44,7 +50,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: "npm run build && npm run start -- -p 0",
+          command: "npm run start -- -p 0",
           wait: { stdout: /localhost:(?<E2E_PORT>\d+)/ },
           reuseExistingServer: !isCI,
           timeout: 180_000,
