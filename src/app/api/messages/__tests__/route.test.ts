@@ -14,6 +14,7 @@ const mockCreateMessage = vi.fn<() => Promise<DbMessage>>();
 const mockBroadcast = vi.fn<() => void>();
 const mockResolveTargetAgents = vi.fn<() => Promise<string[]>>();
 const mockEnqueueRun = vi.fn<() => Promise<unknown>>();
+const mockEnqueueAndAwaitRun = vi.fn<() => Promise<unknown>>();
 
 vi.mock("@/db/queries", () => ({
   createMessage: (...args: unknown[]) => mockCreateMessage(...(args as [])),
@@ -29,6 +30,7 @@ vi.mock("@/agents/resolver", () => ({
 
 vi.mock("@/agents/mailbox", () => ({
   enqueueRun: (...args: unknown[]) => mockEnqueueRun(...(args as [])),
+  enqueueAndAwaitRun: (...args: unknown[]) => mockEnqueueAndAwaitRun(...(args as [])),
 }));
 
 vi.mock("@/agents/orchestrator", () => ({
@@ -112,10 +114,10 @@ describe("POST /api/messages", () => {
     }));
   });
 
-  it("enqueues runs for each resolved target agent", async () => {
+  it("dispatches runs sequentially via enqueueAndAwaitRun", async () => {
     mockCreateMessage.mockResolvedValue(MOCK_MESSAGE);
     mockResolveTargetAgents.mockResolvedValue(["dwight", "jim"]);
-    mockEnqueueRun.mockResolvedValue({ id: "run-1" });
+    mockEnqueueAndAwaitRun.mockResolvedValue({ id: "run-1" });
 
     const { POST } = await import("../route");
     const request = new Request("http://localhost/api/messages", {
@@ -131,14 +133,16 @@ describe("POST /api/messages", () => {
     // Fire-and-forget is async, give it a tick to resolve
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockEnqueueRun).toHaveBeenCalledTimes(2);
-    expect(mockEnqueueRun).toHaveBeenCalledWith(
+    expect(mockEnqueueAndAwaitRun).toHaveBeenCalledTimes(2);
+    expect(mockEnqueueAndAwaitRun).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "dwight", channelId: "general" }),
       expect.any(Function),
     );
-    expect(mockEnqueueRun).toHaveBeenCalledWith(
+    expect(mockEnqueueAndAwaitRun).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "jim", channelId: "general" }),
       expect.any(Function),
     );
+    // enqueueRun should NOT be called (sequential path only)
+    expect(mockEnqueueRun).not.toHaveBeenCalled();
   });
 });
