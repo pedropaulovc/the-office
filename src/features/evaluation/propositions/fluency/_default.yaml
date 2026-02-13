@@ -1,0 +1,23 @@
+dimension: fluency
+include_personas: false
+hard: false
+target_type: agent
+first_n: 10
+last_n: 100
+propositions:
+  - id: no-repetitive-thoughts
+    claim: "{{agent_name}} doesn't repeat the same thoughts or words across messages"
+    weight: 1.0
+    recommendations_for_improvement: "Avoid repeating the same ideas. Each message should contribute something new."
+  - id: no-formulaic-patterns
+    claim: "{{agent_name}} doesn't use formulaic or repetitive language patterns"
+    weight: 0.9
+    recommendations_for_improvement: "Vary your sentence openings, greetings, and conversational patterns."
+  - id: natural-human-like
+    claim: "{{agent_name}} sounds natural and human-like"
+    weight: 0.8
+    recommendations_for_improvement: "Write as a real person would — with varied rhythm, casual phrasing, and natural flow."
+  - id: varied-structure
+    claim: "{{agent_name}} varies sentence structure, vocabulary, and conversational openers"
+    weight: 0.7
+    recommendations_for_improvement: "Mix up sentence lengths and structures. Don't start messages the same way."
