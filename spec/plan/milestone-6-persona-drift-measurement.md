@@ -162,6 +162,8 @@ As a developer, I want to load proposition definitions from YAML files and fill 
 
 As a developer, I want the LLM judge scoring engine and evaluation API routes so that propositions can be scored programmatically and results stored/queried.
 
+> **Note:** S-6.0b introduced `src/features/evaluation/shim-scorer.ts` — a deterministic mock scorer that calls `loadPropositionsForDimension` and returns fixed scores (base=7) with inverted/hard adjustments applied. This story must **replace the shim** with the real LLM-backed `proposition-engine.ts` and **delete `shim-scorer.ts` and its test**.
+
 ### Files to create
 
 | File | Purpose |
