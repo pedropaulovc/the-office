@@ -263,6 +263,20 @@ test.describe("message integration", () => {
   });
 
   test("SSE typing indicator lifecycle", async ({ page }) => {
+    // Block the real SSE connection so only __dispatchSSE controls typing state.
+    // Without this, real server events race with injected test events (root cause
+    // of chronic ~50% flakiness on Vercel preview deployments).
+    await page.route("**/api/sse", async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+        },
+        body: ": connected\n\n",
+      });
+    });
+
     await page.goto("/");
 
     // Wait for messages to load
@@ -270,28 +284,9 @@ test.describe("message integration", () => {
     await expect(authorNames.first()).toBeVisible();
 
     // Wait for client hydration so __dispatchSSE is available.
-    // Author names render via SSR before the useEffect that sets __dispatchSSE runs.
     await page.waitForFunction(() => typeof window.__dispatchSSE === "function");
 
-    // Inject SSE events directly via window.__dispatchSSE to avoid relying on
-    // server-to-browser SSE delivery (unreliable on Vercel serverless where
-    // separate function instances don't share the in-memory connection registry).
-
-    // Clear any stale typing state
-    const allAgents = [
-      "michael", "jim", "dwight", "pam", "ryan", "stanley",
-      "kevin", "angela", "oscar", "andy", "toby", "creed",
-      "kelly", "phyllis", "meredith", "darryl",
-    ];
-    for (const agentId of allAgents) {
-      await page.evaluate(
-        (a) => window.__dispatchSSE?.({ type: "agent_done", channelId: "general", agentId: a }),
-        agentId,
-      );
-    }
-
-    // Verify typing indicator is gone
-    await expect(page.getByText("is typing")).toBeHidden();
+    // With the real SSE blocked, typing state starts clean — no clearing needed.
 
     // Now test typing indicators on a clean slate
     await page.evaluate(() =>
