@@ -1,19 +1,19 @@
-type ReferenceMetric = {
+interface ReferenceMetric {
   treatment: { mean: number; sd: number };
   control: { mean: number; sd: number };
   delta: number;
   pValue: number;
   significant: boolean;
-};
+}
 
-type ReferenceExperiment = {
+interface ReferenceExperiment {
   scenarioId: string;
   experimentLabel: string;
   treatment: string;
   agentsCount: number;
   environmentsCount: number;
   metrics: Record<string, ReferenceMetric>;
-};
+}
 
 // Hard-coded values from TinyTroupe Table 1 (arXiv:2507.09788v1)
 const TABLE1_REFERENCE: ReferenceExperiment[] = [

@@ -83,10 +83,13 @@ describe("comparison-report", () => {
       const trends = validateTrends(ours, ref);
 
       expect(trends).toHaveLength(2);
-      expect(trends[0]!.dimension).toBe("adherence");
-      expect(trends[0]!.sameDirection).toBe(true);
-      expect(trends[1]!.dimension).toBe("consistency");
-      expect(trends[1]!.sameDirection).toBe(true);
+      const [first, second] = trends;
+      expect(first).toBeDefined();
+      expect(second).toBeDefined();
+      expect(first?.dimension).toBe("adherence");
+      expect(first?.sameDirection).toBe(true);
+      expect(second?.dimension).toBe("consistency");
+      expect(second?.sameDirection).toBe(true);
     });
 
     it("detects opposite direction", () => {
@@ -100,9 +103,11 @@ describe("comparison-report", () => {
       const trends = validateTrends(ours, ref);
 
       expect(trends).toHaveLength(1);
-      expect(trends[0]!.sameDirection).toBe(false);
-      expect(trends[0]!.ourDelta).toBe(1.2);
-      expect(trends[0]!.referenceDelta).toBe(-0.9);
+      const [trend] = trends;
+      expect(trend).toBeDefined();
+      expect(trend?.sameDirection).toBe(false);
+      expect(trend?.ourDelta).toBe(1.2);
+      expect(trend?.referenceDelta).toBe(-0.9);
     });
   });
 

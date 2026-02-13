@@ -76,5 +76,5 @@ export { parseArgs, isDryRunResult };
 
 // Only run main when executed directly (not imported by tests)
 if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) {
-  main();
+  void main();
 }

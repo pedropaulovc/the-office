@@ -19,14 +19,14 @@ import type { AgentAction } from "./environment";
 // Types
 // ---------------------------------------------------------------------------
 
-type DimensionScore = { score: number; reasoning: string };
+interface DimensionScore { score: number; reasoning: string }
 
-export type TrajectoryScoreResult = {
+export interface TrajectoryScoreResult {
   scores: Record<string, number>;
   details: Record<string, DimensionScore>;
   inputTokens: number;
   outputTokens: number;
-};
+}
 
 // ---------------------------------------------------------------------------
 // Schema for structured output

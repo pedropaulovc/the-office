@@ -37,8 +37,8 @@ describe("table1-reference", () => {
   it("getReference returns correct experiment by scenarioId", () => {
     const ref = getReference("brainstorming-average");
     expect(ref).toBeDefined();
-    expect(ref!.experimentLabel).toBe("Exp. 1");
-    expect(ref!.treatment).toBe("AC+VI");
+    expect(ref?.experimentLabel).toBe("Exp. 1");
+    expect(ref?.treatment).toBe("AC+VI");
   });
 
   it("getReference returns undefined for unknown scenario", () => {
@@ -52,8 +52,9 @@ describe("table1-reference", () => {
   });
 
   it("Exp. 1 has all 5 metrics including ideas_quantity", () => {
-    const exp1 = getReference("brainstorming-average")!;
-    const metricKeys = Object.keys(exp1.metrics);
+    const exp1 = getReference("brainstorming-average");
+    expect(exp1).toBeDefined();
+    const metricKeys = Object.keys(exp1?.metrics ?? {});
     expect(metricKeys).toEqual(
       expect.arrayContaining([
         "adherence",
@@ -67,8 +68,9 @@ describe("table1-reference", () => {
   });
 
   it("Exp. 3 has only 4 metrics (no ideas_quantity)", () => {
-    const exp3 = getReference("debate-controversial")!;
-    const metricKeys = Object.keys(exp3.metrics);
+    const exp3 = getReference("debate-controversial");
+    expect(exp3).toBeDefined();
+    const metricKeys = Object.keys(exp3?.metrics ?? {});
     expect(metricKeys).toHaveLength(4);
     expect(metricKeys).not.toContain("ideas_quantity");
   });
