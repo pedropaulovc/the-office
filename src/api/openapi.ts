@@ -275,6 +275,77 @@ const CreateRunBody = z
   .meta({ id: "CreateRunBody" });
 
 // ---------------------------------------------------------------------------
+// Evaluation schemas
+// ---------------------------------------------------------------------------
+
+const EvaluationDimension = z.enum([
+  "adherence",
+  "consistency",
+  "fluency",
+  "convergence",
+  "ideas_quantity",
+]);
+
+const EvaluationRunStatus = z.enum(["pending", "running", "completed", "failed"]);
+
+const EvaluationRunSchema = z
+  .object({
+    id: z.uuid(),
+    agentId: z.string(),
+    status: EvaluationRunStatus,
+    dimensions: z.array(EvaluationDimension),
+    windowStart: z.iso.datetime().nullable(),
+    windowEnd: z.iso.datetime().nullable(),
+    sampleSize: z.number().int(),
+    overallScore: z.number().nullable(),
+    isBaseline: z.boolean(),
+    tokenUsage: z.unknown().nullable(),
+    createdAt: z.iso.datetime(),
+    completedAt: z.iso.datetime().nullable(),
+  })
+  .meta({ id: "EvaluationRun" });
+
+const EvaluationScoreSchema = z
+  .object({
+    id: z.uuid(),
+    evaluationRunId: z.uuid(),
+    dimension: EvaluationDimension,
+    propositionId: z.string(),
+    score: z.number(),
+    reasoning: z.string(),
+    contextSnippet: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "EvaluationScore" });
+
+const EvaluationRunWithScores = EvaluationRunSchema.extend({
+  scores: z.array(EvaluationScoreSchema),
+}).meta({ id: "EvaluationRunWithScores" });
+
+const CreateEvaluationRunBody = z
+  .object({
+    agentId: z.string().min(1),
+    dimensions: z.array(EvaluationDimension).min(1),
+    windowStart: z.iso.datetime().optional(),
+    windowEnd: z.iso.datetime().optional(),
+    sampleSize: z.number().int().positive(),
+    isBaseline: z.boolean().optional(),
+  })
+  .meta({ id: "CreateEvaluationRunBody" });
+
+const RecordScoreBody = z
+  .object({
+    dimension: EvaluationDimension,
+    propositionId: z.string().min(1),
+    score: z.number().min(0).max(9),
+    reasoning: z.string().min(1),
+    contextSnippet: z.string().optional(),
+  })
+  .meta({ id: "RecordScoreBody" });
+
+const evaluationRunIdParam = pathParam("runId", "Evaluation run UUID");
+
+// ---------------------------------------------------------------------------
 // Unread schemas
 // ---------------------------------------------------------------------------
 
@@ -365,6 +436,7 @@ export function generateDocument() {
       { name: "Reactions", description: "Message reactions" },
       { name: "Runs", description: "Agent run tracking" },
       { name: "Unreads", description: "Unread message tracking" },
+      { name: "Evaluations", description: "Persona drift evaluation runs and scores" },
       { name: "SSE", description: "Server-Sent Events for real-time updates" },
     ],
     paths: {
@@ -707,6 +779,51 @@ export function generateDocument() {
             "204": { description: "Marked as read" },
             ...err400(),
           },
+        },
+      },
+
+      // ----- Evaluations -----
+      "/api/evaluations": {
+        get: {
+          tags: ["Evaluations"],
+          summary: "List evaluation runs",
+          requestParams: {
+            query: z.object({
+              agentId: z.string().optional(),
+              status: EvaluationRunStatus.optional(),
+              isBaseline: z.boolean().optional(),
+            }),
+          },
+          responses: ok200(z.array(EvaluationRunSchema)),
+        },
+        post: {
+          tags: ["Evaluations"],
+          summary: "Create an evaluation run",
+          requestBody: { required: true, content: jsonContent(CreateEvaluationRunBody) },
+          responses: { ...created201(EvaluationRunSchema), ...err400(), ...err404("Agent not found") },
+        },
+      },
+      "/api/evaluations/{runId}": {
+        get: {
+          tags: ["Evaluations"],
+          summary: "Get evaluation run with scores",
+          requestParams: { path: evaluationRunIdParam },
+          responses: { ...ok200(EvaluationRunWithScores), ...err404() },
+        },
+        delete: {
+          tags: ["Evaluations"],
+          summary: "Delete evaluation run (cascades scores)",
+          requestParams: { path: evaluationRunIdParam },
+          responses: { ...ok200(EvaluationRunSchema), ...err404() },
+        },
+      },
+      "/api/evaluations/{runId}/scores": {
+        post: {
+          tags: ["Evaluations"],
+          summary: "Record a proposition score",
+          requestParams: { path: evaluationRunIdParam },
+          requestBody: { required: true, content: jsonContent(RecordScoreBody) },
+          responses: { ...created201(EvaluationScoreSchema), ...err400(), ...err404("Run not found") },
         },
       },
 
