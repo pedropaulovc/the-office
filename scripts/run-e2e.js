@@ -4,6 +4,46 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { getWorktreeLetter } from "./neon-branch.js";
 
+const timestamp = new Date()
+  .toISOString()
+  .replace(/[:.]/g, "-")
+  .replace("T", "_")
+  .slice(0, 19);
+
+const outputDir = join(process.cwd(), "test-results", timestamp);
+
+// Forward extra CLI args (e.g., --repeat-each=10, --workers=1) to Playwright
+const extraArgs = process.argv.slice(2);
+
+// ---------- External preview mode (CI) ----------
+// When PLAYWRIGHT_BASE_URL is already set, tests run against an external
+// deployment (e.g., Vercel preview). Skip Neon provisioning, build, and
+// local server — just run Playwright directly.
+
+const externalPreview = process.env.PLAYWRIGHT_BASE_URL;
+
+if (externalPreview) {
+  console.log(`Running E2E tests against external preview: ${externalPreview}`);
+
+  const playwright = spawn("npx", ["playwright", "test", ...extraArgs], {
+    stdio: "inherit",
+    shell: true,
+    env: {
+      ...process.env,
+      E2E_OUTPUT_DIR: outputDir,
+    },
+  });
+
+  const exitCode = await new Promise((resolve) => {
+    playwright.on("close", (code) => resolve(code ?? 1));
+  });
+
+  process.exit(exitCode);
+}
+
+// ---------- Local mode ----------
+// Provision a dedicated Neon branch, build, start a local server, run tests.
+
 const letter = getWorktreeLetter();
 
 if (letter) {
@@ -28,14 +68,6 @@ console.log("Building...");
 execSync("npx next build", { stdio: "inherit" });
 
 // ---------- Start Next.js server with stdout capture ----------
-
-const timestamp = new Date()
-  .toISOString()
-  .replace(/[:.]/g, "-")
-  .replace("T", "_")
-  .slice(0, 19);
-
-const outputDir = join(process.cwd(), "test-results", timestamp);
 
 // Write server log to a temp file during the run. Playwright clears
 // outputDir before starting, so we copy the log in after tests finish.
@@ -92,7 +124,7 @@ console.log(`Server ready at ${baseURL}`);
 
 console.log("Running Playwright tests...");
 
-const playwright = spawn("npx", ["playwright", "test"], {
+const playwright = spawn("npx", ["playwright", "test", ...extraArgs], {
   stdio: "inherit",
   shell: true,
   env: {
