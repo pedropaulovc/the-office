@@ -15,6 +15,8 @@ function parseCliArgs() {
       dimensions: { type: "string", default: "adherence" },
       threshold: { type: "string", default: "5.0" },
       "mock-judge": { type: "boolean", default: false },
+      "update-baseline": { type: "boolean", default: false },
+      "regression-delta": { type: "string", default: "1.0" },
       output: { type: "string" },
     },
   });
@@ -33,8 +35,10 @@ function parseCliArgs() {
   return {
     agents,
     dimensions,
-    threshold: parseFloat(values.threshold),
-    mockJudge: values["mock-judge"],
+    threshold: parseFloat(values.threshold!),
+    mockJudge: values["mock-judge"] ?? false,
+    updateBaseline: values["update-baseline"] ?? false,
+    regressionDelta: parseFloat(values["regression-delta"]!),
     output: values.output ?? null,
   };
 }
@@ -47,6 +51,8 @@ async function main() {
     dimensions: args.dimensions,
     threshold: args.threshold,
     mockJudge: args.mockJudge,
+    updateBaseline: args.updateBaseline,
+    regressionDelta: args.regressionDelta,
   };
 
   const result = await runEvaluation(options);
