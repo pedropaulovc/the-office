@@ -40,6 +40,27 @@ Read-only Slack clone (The Office theme). Next.js App Router, Tailwind v4, TypeS
 
 There are multiple instances of Claude Code running in parallel. Each one has multiple node.exe instances (MCP, dev server, etc.) and dev servers running. Each worktree has its own designated port: 3010 for A, 3020 for B, 3030 for C, 3040 for D, 3050 for E, 3060 for F, 3070 for G. The `npm run dev` command is smart to only kill zombie servers associated with your worktree and only start a server in its designated port automatically. DO NOT kill all node.exe or kill by port number. If `npm run dev` fails STOP and ask the user for assistance.
 
+## Database Branching
+
+Multiple worktrees share a single Neon project. To prevent data collisions, each worktree gets isolated Neon branches:
+
+```
+main (Neon)              ← production / shared seed data
+  ├── dev/A              ← worktree A dev
+  ├── dev/B              ← worktree B dev
+  ├── e2e/A              ← worktree A E2E tests
+  ├── e2e/B              ← worktree B E2E tests
+  └── ...
+```
+
+Non-worktree directories (no trailing letter) use the `main` Neon branch directly.
+
+- **`npm run dev`** automatically provisions `dev/{letter}`, pushes schema, seeds data, and updates `.env.local` with the branch connection string.
+- **`npm run test:e2e`** provisions a separate `e2e/{letter}` branch and passes it as an env override (`.env.local` and the running dev server are unaffected).
+- **`npm run db:nuke`** deletes and recreates the `dev/{letter}` branch (for worktrees) or drops all tables via SQL (for non-worktrees on `main`).
+- **`m` / `m --all`** nukes Neon branches during worktree reset so the next `npm run dev` creates fresh ones.
+- **`scripts/neon-branch.js`** is the underlying utility: `provision`, `provision-e2e`, `nuke`, `nuke-all`.
+
 ## Key Specs
 
 - Full capability spec: `spec/functional/` (one file per feature area — see `spec/functional/README.md` for index)
