@@ -71,9 +71,24 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       ? await getRecentMessages(run.channelId)
       : [];
 
+    // 3.25. Load evaluation config (fail-open: use defaults on error)
+    let evalConfig: import("@/features/evaluation/config").ResolvedConfig;
+    try {
+      const { resolveConfig } = await import("@/features/evaluation/config");
+      evalConfig = await resolveConfig(run.agentId);
+    } catch (err) {
+      logWarn("orchestrator.evalConfig.failed", {
+        runId: run.id,
+        agentId: run.agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      const { DEFAULT_RESOLVED_CONFIG } = await import("@/features/evaluation/config");
+      evalConfig = DEFAULT_RESOLVED_CONFIG;
+    }
+
     // 3.5. Evaluate interventions (channel-only, fail-open)
     let interventionNudge: string | null = null;
-    if (run.channelId) {
+    if (run.channelId && (evalConfig.interventions.antiConvergenceEnabled || evalConfig.interventions.varietyInterventionEnabled)) {
       try {
         const { evaluateInterventions } = await import(
           "@/features/evaluation/interventions/evaluate-interventions"
@@ -82,6 +97,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
           run.agentId,
           run.channelId,
           recentMessages,
+          evalConfig.interventions,
         );
         interventionNudge = interventionResult.nudgeText;
         if (interventionNudge) {
@@ -103,25 +119,30 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 
     // 3.6. Check repetition suppression (fail-open)
     let repetitionContext: string | null = null;
-    try {
-      const { checkRepetitionSuppression } = await import(
-        "@/features/evaluation/interventions/repetition-suppression"
-      );
-      const repetitionResult = await checkRepetitionSuppression(run.agentId);
-      repetitionContext = repetitionResult.context;
-      if (repetitionContext) {
-        logInfo("orchestrator.repetition.detected", {
+    if (evalConfig.repetition.enabled) {
+      try {
+        const { checkRepetitionSuppression } = await import(
+          "@/features/evaluation/interventions/repetition-suppression"
+        );
+        const repetitionResult = await checkRepetitionSuppression(
+          run.agentId,
+          evalConfig.repetition.threshold,
+        );
+        repetitionContext = repetitionResult.context;
+        if (repetitionContext) {
+          logInfo("orchestrator.repetition.detected", {
+            runId: run.id,
+            agentId: run.agentId,
+            overlapScore: repetitionResult.overlapScore,
+          });
+        }
+      } catch (err) {
+        logWarn("orchestrator.repetition.failed", {
           runId: run.id,
           agentId: run.agentId,
-          overlapScore: repetitionResult.overlapScore,
+          error: err instanceof Error ? err.message : String(err),
         });
       }
-    } catch (err) {
-      logWarn("orchestrator.repetition.failed", {
-        runId: run.id,
-        agentId: run.agentId,
-        error: err instanceof Error ? err.message : String(err),
-      });
     }
 
     // 4. Build system prompt
@@ -145,8 +166,14 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       repetitionContext,
     });
 
-    // 5. Create MCP server with tools
-    const mcpServer = getToolServer(run.agentId, run.id, run.channelId, run.chainDepth, executeRun);
+    // 5. Create MCP server with tools (pass pipeline config for quality gate)
+    const mcpServer = getToolServer(run.agentId, run.id, run.channelId, run.chainDepth, executeRun, {
+      sendMessage: {
+        gateConfig: evalConfig.pipeline,
+        agentName: agent.displayName,
+        persona: agent.systemPrompt,
+      },
+    });
 
     // 6. Broadcast agent_typing
     if (run.channelId) {
