@@ -93,22 +93,21 @@ export function formatTrajectory(entries: TrajectoryEntry[]): string {
 /**
  * TinyTroupe 0–9 scoring rubric used by the LLM judge.
  */
-export const SCORING_RUBRIC = `Score 0: Completely false/contradicted by evidence
-Score 1: Almost entirely false with minimal support
-Score 2: Mostly false with very weak support
-Score 3: More false than true, some weak evidence
-Score 4: Slightly more false than true
-Score 5: Neither clearly true nor false, ambiguous
-Score 6: Slightly more true than false
-Score 7: More true than false, reasonable evidence
-Score 8: Mostly true with strong evidence
-Score 9: Completely true/fully supported by evidence
+export const SCORING_RUBRIC = `Score 0: The proposition is without any doubt completely false.
+Score 1-2: The proposition has little support and is mostly false.
+Score 3: Weak support — some evidence but mostly contradicted.
+Score 4-5: The evidence is mixed — the proposition is equally true and false.
+Score 6: Fair support — more true than false, but notable exceptions.
+Score 7-8: The proposition is well-supported and mostly true.
+Score 9: The proposition is without any doubt completely true.
 
-Principles:
-- Judge based ONLY on the provided trajectory
-- Do not infer or assume behaviors not shown
-- Consider the full context, not just individual actions
-- Weight recent actions slightly more than older ones`;
+Scoring principles:
+- If the data required to evaluate is not present, assign score 9 (assume true unless contradicted).
+- Score 9 only when evidence is the best possible and ALL parts support the claim.
+- Score 0 only when evidence is the worst possible and ALL parts contradict the claim.
+- Be VERY rigorous. When in doubt, assign the LOWER score.
+- Contradictions ALWAYS override positive evidence — don't dismiss as specification errors.
+- Evaluate EACH relevant element individually; final score is the average.`;
 
 /**
  * Build the system prompt for the LLM judge.
@@ -198,12 +197,12 @@ function clamp(value: number, min: number, max: number): number {
  * contain surrounding text (markdown fences, explanation, etc.).
  */
 function extractJson(raw: string): string {
-  // Try extracting JSON array first
-  const arrayMatch = /\[[\s\S]*\]/.exec(raw);
+  // Try extracting JSON array first (non-greedy to avoid matching across objects)
+  const arrayMatch = /\[[\s\S]*?\]/.exec(raw);
   if (arrayMatch) return arrayMatch[0];
 
-  // Try extracting JSON object
-  const objectMatch = /\{[\s\S]*\}/.exec(raw);
+  // Try extracting JSON object (non-greedy)
+  const objectMatch = /\{[\s\S]*?\}/.exec(raw);
   if (objectMatch) return objectMatch[0];
 
   return raw;
@@ -487,25 +486,6 @@ async function callJudge(
         responseLength: text.length,
         durationMs,
       });
-      countMetric("evaluation.judge_call", 1, { mode: "single" });
-      distributionMetric(
-        "evaluation.judge_latency_ms",
-        durationMs,
-        "millisecond",
-        { mode: "single" },
-      );
-      distributionMetric(
-        "evaluation.judge_input_tokens",
-        tokenUsage.input_tokens,
-        "none",
-        { mode: "single" },
-      );
-      distributionMetric(
-        "evaluation.judge_output_tokens",
-        tokenUsage.output_tokens,
-        "none",
-        { mode: "single" },
-      );
 
       return { text, tokenUsage };
     },
@@ -573,6 +553,7 @@ export async function scoreProposition(
       const systemPrompt = buildJudgeSystemPrompt(context.persona);
       const userPrompt = buildScoreUserPrompt(proposition, trajectoryText);
 
+      countMetric("evaluation.judge_call", 1, { mode: "score" });
       const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt);
       let result = parseScoreResponse(text);
       let totalUsage = tokenUsage;
@@ -644,18 +625,21 @@ export async function scoreProposition(
         confidence: result.confidence,
         durationMs,
       });
-      distributionMetric(
-        "evaluation.judge_score",
-        result.score,
-        "none",
-        { propositionId: proposition.id },
-      );
-      distributionMetric(
-        "evaluation.judge_confidence",
-        result.confidence,
-        "none",
-        { propositionId: proposition.id },
-      );
+      distributionMetric("evaluation.judge_score", result.score, "none", {
+        propositionId: proposition.id,
+      });
+      distributionMetric("evaluation.judge_confidence", result.confidence, "none", {
+        propositionId: proposition.id,
+      });
+      distributionMetric("evaluation.judge_latency_ms", durationMs, "millisecond", {
+        mode: "score",
+      });
+      distributionMetric("evaluation.judge_input_tokens", totalUsage.input_tokens, "none", {
+        mode: "score",
+      });
+      distributionMetric("evaluation.judge_output_tokens", totalUsage.output_tokens, "none", {
+        mode: "score",
+      });
 
       return { ...result, tokenUsage: totalUsage };
     },
@@ -701,6 +685,7 @@ export async function checkProposition(
       const systemPrompt = buildJudgeSystemPrompt(context.persona);
       const userPrompt = buildCheckUserPrompt(proposition, trajectoryText);
 
+      countMetric("evaluation.judge_call", 1, { mode: "check" });
       const { text, tokenUsage } = await callJudge(systemPrompt, userPrompt);
       const parsed = parseCheckResponse(text);
       const durationMs = Date.now() - start;
@@ -711,7 +696,15 @@ export async function checkProposition(
         confidence: parsed.confidence,
         durationMs,
       });
-      countMetric("evaluation.judge_call", 1, { mode: "check" });
+      distributionMetric("evaluation.judge_latency_ms", durationMs, "millisecond", {
+        mode: "check",
+      });
+      distributionMetric("evaluation.judge_input_tokens", tokenUsage.input_tokens, "none", {
+        mode: "check",
+      });
+      distributionMetric("evaluation.judge_output_tokens", tokenUsage.output_tokens, "none", {
+        mode: "check",
+      });
 
       return { ...parsed, tokenUsage };
     },

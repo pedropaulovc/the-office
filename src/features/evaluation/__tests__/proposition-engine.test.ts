@@ -184,14 +184,24 @@ describe("proposition-engine", () => {
       expect(SCORING_RUBRIC).toContain("Score 9");
     });
 
-    it("contains Principles section", () => {
-      expect(SCORING_RUBRIC).toContain("Principles:");
+    it("contains Scoring principles section", () => {
+      expect(SCORING_RUBRIC).toContain("Scoring principles:");
     });
 
-    it("contains all intermediate scores", () => {
-      for (let i = 0; i <= 9; i++) {
-        expect(SCORING_RUBRIC).toContain(`Score ${i}`);
-      }
+    it("contains all score bands from TinyTroupe rubric", () => {
+      expect(SCORING_RUBRIC).toContain("Score 0:");
+      expect(SCORING_RUBRIC).toContain("Score 1-2:");
+      expect(SCORING_RUBRIC).toContain("Score 3:");
+      expect(SCORING_RUBRIC).toContain("Score 4-5:");
+      expect(SCORING_RUBRIC).toContain("Score 6:");
+      expect(SCORING_RUBRIC).toContain("Score 7-8:");
+      expect(SCORING_RUBRIC).toContain("Score 9:");
+    });
+
+    it("contains key scoring principles from TinyTroupe", () => {
+      expect(SCORING_RUBRIC).toContain("assign score 9");
+      expect(SCORING_RUBRIC).toContain("Be VERY rigorous");
+      expect(SCORING_RUBRIC).toContain("Contradictions ALWAYS override");
     });
   });
 
