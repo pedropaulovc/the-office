@@ -3,9 +3,8 @@ import { jsonResponse, apiHandler } from "@/lib/api-response";
 import { getScenario, listScenarios } from "@/features/evaluation/experiment/scenario-library";
 import { logInfo, countMetric } from "@/lib/telemetry";
 
-export async function GET(request: NextRequest) {
-  // eslint-disable-next-line @typescript-eslint/require-await
-  return apiHandler("api.evaluations.experiment.scenarios", "http.server", async () => {
+export function GET(request: NextRequest) {
+  return apiHandler("api.evaluations.experiment.scenarios", "http.server", () => {
     const id = request.nextUrl.searchParams.get("id");
 
     if (id) {
