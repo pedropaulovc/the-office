@@ -1,5 +1,43 @@
 import { test, expect } from "@playwright/test";
 
+interface ScenarioInfo {
+  id: string;
+}
+
+interface GroupStats {
+  mean: number;
+  sd: number;
+}
+
+interface MetricInfo {
+  treatment: GroupStats;
+  control: GroupStats;
+  delta: number;
+  tTest: unknown;
+  effectSize: number;
+}
+
+interface DryRunBody {
+  dryRun: boolean;
+  scenario: ScenarioInfo;
+  totalAgents: number;
+  totalEnvironments: number;
+  seed: number;
+}
+
+interface ExperimentBody {
+  scenario: string;
+  agentsCount: number;
+  environmentsCount: number;
+  metrics: Record<string, MetricInfo>;
+  displayLabels: Record<string, string>;
+  timestamp: string;
+}
+
+interface ErrorBody {
+  error: string;
+}
+
 test.describe("experiment runner API", () => {
   test("dry run returns scenario config", async ({ request }) => {
     const response = await request.post("/api/evaluations/experiment/run", {
@@ -7,7 +45,7 @@ test.describe("experiment runner API", () => {
     });
     expect(response.status()).toBe(200);
 
-    const body = await response.json();
+    const body = (await response.json()) as DryRunBody;
     expect(body.dryRun).toBe(true);
     expect(body.scenario).toBeDefined();
     expect(body.scenario.id).toBe("brainstorming-average");
@@ -22,7 +60,7 @@ test.describe("experiment runner API", () => {
     });
     expect(response.status()).toBe(200);
 
-    const body = await response.json();
+    const body = (await response.json()) as ExperimentBody;
     expect(body.scenario).toBe("debate-controversial");
     expect(body.agentsCount).toBe(120); // 5 × 24
     expect(body.environmentsCount).toBe(24);
@@ -35,10 +73,10 @@ test.describe("experiment runner API", () => {
 
     // Each metric has treatment/control groups with statistics
     const adherence = body.metrics.adherence;
-    expect(adherence.treatment).toHaveProperty("mean");
-    expect(adherence.treatment).toHaveProperty("sd");
-    expect(adherence.control).toHaveProperty("mean");
-    expect(adherence.control).toHaveProperty("sd");
+    expect(adherence?.treatment).toHaveProperty("mean");
+    expect(adherence?.treatment).toHaveProperty("sd");
+    expect(adherence?.control).toHaveProperty("mean");
+    expect(adherence?.control).toHaveProperty("sd");
     expect(adherence).toHaveProperty("delta");
     expect(adherence).toHaveProperty("tTest");
     expect(adherence).toHaveProperty("effectSize");
@@ -55,8 +93,8 @@ test.describe("experiment runner API", () => {
       data: { scenario: "brainstorming-average", seed: 123 },
     });
 
-    const body1 = await run1.json();
-    const body2 = await run2.json();
+    const body1 = (await run1.json()) as ExperimentBody;
+    const body2 = (await run2.json()) as ExperimentBody;
 
     // Metrics should be identical (same seed -> same deterministic results)
     expect(body1.metrics).toEqual(body2.metrics);
@@ -68,7 +106,7 @@ test.describe("experiment runner API", () => {
     });
     // Unknown scenario passes Zod but throws in runExperiment -> apiHandler returns 500
     expect(response.status()).toBe(500);
-    const body = await response.json();
+    const body = (await response.json()) as ErrorBody;
     expect(body.error).toBeDefined();
   });
 
@@ -77,7 +115,7 @@ test.describe("experiment runner API", () => {
       data: {},
     });
     expect(response.status()).toBe(400);
-    const body = await response.json();
+    const body = (await response.json()) as ErrorBody;
     expect(body.error).toBeDefined();
   });
 });

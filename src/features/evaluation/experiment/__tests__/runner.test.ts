@@ -136,7 +136,7 @@ describe("runner", () => {
       const result = runExperiment({ scenario: "debate-controversial", seed: 42, runs: 2 });
       expect(result).toHaveProperty("metrics");
       if (!("metrics" in result)) return;
-      const report = result as ExperimentReport;
+      const report = result;
       // Should have all dimensions
       expect(Object.keys(report.metrics)).toEqual(
         expect.arrayContaining(["adherence", "consistency", "fluency", "convergence"]),
@@ -159,8 +159,8 @@ describe("runner", () => {
       const scores = scoreEnvironments(pairs, "treatment", dimensions);
 
       // 2 agents in 1 environment = 2 scores per dimension
-      expect(scores["adherence"]).toHaveLength(2);
-      expect(scores["consistency"]).toHaveLength(2);
+      expect(scores.adherence).toHaveLength(2);
+      expect(scores.consistency).toHaveLength(2);
     });
 
     it("scores are bounded between 0 and 9", () => {
@@ -175,7 +175,9 @@ describe("runner", () => {
       const scores = scoreEnvironments(pairs, "treatment", dimensions);
 
       for (const dim of dimensions) {
-        for (const score of scores[dim]!) {
+        const dimScores = scores[dim];
+        if (!dimScores) throw new Error(`missing scores for dimension: ${dim}`);
+        for (const score of dimScores) {
           expect(score).toBeGreaterThanOrEqual(0);
           expect(score).toBeLessThanOrEqual(9);
         }

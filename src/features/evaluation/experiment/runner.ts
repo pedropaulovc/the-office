@@ -9,20 +9,20 @@ import { generateExperimentReport } from "./experiment-report";
 import type { MetricResult, ExperimentReport } from "./experiment-report";
 import type { ScenarioConfig } from "./types";
 
-type RunnerOptions = {
+interface RunnerOptions {
   scenario: string;
   seed?: number;
   runs?: number;
   dryRun?: boolean;
-};
+}
 
-type DryRunResult = {
+interface DryRunResult {
   dryRun: true;
   scenario: ScenarioConfig;
   totalAgents: number;
   totalEnvironments: number;
   seed: number;
-};
+}
 
 /**
  * Score all agents in all environments for a given group (treatment or control).
@@ -47,7 +47,7 @@ function scoreEnvironments(
       for (const dim of dimensions) {
         const dimOffset = dimensions.indexOf(dim) * 0.2;
         const score = Math.min(9, Math.max(0, baseScore + dimOffset));
-        scores[dim]!.push(score);
+        scores[dim]?.push(score);
       }
     }
   }
@@ -120,16 +120,16 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
       const cScores = scoreEnvironments(envResult.pairs, "control", scenario.evaluation_dimensions);
 
       for (const dim of scenario.evaluation_dimensions) {
-        allTreatmentScores[dim]!.push(...tScores[dim]!);
-        allControlScores[dim]!.push(...cScores[dim]!);
+        allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
+        allControlScores[dim]?.push(...(cScores[dim] ?? []));
       }
     }
 
     // 4. Compute statistics per dimension across all runs
     const metrics: Record<string, MetricResult> = {};
     for (const dim of scenario.evaluation_dimensions) {
-      const tScores = allTreatmentScores[dim]!;
-      const cScores = allControlScores[dim]!;
+      const tScores = allTreatmentScores[dim] ?? [];
+      const cScores = allControlScores[dim] ?? [];
       const tTest = welchTTest(tScores, cScores);
       const effectSize = cohensD(tScores, cScores);
 
