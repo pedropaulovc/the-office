@@ -277,6 +277,22 @@ export async function getRecentMessages(channelId: string, limit = 20): Promise<
   return rows.reverse();
 }
 
+/**
+ * Get the last N messages sent by a specific agent across ALL channels.
+ * Lightweight query for repetition detection (no reaction joins, no thread counts).
+ */
+export async function getRecentAgentMessages(agentId: string, limit = 5): Promise<DbMessage[]> {
+  return withSpan("getRecentAgentMessages", "db.query", async () => {
+    const rows = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.userId, agentId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit);
+    return rows.reverse();
+  });
+}
+
 export function updateMessage(
   id: string,
   data: { text: string },

@@ -245,4 +245,39 @@ describe("buildSystemPrompt", () => {
 
     expect(result).not.toContain("### Conversation Guidance");
   });
+
+  it("includes repetition suppression context when provided", async () => {
+    const { buildSystemPrompt } = await import("../prompt-builder");
+    const repetitionContext =
+      '### Recent Messages You\'ve Sent\n1. "Hello"\n\nIMPORTANT: Vary your language.';
+    const result = buildSystemPrompt({
+      agent: {
+        id: "michael",
+        displayName: "Michael Scott",
+        systemPrompt: "Persona.",
+      },
+      memoryBlocks: [],
+      recentMessages: [],
+      repetitionContext,
+    });
+
+    expect(result).toContain("### Recent Messages You've Sent");
+    expect(result).toContain("IMPORTANT: Vary your language.");
+  });
+
+  it("omits repetition suppression context when null", async () => {
+    const { buildSystemPrompt } = await import("../prompt-builder");
+    const result = buildSystemPrompt({
+      agent: {
+        id: "michael",
+        displayName: "Michael Scott",
+        systemPrompt: "Persona.",
+      },
+      memoryBlocks: [],
+      recentMessages: [],
+      repetitionContext: null,
+    });
+
+    expect(result).not.toContain("### Recent Messages You've Sent");
+  });
 });

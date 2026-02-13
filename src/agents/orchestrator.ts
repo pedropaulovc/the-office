@@ -100,12 +100,36 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       }
     }
 
+    // 3.6. Check repetition suppression (fail-open)
+    let repetitionContext: string | null = null;
+    try {
+      const { checkRepetitionSuppression } = await import(
+        "@/features/evaluation/interventions/repetition-suppression"
+      );
+      const repetitionResult = await checkRepetitionSuppression(run.agentId);
+      repetitionContext = repetitionResult.context;
+      if (repetitionContext) {
+        logInfo("orchestrator.repetition.detected", {
+          runId: run.id,
+          agentId: run.agentId,
+          overlapScore: repetitionResult.overlapScore,
+        });
+      }
+    } catch (err) {
+      logWarn("orchestrator.repetition.failed", {
+        runId: run.id,
+        agentId: run.agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // 4. Build system prompt
     const systemPrompt = buildSystemPrompt({
       agent,
       memoryBlocks,
       recentMessages,
       interventionNudge,
+      repetitionContext,
     });
 
     // 5. Create MCP server with tools

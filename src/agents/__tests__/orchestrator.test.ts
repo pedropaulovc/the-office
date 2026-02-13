@@ -317,6 +317,7 @@ describe("orchestrator", () => {
       memoryBlocks: [memoryBlock],
       recentMessages: [expect.objectContaining({ userId: "dwight" })],
       interventionNudge: null,
+      repetitionContext: null,
     });
     expect(mockQuery).toHaveBeenCalled();
     expect(result.status).toBe("completed");
