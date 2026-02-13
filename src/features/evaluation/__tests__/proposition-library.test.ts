@@ -56,10 +56,10 @@ describe("proposition-library", () => {
     for (const character of ALL_CHARACTERS) {
       it(`${character} has 6-10 agent-specific propositions`, async () => {
         const { loadPropositionFile } = await import("../proposition-loader");
-        const { resolve, join } = await import("node:path");
-        const dir = resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
+        const path = await import("node:path");
+        const dir = path.resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
         const result = await loadPropositionFile(
-          join(dir, `${character}.yaml`),
+          path.join(dir, `${character}.yaml`),
           { agent_name: character },
         );
 
@@ -73,10 +73,10 @@ describe("proposition-library", () => {
     for (const character of ALL_CHARACTERS) {
       it(`${character} propositions have id, claim, and weight`, async () => {
         const { loadPropositionFile } = await import("../proposition-loader");
-        const { resolve, join } = await import("node:path");
-        const dir = resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
+        const path = await import("node:path");
+        const dir = path.resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
         const result = await loadPropositionFile(
-          join(dir, `${character}.yaml`),
+          path.join(dir, `${character}.yaml`),
           { agent_name: character },
         );
 
@@ -96,10 +96,10 @@ describe("proposition-library", () => {
     for (const character of ALL_CHARACTERS) {
       it(`${character} has at least 1 anti-pattern (inverted) proposition`, async () => {
         const { loadPropositionFile } = await import("../proposition-loader");
-        const { resolve, join } = await import("node:path");
-        const dir = resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
+        const path = await import("node:path");
+        const dir = path.resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
         const result = await loadPropositionFile(
-          join(dir, `${character}.yaml`),
+          path.join(dir, `${character}.yaml`),
           { agent_name: character },
         );
 
@@ -151,13 +151,13 @@ describe("proposition-library", () => {
 
   it("all proposition IDs are globally unique", async () => {
     const { loadPropositionFile } = await import("../proposition-loader");
-    const { resolve, join } = await import("node:path");
-    const dir = resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
+    const path = await import("node:path");
+    const dir = path.resolve(process.cwd(), "src/features/evaluation/propositions/adherence");
 
     const allIds = new Set<string>();
     for (const character of ALL_CHARACTERS) {
       const result = await loadPropositionFile(
-        join(dir, `${character}.yaml`),
+        path.join(dir, `${character}.yaml`),
         { agent_name: character },
       );
       for (const prop of result.propositions) {

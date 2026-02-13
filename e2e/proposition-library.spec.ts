@@ -64,14 +64,15 @@ test.describe("proposition library API", () => {
       ),
     );
 
+    expect(responses).toHaveLength(ALL_CHARACTERS.length);
+
     let totalPropositions = 0;
 
-    for (let i = 0; i < ALL_CHARACTERS.length; i++) {
-      const response = responses[i]!;
+    for (const [i, response] of responses.entries()) {
       expect(response.status()).toBe(200);
 
       const result = (await response.json()) as PropositionResponse;
-      const agentId = ALL_CHARACTERS[i]!;
+      const agentId = ALL_CHARACTERS[i];
 
       expect(result.agentId).toBe(agentId);
       // Each agent: 4 default + 6-10 agent-specific = 10-14 total
