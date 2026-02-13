@@ -375,6 +375,9 @@ function truncate(value: string, max = LOG_MAX_CHARS): string {
 }
 
 function formatTriggerPrompt(run: Run): string {
+  if (run.triggerPrompt) {
+    return run.triggerPrompt;
+  }
   if (run.triggerMessageId) {
     return `A new message was posted (trigger: ${run.triggerMessageId}). Review the recent conversation and decide how to respond.`;
   }

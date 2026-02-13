@@ -707,6 +707,41 @@ describe("orchestrator", () => {
     expect(mockQuery).toHaveBeenCalled();
   });
 
+  it("uses triggerPrompt as SDK prompt when present on the run", async () => {
+    const run = createMockRun({
+      agentId: "michael",
+      channelId: "general",
+      triggerPrompt: "You have a scheduled check-in. Say something interesting about the office.",
+    });
+    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(run);
+
+    const callArgs = mockQuery.mock.calls[0] as [{ prompt: string }];
+    expect(callArgs[0].prompt).toBe(
+      "You have a scheduled check-in. Say something interesting about the office.",
+    );
+  });
+
+  it("falls back to triggerMessageId prompt when triggerPrompt is null", async () => {
+    const run = createMockRun({
+      agentId: "michael",
+      channelId: "general",
+      triggerMessageId: "msg-42",
+      triggerPrompt: null,
+    });
+    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(run);
+
+    const callArgs = mockQuery.mock.calls[0] as [{ prompt: string }];
+    expect(callArgs[0].prompt).toBe(
+      "A new message was posted (trigger: msg-42). Review the recent conversation and decide how to respond.",
+    );
+  });
+
   it("passes chainDepth and executeRun to getToolServer", async () => {
     const run = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 1 });
     sdkMessages = [makeInitMessage(), makeSuccessResult()];
