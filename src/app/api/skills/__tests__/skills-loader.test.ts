@@ -42,8 +42,8 @@ describe("skills-loader", () => {
       const skills = await listSkills();
 
       expect(skills).toHaveLength(2);
-      expect(skills[0].name).toBe("character-voice");
-      expect(skills[1].name).toBe("meeting-dynamics");
+      expect(skills[0]?.name).toBe("character-voice");
+      expect(skills[1]?.name).toBe("meeting-dynamics");
     });
 
     it("returns empty array when .skills directory does not exist", async () => {
@@ -85,7 +85,7 @@ describe("skills-loader", () => {
       const skills = await listSkills();
 
       expect(skills).toHaveLength(1);
-      expect(skills[0].name).toBe("valid-skill");
+      expect(skills[0]?.name).toBe("valid-skill");
     });
 
     it("skips entries with invalid frontmatter", async () => {
@@ -103,7 +103,7 @@ describe("skills-loader", () => {
       const skills = await listSkills();
 
       expect(skills).toHaveLength(1);
-      expect(skills[0].name).toBe("valid");
+      expect(skills[0]?.name).toBe("valid");
     });
 
     it("ignores non-directory entries", async () => {
@@ -139,8 +139,8 @@ describe("skills-loader", () => {
       const { listSkills } = await import("../skills-loader");
       const skills = await listSkills();
 
-      expect(skills[0].name).toBe("alpha");
-      expect(skills[1].name).toBe("zebra");
+      expect(skills[0]?.name).toBe("alpha");
+      expect(skills[1]?.name).toBe("zebra");
     });
   });
 
@@ -156,9 +156,9 @@ describe("skills-loader", () => {
       const skill = await getSkill("character-voice");
 
       expect(skill).not.toBeNull();
-      expect(skill!.name).toBe("character-voice");
-      expect(skill!.description).toBe("Voice guide");
-      expect(skill!.content).toBe("# Guide\n\nContent here.");
+      expect(skill?.name).toBe("character-voice");
+      expect(skill?.description).toBe("Voice guide");
+      expect(skill?.content).toBe("# Guide\n\nContent here.");
     });
 
     it("returns null for non-existent skill", async () => {

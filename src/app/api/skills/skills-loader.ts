@@ -13,6 +13,19 @@ export interface SkillDetail {
   content: string;
 }
 
+interface SkillFrontmatter {
+  name?: unknown;
+  description?: unknown;
+}
+
+function parseFrontmatter(raw: string): { name: string; description: string; content: string } | null {
+  const { data, content } = matter(raw) as { data: SkillFrontmatter; content: string };
+  if (typeof data.name !== "string" || typeof data.description !== "string") {
+    return null;
+  }
+  return { name: data.name, description: data.description, content };
+}
+
 const SKILLS_DIR = path.join(process.cwd(), ".skills");
 
 const VALID_SKILL_NAME = /^[a-z0-9-]+$/;
@@ -32,11 +45,9 @@ export async function listSkills(): Promise<SkillSummary[]> {
     const filePath = path.join(SKILLS_DIR, dir.name, "SKILL.md");
     try {
       const raw = await readFile(filePath, "utf-8");
-      const { data } = matter(raw);
-      if (typeof data.name !== "string" || typeof data.description !== "string") {
-        continue;
-      }
-      skills.push({ name: data.name, description: data.description });
+      const parsed = parseFrontmatter(raw);
+      if (!parsed) continue;
+      skills.push({ name: parsed.name, description: parsed.description });
     } catch {
       // Skip directories without a valid SKILL.md
     }
@@ -60,16 +71,13 @@ export async function getSkill(name: string): Promise<SkillDetail | null> {
 
   try {
     const raw = await readFile(filePath, "utf-8");
-    const { data, content } = matter(raw);
-
-    if (typeof data.name !== "string" || typeof data.description !== "string") {
-      return null;
-    }
+    const parsed = parseFrontmatter(raw);
+    if (!parsed) return null;
 
     return {
-      name: data.name,
-      description: data.description,
-      content: content.trim(),
+      name: parsed.name,
+      description: parsed.description,
+      content: parsed.content.trim(),
     };
   } catch {
     return null;
