@@ -250,6 +250,12 @@ When a Playwright E2E test fails, NEVER assume it's a timeout/flakiness issue. Y
 #### Prefer locators to selectors
 Unlike traditional selectors that perform a one-time query, locators are lazy and resilient references to elements that automatically retry until elements become available, wait implicitly for elements to be actionable, and adapt to DOM changes between queries.
 
+#### Zero tolerance for server errors during E2E runs
+The Claude Code SDK process IS available in the E2E test environment. There must be **ZERO WebServer errors** and **ZERO Sentry errors** in the test output. Any `[WebServer] [error]` line (e.g., `executeRun failed`) means something is genuinely broken — do NOT dismiss these as "expected" or "not available in test env." Investigate and fix the root cause.
+
+#### E2E server log
+Each E2E run captures the full Next.js server stdout (including `[sentry]` trace lines and `[error]` lines) to `test-results/{timestamp}/server.log`, alongside Playwright traces in the same folder. Every `[sentry]` line includes a `trace=<TRACE_ID>` that can be looked up in the Sentry UI or via `scripts/sentry-trace.sh` for full span/log details. Use this log to correlate server-side errors with test failures — grep for trace IDs, error messages, or agent IDs.
+
 #### E2E tests in this project are rock solid
 All E2E tests go through a stress test where they run 10x in parallel and 10x in sequence every new push to main in search of race conditions and flakiness. You may check the stress test health looking at the workflow history of the ci-cd-main workflow on GitHub.
 

@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockLogInfo = vi.fn();
+const mockLogError = vi.fn();
+const mockCountMetric = vi.fn();
 
 vi.mock("@/lib/telemetry", () => ({
   logInfo: (msg: string, attrs: Record<string, string>) => { mockLogInfo(msg, attrs); },
+  logError: (msg: string, attrs: Record<string, string>) => { mockLogError(msg, attrs); },
+  logWarn: vi.fn(),
+  countMetric: (name: string, value: number, attrs: Record<string, string>) => { mockCountMetric(name, value, attrs); },
 }));
 
 describe("sdk-env", () => {
@@ -55,7 +60,7 @@ describe("sdk-env", () => {
     expect(() => buildSdkEnv()).toThrow("ANTHROPIC_API_KEY is not set");
   });
 
-  it("createSdkStderrHandler calls logInfo with correct attributes", async () => {
+  it("createSdkStderrHandler calls logInfo for normal output", async () => {
     const { createSdkStderrHandler } = await import("../sdk-env");
     const handler = createSdkStderrHandler("run-1", "michael");
 
@@ -66,5 +71,35 @@ describe("sdk-env", () => {
       agentId: "michael",
       output: "some debug output",
     });
+  });
+
+  it("createSdkStderrHandler logs process exit at error level", async () => {
+    const { createSdkStderrHandler } = await import("../sdk-env");
+    const handler = createSdkStderrHandler("run-1", "michael");
+
+    handler("Claude Code process exited with code 1");
+
+    expect(mockLogError).toHaveBeenCalledWith("sdk.process_exit", {
+      runId: "run-1",
+      agentId: "michael",
+      output: "Claude Code process exited with code 1",
+    });
+    expect(mockCountMetric).toHaveBeenCalledWith("sdk.process_exit", 1, { agentId: "michael" });
+    expect(mockLogInfo).not.toHaveBeenCalled();
+  });
+
+  it("createSdkStderrHandler logs signal termination at error level", async () => {
+    const { createSdkStderrHandler } = await import("../sdk-env");
+    const handler = createSdkStderrHandler("run-1", "michael");
+
+    handler("Claude Code process terminated by signal SIGTERM");
+
+    expect(mockLogError).toHaveBeenCalledWith("sdk.process_signal", {
+      runId: "run-1",
+      agentId: "michael",
+      output: "Claude Code process terminated by signal SIGTERM",
+    });
+    expect(mockCountMetric).toHaveBeenCalledWith("sdk.process_signal", 1, { agentId: "michael" });
+    expect(mockLogInfo).not.toHaveBeenCalled();
   });
 });
