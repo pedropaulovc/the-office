@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks — follow shim-scorer.test.ts pattern exactly
+// Mocks
 // ---------------------------------------------------------------------------
 
 const mockStartSpan = vi.fn();
