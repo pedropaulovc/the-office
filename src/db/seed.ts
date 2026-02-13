@@ -394,7 +394,60 @@ async function seed() {
       createdAt: def.createdAt,
     })),
   );
-  console.log(`  1 run + ${sendMessageDefs.length} run_messages for Michael`);
+  console.log(`  1 run + ${sendMessageDefs.length} run_messages for Michael (recent)`);
+
+  // 5b. Historical run for Michael (10 days ago) — needed for consistency scoring
+  const michaelHistoricalRun = await db
+    .insert(runs)
+    .values({
+      agentId: "michael",
+      status: "completed",
+      stopReason: "end_turn",
+      channelId: "general",
+      triggerPrompt: "Respond to the conversation in #general",
+      chainDepth: 0,
+      startedAt: t(10, 8, 55),
+      completedAt: t(10, 9, 5),
+    })
+    .returning({ id: runs.id });
+
+  const michaelHistoricalRunId = michaelHistoricalRun[0]?.id;
+  if (!michaelHistoricalRunId) throw new Error("Failed to create Michael's historical run");
+
+  const historicalSendMessageDefs = [
+    {
+      text: "That's what she said! Seriously though, I am the world's best boss. My mug says so, and mugs don't lie.",
+      createdAt: t(10, 9, 0),
+    },
+    {
+      text: "Dwight, you ignorant... you know what, you're actually doing great. But I'm still funnier than you.",
+      createdAt: t(10, 9, 1),
+    },
+    {
+      text: "Everyone, I have an announcement. We are having a party. Because I said so. And I'm the boss.",
+      createdAt: t(10, 9, 2),
+    },
+    {
+      text: "You know what they say — you miss 100% of the shots you don't take. Wayne Gretzky. Michael Scott.",
+      createdAt: t(10, 9, 3),
+    },
+    {
+      text: "I love inside jokes. I'd love to be a part of one someday. Actually, I already am — my whole life is an inside joke.",
+      createdAt: t(10, 9, 4),
+    },
+  ];
+
+  await db.insert(runMessages).values(
+    historicalSendMessageDefs.map((def) => ({
+      runId: michaelHistoricalRunId,
+      messageType: "tool_call_message" as const,
+      content: `send_message: ${def.text}`,
+      toolName: "send_message",
+      toolInput: { text: def.text, channel_id: "general" },
+      createdAt: def.createdAt,
+    })),
+  );
+  console.log(`  1 run + ${historicalSendMessageDefs.length} run_messages for Michael (historical)`);
 
   // 6. Messages — truncate reactions first (FK), then messages, then re-insert
   console.log("Seeding messages...");

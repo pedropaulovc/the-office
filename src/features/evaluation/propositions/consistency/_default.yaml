@@ -1,0 +1,19 @@
+dimension: consistency
+include_personas: false
+hard: false
+target_type: agent
+first_n: 10
+last_n: 100
+propositions:
+  - id: consistent-tone
+    claim: "{{agent_name}}'s recent messages maintain a consistent tone with their earlier messages"
+    weight: 1.0
+    recommendations_for_improvement: "Maintain the same emotional register and communication style as in your earlier messages."
+  - id: consistent-vocabulary
+    claim: "{{agent_name}} uses similar vocabulary and speech patterns across both time periods"
+    weight: 0.9
+    recommendations_for_improvement: "Use the same characteristic phrases and word choices that appeared in your earlier messages."
+  - id: consistent-behavior
+    claim: "{{agent_name}} reacts to similar situations in a consistent manner across both time periods"
+    weight: 0.8
+    recommendations_for_improvement: "Respond to situations in the same way you have in the past — maintain behavioral consistency."
