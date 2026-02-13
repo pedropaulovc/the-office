@@ -1,0 +1,18 @@
+dimension: convergence
+include_personas: false
+target_type: environment
+first_n: 10
+last_n: 100
+propositions:
+  - id: agents-diverge
+    claim: "As the conversation progresses, the agents' behaviors diverge from one another, instead of becoming more similar. Topics discussed become more varied toward the end of the conversation. Discussions do not converge to a single topic or perspective at the end."
+    weight: 1.0
+    recommendations_for_improvement: "Maintain your unique voice and perspective. Don't simply agree with others."
+  - id: distinct-vocabulary
+    claim: "Each agent in the conversation uses distinctly different vocabulary and speech patterns from the other agents"
+    weight: 0.8
+    recommendations_for_improvement: "Use your own characteristic words and phrases, not those of other participants."
+  - id: diverse-perspectives
+    claim: "The agents present diverse perspectives and do not all converge to the same viewpoint"
+    weight: 0.9
+    recommendations_for_improvement: "Offer your unique perspective even if it differs from the majority."

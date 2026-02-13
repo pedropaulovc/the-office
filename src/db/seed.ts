@@ -449,6 +449,81 @@ async function seed() {
   );
   console.log(`  1 run + ${historicalSendMessageDefs.length} run_messages for Michael (historical)`);
 
+  // 5c. Seed run data for Jim (convergence evaluation — distinct casual/sarcastic voice)
+  const jimRun = await db
+    .insert(runs)
+    .values({
+      agentId: "jim",
+      status: "completed",
+      stopReason: "end_turn",
+      channelId: "general",
+      triggerPrompt: "Respond to the conversation in #general",
+      chainDepth: 0,
+      startedAt: t(1, 10, 0),
+      completedAt: t(1, 10, 10),
+    })
+    .returning({ id: runs.id });
+
+  const jimRunId = jimRun[0]?.id;
+  if (!jimRunId) throw new Error("Failed to create Jim's run");
+
+  const jimSendMessageDefs = [
+    { text: "So Dwight just announced he's bringing his katana to the meeting. Normal Tuesday.", createdAt: t(1, 10, 1) },
+    { text: "Anyone else notice Michael's been practicing finger guns in his office for 20 minutes?", createdAt: t(1, 10, 3) },
+    { text: "I'm not saying the vending machine is broken, but it just gave Kevin seven candy bars and charged him for one.", createdAt: t(1, 10, 5) },
+    { text: "Pam and I are grabbing lunch. Alfredo's, obviously. Not Pizza by Alfredo.", createdAt: t(1, 10, 7) },
+  ];
+
+  await db.insert(runMessages).values(
+    jimSendMessageDefs.map((def) => ({
+      runId: jimRunId,
+      messageType: "tool_call_message" as const,
+      content: `send_message: ${def.text}`,
+      toolName: "send_message",
+      toolInput: { text: def.text, channel_id: "general" },
+      createdAt: def.createdAt,
+    })),
+  );
+  console.log(`  1 run + ${jimSendMessageDefs.length} run_messages for Jim (convergence)`);
+
+  // 5d. Seed run data for Dwight (convergence evaluation — formal/declarative voice)
+  const dwightRun = await db
+    .insert(runs)
+    .values({
+      agentId: "dwight",
+      status: "completed",
+      stopReason: "end_turn",
+      channelId: "general",
+      triggerPrompt: "Respond to the conversation in #general",
+      chainDepth: 0,
+      startedAt: t(2, 9, 0),
+      completedAt: t(2, 9, 15),
+    })
+    .returning({ id: runs.id });
+
+  const dwightRunId = dwightRun[0]?.id;
+  if (!dwightRunId) throw new Error("Failed to create Dwight's run");
+
+  const dwightSendMessageDefs = [
+    { text: "FACT: Bears can run at speeds of up to 35 miles per hour. This is relevant to our fire safety protocol.", createdAt: t(2, 9, 1) },
+    { text: "FALSE. The conference room does NOT need to be 'redecorated.' It needs to be fortified against intruders.", createdAt: t(2, 9, 3) },
+    { text: "I have completed my inspection of the office perimeter. All exits are secure. You're welcome.", createdAt: t(2, 9, 5) },
+    { text: "As Assistant to the Regional Manager, I am issuing a formal reminder: the beet harvest is in three weeks. Plan accordingly.", createdAt: t(2, 9, 8) },
+    { text: "FACT: Paper is the backbone of civilization. Without Dunder Mifflin, society would collapse within 72 hours.", createdAt: t(2, 9, 12) },
+  ];
+
+  await db.insert(runMessages).values(
+    dwightSendMessageDefs.map((def) => ({
+      runId: dwightRunId,
+      messageType: "tool_call_message" as const,
+      content: `send_message: ${def.text}`,
+      toolName: "send_message",
+      toolInput: { text: def.text, channel_id: "general" },
+      createdAt: def.createdAt,
+    })),
+  );
+  console.log(`  1 run + ${dwightSendMessageDefs.length} run_messages for Dwight (convergence)`);
+
   // 6. Messages — truncate reactions first (FK), then messages, then re-insert
   console.log("Seeding messages...");
   await db.delete(reactions);

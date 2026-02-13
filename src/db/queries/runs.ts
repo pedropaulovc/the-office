@@ -252,6 +252,48 @@ export function getAgentSendMessages(
   );
 }
 
+export interface ChannelRunMessage extends RunMessage {
+  agentId: string;
+}
+
+/**
+ * Fetch all send_message tool calls from a channel within a time window.
+ * Returns messages enriched with the agentId from the parent run.
+ */
+export function getChannelSendMessages(
+  channelId: string,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<ChannelRunMessage[]> {
+  return withSpan("getChannelSendMessages", "db.query", async () => {
+    const rows = await db
+      .select({
+        id: runMessages.id,
+        runId: runMessages.runId,
+        stepId: runMessages.stepId,
+        messageType: runMessages.messageType,
+        content: runMessages.content,
+        toolName: runMessages.toolName,
+        toolInput: runMessages.toolInput,
+        createdAt: runMessages.createdAt,
+        agentId: runs.agentId,
+      })
+      .from(runMessages)
+      .innerJoin(runs, eq(runMessages.runId, runs.id))
+      .where(
+        and(
+          eq(runs.channelId, channelId),
+          eq(runMessages.toolName, "send_message"),
+          gte(runMessages.createdAt, windowStart),
+          lte(runMessages.createdAt, windowEnd),
+        ),
+      )
+      .orderBy(runMessages.createdAt);
+
+    return rows;
+  });
+}
+
 export async function createRunMessage(data: NewRunMessage): Promise<RunMessage> {
   const rows = await db.insert(runMessages).values(data).returning();
   const created = rows[0];
