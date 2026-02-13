@@ -3,6 +3,7 @@ import { existsSync, rmSync, mkdirSync, createWriteStream } from "fs";
 import { basename, join } from "path";
 import { createServer } from "net";
 import { platform } from "os";
+import { getWorktreeLetter, updateEnvLocal } from "./neon-branch.js";
 
 const LOCK_FILE = join(process.cwd(), ".next", "dev", "lock");
 const NEXT_CACHE = join(process.cwd(), ".next");
@@ -178,6 +179,25 @@ async function main() {
     execSync("node scripts/ensure-env.js", { stdio: "inherit" });
   } catch {
     process.exit(1);
+  }
+
+  // Provision Neon branch for worktrees
+  const letter = getWorktreeLetter();
+  if (letter) {
+    console.log(`Provisioning Neon branch dev/${letter}...`);
+    const connStr = execSync(`node scripts/neon-branch.js provision ${letter}`, {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "inherit"],
+    }).trim();
+    updateEnvLocal(connStr);
+
+    console.log("Pushing schema to branch...");
+    execSync("npx drizzle-kit push", { stdio: "inherit" });
+
+    console.log("Seeding branch...");
+    execSync("npx tsx src/db/seed.ts", { stdio: "inherit" });
+
+    console.log(`Neon branch dev/${letter} provisioned and seeded.`);
   }
 
   const { port: desiredPort, strict } = getPortForWorktree();
