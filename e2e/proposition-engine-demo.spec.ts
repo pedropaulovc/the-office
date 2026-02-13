@@ -48,6 +48,7 @@ interface EvaluationScoreResponse {
 test.describe("proposition engine demo", () => {
   // Sequential — each test is a demo step, requires live LLM
   test.describe.configure({ mode: "default" });
+  test.use({ actionTimeout: 30_000 });
 
   test.beforeEach(({}, testInfo) => {
     testInfo.setTimeout(30_000);

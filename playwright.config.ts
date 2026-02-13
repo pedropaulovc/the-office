@@ -34,7 +34,7 @@ export default defineConfig({
   reporter: "html",
   use: {
     baseURL: previewUrl ?? `http://localhost:${process.env.E2E_PORT}`,
-    trace: "retain-on-failure",
+    trace: "retain-on-first-failure",
     actionTimeout,
   },
   projects: [
