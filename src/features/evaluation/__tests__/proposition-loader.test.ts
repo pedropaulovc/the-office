@@ -246,14 +246,14 @@ describe("proposition-loader", () => {
 
       await fs.writeFile(
         tmpFile,
-        "dimension: adherence\npropositions: []\n",
+        "dimension: invalid_dim\npropositions: []\n",
         "utf-8",
       );
 
       const { loadPropositionFile } = await import("../proposition-loader");
 
       try {
-        // propositions array is empty but target_type is missing — should fail validation
+        // invalid dimension value — should fail Zod validation
         await expect(loadPropositionFile(tmpFile)).rejects.toThrow();
       } finally {
         await fs.unlink(tmpFile);

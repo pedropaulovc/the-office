@@ -17,7 +17,7 @@ export const propositionYamlSchema = z.object({
   agent_id: z.string().optional(),
   include_personas: z.boolean().default(true),
   hard: z.boolean().default(false),
-  target_type: targetType,
+  target_type: targetType.default("agent"),
   first_n: z.number().int().nonnegative().optional(),
   last_n: z.number().int().nonnegative().optional(),
   propositions: z.array(
