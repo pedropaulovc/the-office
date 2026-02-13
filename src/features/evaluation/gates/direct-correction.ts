@@ -64,7 +64,7 @@ ${rulesSection}
 Rewrite the message to satisfy ALL corrective rules. Preserve the agent's voice and intended meaning as much as possible.`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => { controller.abort(); }, 5000);
 
     try {
       const response = await getAnthropicClient().messages.create(

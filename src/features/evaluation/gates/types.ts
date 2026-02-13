@@ -81,13 +81,13 @@ export const DEFAULT_PIPELINE_CONFIG: CorrectionPipelineConfig = {
 
 export interface RegenerationFeedback {
   tentativeAction: string;
-  failedDimensions: Array<{
+  failedDimensions: {
     dimension: QualityDimension;
     score: number;
     threshold: number;
     reasoning: string;
     recommendation: string;
-  }>;
+  }[];
   attemptNumber: number;
   maxAttempts: number;
 }

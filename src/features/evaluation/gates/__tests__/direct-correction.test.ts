@@ -109,7 +109,7 @@ describe("directCorrect", () => {
     );
 
     const callArgs = mockCreate.mock.calls[0] as unknown[];
-    const body = callArgs[0] as { messages: Array<{ content: string }> };
+    const body = callArgs[0] as { messages: { content: string }[] };
     const content = body.messages[0]?.content ?? "";
     expect(content).toContain("Michael persona");
     expect(content).toContain("Hey Michael");
@@ -152,7 +152,7 @@ describe("directCorrect", () => {
 
     expect(result.correctedText).toBe("Multi-fixed");
     const callArgs = mockCreate.mock.calls[0] as unknown[];
-    const body = callArgs[0] as { messages: Array<{ content: string }> };
+    const body = callArgs[0] as { messages: { content: string }[] };
     const content = body.messages[0]?.content ?? "";
     expect(content).toContain("persona_adherence");
     expect(content).toContain("fluency");

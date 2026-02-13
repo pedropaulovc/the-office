@@ -45,11 +45,11 @@ function computeStats(logs: CorrectionLog[]): GateStatistics {
   }
 
   for (const log of logs) {
-    const scores = log.dimensionScores as Array<{
+    const scores = log.dimensionScores as {
       dimension: QualityDimension;
       score: number;
       passed: boolean;
-    }>;
+    }[];
     if (!Array.isArray(scores)) continue;
     for (const ds of scores) {
       if (!ALL_DIMENSIONS.includes(ds.dimension)) continue;
