@@ -28,6 +28,7 @@ describe("runs schema", () => {
       expect(columnNames).toContain("stop_reason");
       expect(columnNames).toContain("trigger_message_id");
       expect(columnNames).toContain("channel_id");
+      expect(columnNames).toContain("trigger_prompt");
       expect(columnNames).toContain("chain_depth");
       expect(columnNames).toContain("created_at");
       expect(columnNames).toContain("started_at");
@@ -59,6 +60,7 @@ describe("runs schema", () => {
         "stop_reason",
         "trigger_message_id",
         "channel_id",
+        "trigger_prompt",
         "started_at",
         "completed_at",
         "token_usage",
@@ -66,6 +68,13 @@ describe("runs schema", () => {
         const col = config.columns.find((c) => c.name === name);
         expect(col?.notNull).toBe(false);
       }
+    });
+
+    it("has trigger_prompt as optional text column", () => {
+      const col = config.columns.find((c) => c.name === "trigger_prompt");
+      expect(col).toBeDefined();
+      expect(col?.dataType).toBe("string");
+      expect(col?.notNull).toBe(false);
     });
 
     it("has a composite index on (agent_id, status)", () => {
@@ -94,6 +103,7 @@ describe("runs schema", () => {
         stopReason: null,
         triggerMessageId: null,
         channelId: null,
+        triggerPrompt: null,
         chainDepth: 0,
         createdAt: new Date(),
         startedAt: null,
