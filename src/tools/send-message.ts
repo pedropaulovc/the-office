@@ -147,8 +147,8 @@ async function runQualityGate(
     {
       runId,
       channelId,
-      agentName: toolOptions?.agentName ?? agentId,
-      persona: toolOptions?.persona,
+      agentName: toolOptions.agentName ?? agentId,
+      persona: toolOptions.persona,
       recentMessages: agentRecentMessages,
     },
   );

@@ -329,7 +329,7 @@ describe("formatFeedbackForAgent", () => {
     };
 
     const result = formatFeedbackForAgent(feedback);
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result) as { type: string; instruction: string };
 
     expect(parsed.type).toBe("quality_check_failed");
     expect(parsed.instruction).toContain("MORE RADICAL");
