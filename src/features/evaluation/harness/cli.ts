@@ -35,10 +35,10 @@ function parseCliArgs() {
   return {
     agents,
     dimensions,
-    threshold: parseFloat(values.threshold!),
-    mockJudge: values["mock-judge"] ?? false,
-    updateBaseline: values["update-baseline"] ?? false,
-    regressionDelta: parseFloat(values["regression-delta"]!),
+    threshold: parseFloat(values.threshold),
+    mockJudge: values["mock-judge"],
+    updateBaseline: values["update-baseline"],
+    regressionDelta: parseFloat(values["regression-delta"]),
     output: values.output ?? null,
   };
 }
