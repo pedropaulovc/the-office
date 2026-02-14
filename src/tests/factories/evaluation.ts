@@ -18,6 +18,7 @@ export function createMockEvaluationRun(
     overallScore: null,
     isBaseline: false,
     tokenUsage: null,
+    experimentId: null,
     createdAt: new Date("2025-01-01"),
     completedAt: null,
     ...overrides,

@@ -88,6 +88,7 @@ describe("evaluations schema", () => {
         overallScore: null,
         isBaseline: false,
         tokenUsage: null,
+        experimentId: null,
         createdAt: new Date(),
         completedAt: null,
       };

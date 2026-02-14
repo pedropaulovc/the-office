@@ -53,6 +53,8 @@ describe("agents schema", () => {
       maxBudgetUsd: 0.1,
       sessionId: null,
       isActive: true,
+      experimentId: null,
+      persona: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

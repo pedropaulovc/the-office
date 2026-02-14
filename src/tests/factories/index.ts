@@ -10,3 +10,9 @@ export {
   resetEvaluationRunFactoryCounter,
   resetEvaluationScoreFactoryCounter,
 } from "./evaluation";
+export {
+  createMockExperiment,
+  createMockExperimentEnvironment,
+  resetExperimentFactoryCounter,
+  resetExperimentEnvironmentFactoryCounter,
+} from "./experiment";

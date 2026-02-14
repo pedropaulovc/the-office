@@ -32,6 +32,7 @@ export const evaluationRuns = pgTable(
     overallScore: real("overall_score"),
     isBaseline: boolean("is_baseline").notNull().default(false),
     tokenUsage: jsonb("token_usage"),
+    experimentId: uuid("experiment_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

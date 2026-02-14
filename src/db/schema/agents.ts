@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, integer, real, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 
 export const agents = pgTable("agents", {
   id: text("id").primaryKey(),
@@ -11,6 +11,8 @@ export const agents = pgTable("agents", {
   maxBudgetUsd: real("max_budget_usd").notNull().default(1),
   sessionId: text("session_id"),
   isActive: boolean("is_active").notNull().default(true),
+  experimentId: uuid("experiment_id"),
+  persona: jsonb("persona"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

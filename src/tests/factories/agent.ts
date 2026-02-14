@@ -15,6 +15,8 @@ export function createMockAgent(overrides?: Partial<Agent>): Agent {
     maxBudgetUsd: 0.1,
     sessionId: null,
     isActive: true,
+    experimentId: null,
+    persona: null,
     createdAt: new Date("2025-01-01"),
     updatedAt: new Date("2025-01-01"),
     ...overrides,
