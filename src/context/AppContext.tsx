@@ -9,12 +9,14 @@ interface AppContextValue {
   threadPanel: ThreadPanel;
   activeTab: TopLevelTab;
   activeDashboardPage: DashboardPage;
+  activeExperimentId: string | null;
   switchUser: (userId: string) => void;
   navigateTo: (view: ActiveView) => void;
   openThread: (parentMessageId: string) => void;
   closeThread: () => void;
   switchTab: (tab: TopLevelTab) => void;
   switchDashboardPage: (page: DashboardPage) => void;
+  setActiveExperimentId: (id: string | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -25,6 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [threadPanel, setThreadPanel] = useState<ThreadPanel>({ state: 'closed', parentMessageId: null });
   const [activeTab, setActiveTab] = useState<TopLevelTab>('slack');
   const [activeDashboardPage, setActiveDashboardPage] = useState<DashboardPage>('experiments');
+  const [activeExperimentId, setActiveExperimentId] = useState<string | null>(null);
 
   const switchUser = useCallback((userId: string) => {
     setCurrentUserId(userId);
@@ -60,12 +63,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       threadPanel,
       activeTab,
       activeDashboardPage,
+      activeExperimentId,
       switchUser,
       navigateTo,
       openThread,
       closeThread,
       switchTab,
       switchDashboardPage,
+      setActiveExperimentId,
     }}>
       {children}
     </AppContext.Provider>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FlaskConical, Plus } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 import { useExperiments } from '@/hooks/use-experiments';
 import type { CreateExperimentData, ExperimentProgress, ExperimentPhase } from '@/hooks/use-experiments';
 import { ExperimentLaunchDialog } from '@/components/dashboard/ExperimentLaunchDialog';
@@ -94,6 +95,7 @@ function EmptyState() {
 }
 
 export function ExperimentsPage() {
+  const { setActiveExperimentId, switchDashboardPage } = useApp();
   const { experiments, loading, error, createExperiment, runExperiment } = useExperiments();
   const [dialogVisibility, setDialogVisibility] = useState<DialogVisibility>('hidden');
 
@@ -143,7 +145,7 @@ export function ExperimentsPage() {
               {experiments.map((exp) => (
                 <tr
                   key={exp.id}
-                  onClick={() => { console.log(exp.id); }}
+                  onClick={() => { setActiveExperimentId(exp.id); switchDashboardPage('experiment-detail'); }}
                   data-testid="experiment-row"
                   className="border-b border-border cursor-pointer hover:bg-slack-message-hover transition-colors"
                 >

@@ -3,6 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockUseExperiments = vi.fn<() => Record<string, unknown>>();
 
+vi.mock('@/context/AppContext', () => ({
+  useApp: () => ({
+    setActiveExperimentId: vi.fn(),
+    switchDashboardPage: vi.fn(),
+  }),
+}));
+
 vi.mock('@/hooks/use-experiments', () => ({
   useExperiments: () => mockUseExperiments(),
 }));
