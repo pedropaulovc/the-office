@@ -300,6 +300,7 @@ You have access to Playwright via playwright-cli skill. Make sure to **only use 
 
 - **Run the Build**: After significant changes, run `npm run build` and `npm run lint`.
 - **Visual Check**: You WILL be asked to demo your code changes using Playwright, so before claiming completion you MUST perform a visual check with it.
+- **CI Must Be Green**: Before claiming work is done or a PR is ready, watch CI/CD with `gh run watch <run-id>` and confirm all jobs pass. A PR with failing CI is not done.
 
 ### Mock Data Standard
 
