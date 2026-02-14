@@ -95,7 +95,7 @@ describe("send_message tool", () => {
     });
     mockCreateRunMessage.mockResolvedValue(undefined);
     // Default: non-DM channel (no chain trigger)
-    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "" });
+    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["michael", "dwight", "jim"]);
   });
 
@@ -129,7 +129,7 @@ describe("send_message tool", () => {
   });
 
   it("does not enqueue follow-up for non-DM channels", async () => {
-    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "" });
+    mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "", experimentId: null });
 
     const { createSendMessageTool } = await import("../send-message");
     const toolDef = createSendMessageTool("michael", "run-1", "general", 0) as unknown as MockToolDef;
@@ -145,7 +145,7 @@ describe("send_message tool", () => {
       id: "dm-msg-1", channelId: "dm-michael-dwight", userId: "michael",
       text: "Hey Dwight", parentMessageId: null, createdAt: new Date(),
     });
-    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "" });
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
     const mockExecutor = vi.fn();
 
@@ -171,7 +171,7 @@ describe("send_message tool", () => {
       id: "dm-msg-2", channelId: "dm-michael-dwight", userId: "michael",
       text: "Again", parentMessageId: null, createdAt: new Date(),
     });
-    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "" });
+    mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
 
     const { createSendMessageTool } = await import("../send-message");
@@ -195,7 +195,7 @@ describe("send_message tool", () => {
       id: "dm-msg-d0", channelId: "dm-ab", userId: "agentA",
       text: "d0", parentMessageId: null, createdAt: new Date(),
     });
-    mockGetChannel.mockResolvedValue({ id: "dm-ab", name: "DM", kind: "dm", topic: "" });
+    mockGetChannel.mockResolvedValue({ id: "dm-ab", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["agentA", "agentB"]);
 
     const { createSendMessageTool } = await import("../send-message");

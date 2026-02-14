@@ -27,6 +27,8 @@ const FALLBACK_AGENT: AgentView = {
   maxBudgetUsd: 0.1,
   sessionId: null,
   isActive: false,
+  experimentId: null,
+  persona: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   presence: 'offline',
