@@ -152,9 +152,9 @@ logStream.write(`=== E2E server started at ${new Date().toISOString()} ===\n`);
 
 console.log(`Starting Next.js server (log: test-results/${timestamp}/server.log)...`);
 
-const server = spawn("npx", ["next", "start", "--port", "0"], {
+const nextBin = join("node_modules", "next", "dist", "bin", "next");
+const server = spawn(process.execPath, [nextBin, "start", "--port", "0"], {
   stdio: ["ignore", "pipe", "pipe"],
-  shell: true,
   env: { ...process.env, SENTRY_TRACE_LOG: "1" },
 });
 
