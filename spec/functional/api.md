@@ -839,6 +839,139 @@ Summary of every route, grouped by resource.
 | POST | `/api/unreads/mark-read` | M1 (S-1.9) |
 | **SSE** | | |
 | GET | `/api/sse` | M3 (S-3.0) |
+| **Evaluation** | | |
+| GET | `/api/evaluations` | M6 (S-6.0a) |
+| POST | `/api/evaluations/score` | M6 (S-6.0a) |
+| GET | `/api/evaluations/[runId]` | M6 (S-6.0a) |
+| GET | `/api/evaluations/[runId]/scores` | M6 (S-6.0a) |
+| POST | `/api/evaluations/adherence` | M6 (S-6.1) |
+| POST | `/api/evaluations/consistency` | M6 (S-6.2) |
+| POST | `/api/evaluations/fluency` | M6 (S-6.3) |
+| POST | `/api/evaluations/convergence` | M6 (S-6.4) |
+| POST | `/api/evaluations/ideas-quantity` | M6 (S-6.6) |
+| GET | `/api/evaluations/baselines` | M8 (S-8.2) |
+| GET | `/api/evaluations/baselines/[agentId]` | M8 (S-8.2) |
+| POST | `/api/evaluations/quality-check` | M7 (S-7.0) |
+| GET | `/api/evaluations/quality-check/stats` | M7 (S-7.0) |
+| GET | `/api/evaluations/correction-logs` | M7 (S-7.0) |
+| GET | `/api/evaluations/interventions` | M7 (S-7.1) |
+| POST | `/api/evaluations/interventions/evaluate` | M7 (S-7.1) |
+| GET | `/api/evaluations/interventions/nudges` | M7 (S-7.1) |
+| GET | `/api/evaluations/config` | M7 (S-7.3) |
+| GET | `/api/evaluations/config/[agentId]` | M7 (S-7.3) |
+| PATCH | `/api/evaluations/config/[agentId]` | M7 (S-7.3) |
+| GET | `/api/evaluations/costs` | M7 (S-7.3) |
+
+---
+
+## Evaluation Config
+
+Per-agent configuration for all correction mechanisms.
+
+### `GET /api/evaluations/config`
+
+List all agent configs (resolved: DB config merged with defaults).
+
+**Response 200:**
+
+```json
+{
+  "configs": [
+    { "agentId": "michael", "config": { "pipeline": { ... }, "interventions": { ... }, "repetition": { ... } }, "updatedAt": "..." }
+  ]
+}
+```
+
+### `GET /api/evaluations/config/[agentId]`
+
+Get resolved config for a single agent.
+
+**Response 200:** `{ "agentId": "michael", "config": { ... } }`
+
+### `PATCH /api/evaluations/config/[agentId]`
+
+Update agent config. Uses **flat DB-column keys** (not the nested format returned by GET). Schema is `.strict()` — unrecognized keys return 400.
+
+**Request body (all optional, `.strict()`):**
+
+```json
+{
+  "gateAdherenceEnabled": true,
+  "gateConsistencyEnabled": true,
+  "gateFluencyEnabled": true,
+  "gateSuitabilityEnabled": true,
+  "gateAdherenceThreshold": 7,
+  "gateConsistencyThreshold": 7,
+  "gateFluencyThreshold": 7,
+  "gateSuitabilityThreshold": 7,
+  "gateSimilarityEnabled": false,
+  "maxActionSimilarity": 0.6,
+  "enableRegeneration": true,
+  "enableDirectCorrection": false,
+  "maxCorrectionAttempts": 2,
+  "continueOnFailure": true,
+  "minimumRequiredQtyOfActions": 0,
+  "antiConvergenceEnabled": false,
+  "convergenceThreshold": 0.6,
+  "varietyInterventionEnabled": false,
+  "varietyMessageThreshold": 7,
+  "repetitionSuppressionEnabled": false,
+  "repetitionThreshold": 0.3
+}
+```
+
+**Response 200:** Resolved config (same nested format as GET).
+
+### `GET /api/evaluations/costs`
+
+Cost summary aggregated from correction and intervention logs.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `agentId` | query, string | Filter by agent. Omit for total. |
+| `startDate` | query, ISO 8601 | Start of time window |
+| `endDate` | query, ISO 8601 | End of time window |
+
+**Response 200:**
+
+```json
+{
+  "agentId": "michael",
+  "correctionTokens": { "input": 1200, "output": 350 },
+  "interventionTokens": { "input": 800, "output": 200 },
+  "totalTokens": { "input": 2000, "output": 550 },
+  "estimatedCostUsd": 0.0012
+}
+```
+
+### `POST /api/evaluations/quality-check`
+
+Run a quality check on a proposed message. When `config` is omitted, falls back to the agent's DB config (from `agent_evaluation_config` table). Always logs to `correction_logs` for cost tracking.
+
+**Request body:**
+
+```json
+{
+  "agentId": "michael",
+  "messageText": "That's what she said!",
+  "conversationContext": ["Hey Michael, how's it going?"],
+  "recentMessages": ["Previous message 1", "Previous message 2"],
+  "config": {
+    "dimensions": {
+      "persona_adherence": { "enabled": true, "threshold": 7 }
+    },
+    "similarity": { "enabled": false, "threshold": 0.6 }
+  },
+  "pipeline": {
+    "enableRegeneration": true,
+    "enableDirectCorrection": false,
+    "maxCorrectionAttempts": 2,
+    "continueOnFailure": true
+  }
+}
+```
+
+**Response 201:** Gate result with per-dimension scores, similarity result, total score, and token usage.
 
 ---
 

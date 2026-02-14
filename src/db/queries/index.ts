@@ -7,3 +7,5 @@ export * from "./unreads";
 export * from "./evaluations";
 export * from "./correction-logs";
 export * from "./intervention-logs";
+export * from "./evaluation-config";
+

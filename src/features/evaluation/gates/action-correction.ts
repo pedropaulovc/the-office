@@ -2,6 +2,7 @@ import {
   scoreProposition,
   type TrajectoryEntry,
   type ScoringContext,
+  type TokenUsage,
 } from "@/features/evaluation/proposition-engine";
 import type { Proposition } from "@/features/evaluation/types";
 import { computeActionSimilarity } from "./action-similarity";
@@ -104,12 +105,16 @@ function buildTrajectory(
 // Score a single dimension
 // ---------------------------------------------------------------------------
 
+interface DimensionResultWithTokens extends DimensionResult {
+  tokenUsage: TokenUsage;
+}
+
 async function scoreDimension(
   dimension: QualityDimension,
   threshold: number,
   trajectory: TrajectoryEntry[],
   persona: string | undefined,
-): Promise<DimensionResult> {
+): Promise<DimensionResultWithTokens> {
   const spec = DIMENSION_SPECS[dimension];
   const context: ScoringContext = {
     trajectory,
@@ -124,6 +129,7 @@ async function scoreDimension(
     reasoning: result.reasoning,
     passed: result.score >= threshold,
     threshold,
+    tokenUsage: result.tokenUsage,
   };
 }
 
@@ -180,7 +186,7 @@ export async function checkActionQuality(
     countMetric("gate.quality_check", 1, { agentId });
 
     // Score enabled dimensions in parallel
-    const dimensionResults = await Promise.all(
+    const dimensionResultsWithTokens = await Promise.all(
       enabledDimensions.map((dim) =>
         scoreDimension(
           dim,
@@ -190,6 +196,22 @@ export async function checkActionQuality(
         ),
       ),
     );
+
+    // Aggregate token usage across all dimensions
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const dimensionResults: DimensionResult[] = [];
+    for (const r of dimensionResultsWithTokens) {
+      totalInputTokens += r.tokenUsage.input_tokens;
+      totalOutputTokens += r.tokenUsage.output_tokens;
+      dimensionResults.push({
+        dimension: r.dimension,
+        score: r.score,
+        reasoning: r.reasoning,
+        passed: r.passed,
+        threshold: r.threshold,
+      });
+    }
 
     // Similarity check
     let similarityResult = null;
@@ -236,6 +258,9 @@ export async function checkActionQuality(
       dimensionResults,
       similarityResult,
       totalScore,
+      tokenUsage: totalInputTokens > 0 || totalOutputTokens > 0
+        ? { input_tokens: totalInputTokens, output_tokens: totalOutputTokens }
+        : undefined,
     };
   });
 }

@@ -7,6 +7,7 @@
  */
 import type { TrajectoryEntry, ScoringContext, TokenUsage } from "@/features/evaluation/proposition-engine";
 import type { InterventionEvalContext } from "@/features/evaluation/interventions/types";
+import type { InterventionConfig } from "@/features/evaluation/config";
 import { createAntiConvergenceIntervention } from "@/features/evaluation/interventions/anti-convergence";
 import { createVarietyIntervention } from "@/features/evaluation/interventions/variety-intervention";
 import { withSpan, logInfo, logError, countMetric } from "@/lib/telemetry";
@@ -32,6 +33,7 @@ export async function evaluateInterventions(
   agentId: string,
   channelId: string | null,
   recentMessages: { userId: string; text: string; createdAt: Date | string }[],
+  interventionConfig?: InterventionConfig,
 ): Promise<{ nudgeText: string | null; tokenUsage: TokenUsage }> {
   if (!channelId) {
     logInfo("evaluateInterventions.skipped", { agentId, reason: "dm" });
@@ -63,23 +65,36 @@ export async function evaluateInterventions(
         };
 
         const antiConvergence = createAntiConvergenceIntervention(agentId, channelId);
-        const variety = createVarietyIntervention(agentId, channelId, trajectory.length);
+        const variety = createVarietyIntervention(
+          agentId,
+          channelId,
+          trajectory.length,
+          interventionConfig?.varietyMessageThreshold ?? 7,
+        );
 
         let totalTokenUsage: TokenUsage = { ...ZERO_USAGE };
         const nudgeParts: string[] = [];
+        let antiConvergenceFired = false;
+        let varietyFired = false;
 
-        // Anti-convergence first
-        const acResult = await antiConvergence.evaluate(evalContext);
-        totalTokenUsage = mergeTokenUsage(totalTokenUsage, acResult.tokenUsage);
-        if (acResult.fired && acResult.nudgeText) {
-          nudgeParts.push(acResult.nudgeText);
+        // Anti-convergence first (skip if disabled in config)
+        if (!interventionConfig || interventionConfig.antiConvergenceEnabled) {
+          const acResult = await antiConvergence.evaluate(evalContext);
+          totalTokenUsage = mergeTokenUsage(totalTokenUsage, acResult.tokenUsage);
+          antiConvergenceFired = acResult.fired;
+          if (acResult.fired && acResult.nudgeText) {
+            nudgeParts.push(acResult.nudgeText);
+          }
         }
 
-        // Variety second
-        const vResult = await variety.evaluate(evalContext);
-        totalTokenUsage = mergeTokenUsage(totalTokenUsage, vResult.tokenUsage);
-        if (vResult.fired && vResult.nudgeText) {
-          nudgeParts.push(vResult.nudgeText);
+        // Variety second (skip if disabled in config)
+        if (!interventionConfig || interventionConfig.varietyInterventionEnabled) {
+          const vResult = await variety.evaluate(evalContext);
+          totalTokenUsage = mergeTokenUsage(totalTokenUsage, vResult.tokenUsage);
+          varietyFired = vResult.fired;
+          if (vResult.fired && vResult.nudgeText) {
+            nudgeParts.push(vResult.nudgeText);
+          }
         }
 
         const nudgeText = nudgeParts.length > 0 ? nudgeParts.join("\n") : null;
@@ -93,8 +108,8 @@ export async function evaluateInterventions(
         logInfo("evaluateInterventions.complete", {
           agentId,
           channelId,
-          antiConvergenceFired: acResult.fired,
-          varietyFired: vResult.fired,
+          antiConvergenceFired,
+          varietyFired,
           hasNudge: nudgeText !== null,
           inputTokens: totalTokenUsage.input_tokens,
           outputTokens: totalTokenUsage.output_tokens,

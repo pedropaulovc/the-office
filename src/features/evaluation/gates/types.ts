@@ -20,6 +20,7 @@ export interface GateResult {
   dimensionResults: DimensionResult[];
   similarityResult: SimilarityResult | null;
   totalScore: number;  // sum of all dimension scores
+  tokenUsage?: { input_tokens: number; output_tokens: number } | undefined;
 }
 
 export interface GateConfig {
