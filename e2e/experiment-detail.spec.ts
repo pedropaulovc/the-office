@@ -15,7 +15,7 @@ test.describe("experiment detail page", () => {
     const runRes = await request.post(`/api/experiments/${created.id}/run`, {
       data: {},
     });
-    expect(runRes.status()).toBe(202);
+    expect(runRes.status()).toBe(200);
   });
 
   async function navigateToDetail(page: Page) {

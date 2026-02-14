@@ -1,8 +1,6 @@
 'use client';
 
 import type { ExperimentEnvironment } from '@/hooks/use-experiment-detail';
-import { useApp } from '@/context/AppContext';
-import { useData } from '@/context/useData';
 
 interface EnvironmentsListProps {
   environments: ExperimentEnvironment[];
@@ -14,14 +12,6 @@ const GROUP_STYLES: Record<string, string> = {
 };
 
 export function EnvironmentsList({ environments }: EnvironmentsListProps) {
-  const { navigateToExperimentChannel } = useApp();
-  const { loadExperimentChannel } = useData();
-
-  const handleView = async (channelId: string) => {
-    await loadExperimentChannel(channelId);
-    navigateToExperimentChannel(channelId);
-  };
-
   const sorted = [...environments].sort((a, b) => {
     if (a.environmentIndex !== b.environmentIndex) return a.environmentIndex - b.environmentIndex;
     return a.group === 'treatment' ? -1 : 1;
@@ -58,10 +48,8 @@ export function EnvironmentsList({ environments }: EnvironmentsListProps) {
               </td>
               <td className="px-4 py-2 text-right">
                 <button
-                  data-testid="view-in-slack"
-                  disabled={!env.channelId}
-                  onClick={() => { if (env.channelId) void handleView(env.channelId); }}
-                  className="text-xs text-slack-channel-active hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                  onClick={() => { console.log('View environment', env.id); }}
+                  className="text-xs text-slack-channel-active hover:underline"
                 >
                   View
                 </button>
