@@ -131,3 +131,40 @@ export const correctionLogs = pgTable(
 
 export type CorrectionLog = typeof correctionLogs.$inferSelect;
 export type NewCorrectionLog = typeof correctionLogs.$inferInsert;
+
+// --- Intervention Logs ---
+
+export const interventionLogs = pgTable(
+  "intervention_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    channelId: text("channel_id"),
+    interventionType: text("intervention_type", {
+      enum: ["anti_convergence", "variety", "custom"],
+    }).notNull(),
+    textualPrecondition: text("textual_precondition"),
+    textualPreconditionResult: boolean("textual_precondition_result"),
+    functionalPreconditionResult: boolean("functional_precondition_result"),
+    propositionalPreconditionResult: boolean(
+      "propositional_precondition_result",
+    ),
+    fired: boolean("fired").notNull(),
+    nudgeText: text("nudge_text"),
+    tokenUsage: jsonb("token_usage"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("intervention_logs_agent_created_idx").on(
+      table.agentId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export type InterventionLog = typeof interventionLogs.$inferSelect;
+export type NewInterventionLog = typeof interventionLogs.$inferInsert;
