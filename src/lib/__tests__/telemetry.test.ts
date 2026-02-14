@@ -110,7 +110,7 @@ describe("telemetry helpers", () => {
 
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
-      "test.name | short value",
+      "test.name.1 | short value",
       expect.objectContaining({ agentId: "michael", chunk: 1, totalChunks: 1 }),
     );
   });
@@ -145,7 +145,7 @@ describe("telemetry helpers", () => {
     );
 
     // Each chunk's message body is <=5000 chars of the value
-    const firstMsg = mockLoggerInfo.mock.calls[0][0] as string;
+    const firstMsg = mockLoggerInfo.mock.calls[0]![0] as string;
     const prefix = "sdk.input.system_prompt.michael.1 | ";
     expect(firstMsg.length - prefix.length).toBe(5000);
   });
@@ -157,7 +157,7 @@ describe("telemetry helpers", () => {
 
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
-      `test.exact | ${exact}`,
+      `test.exact.1 | ${exact}`,
       expect.objectContaining({ chunk: 1, totalChunks: 1 }),
     );
   });
@@ -170,8 +170,8 @@ describe("telemetry helpers", () => {
 
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
-      "judge.request",
-      expect.objectContaining({ model: "haiku", prompt: "short" }),
+      "judge.request.1",
+      expect.objectContaining({ model: "haiku", prompt: "short", chunk: 1, totalChunks: 1 }),
     );
   });
 
@@ -191,7 +191,7 @@ describe("telemetry helpers", () => {
       "judge.request.1",
       expect.objectContaining({ model: "haiku", chunk: 1, totalChunks: 2 }),
     );
-    const chunk1Attrs = mockLoggerInfo.mock.calls[0][1] as Record<string, unknown>;
+    const chunk1Attrs = mockLoggerInfo.mock.calls[0]![1] as Record<string, unknown>;
     expect((chunk1Attrs.systemPrompt as string).length).toBe(5000);
 
     // Chunk 2: next 5k of systemPrompt
@@ -200,7 +200,7 @@ describe("telemetry helpers", () => {
       "judge.request.2",
       expect.objectContaining({ model: "haiku", chunk: 2, totalChunks: 2 }),
     );
-    const chunk2Attrs = mockLoggerInfo.mock.calls[1][1] as Record<string, unknown>;
+    const chunk2Attrs = mockLoggerInfo.mock.calls[1]![1] as Record<string, unknown>;
     expect((chunk2Attrs.systemPrompt as string).length).toBe(5000);
   });
 });

@@ -58,19 +58,14 @@ export function logError(
 /**
  * Logs a long string as multiple chunked messages.
  * Each chunk is emitted as `{baseName}.1`, `.2`, etc.
- * Short strings (<=LOG_CHUNK_SIZE) emit a single log with no suffix.
+ * Always suffixed — even single-chunk messages get `.1`.
  */
 export function logChunked(
   baseName: string,
   value: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
-  if (value.length <= LOG_CHUNK_SIZE) {
-    logInfo(`${baseName} | ${value}`, { ...attributes, chunk: 1, totalChunks: 1 });
-    return;
-  }
-
-  const totalChunks = Math.ceil(value.length / LOG_CHUNK_SIZE);
+  const totalChunks = Math.ceil(value.length / LOG_CHUNK_SIZE) || 1;
   for (let i = 0; i < totalChunks; i++) {
     const chunk = value.slice(i * LOG_CHUNK_SIZE, (i + 1) * LOG_CHUNK_SIZE);
     logInfo(`${baseName}.${i + 1} | ${chunk}`, {
@@ -95,7 +90,7 @@ export function logChunkedAttrs(
   );
 
   if (longKeys.length === 0) {
-    logInfo(baseName, attributes);
+    logInfo(`${baseName}.1`, { ...attributes, chunk: 1, totalChunks: 1 });
     return;
   }
 
