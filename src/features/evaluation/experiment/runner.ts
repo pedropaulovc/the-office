@@ -2,14 +2,17 @@ import { withNewTrace, logInfo, countMetric } from "@/lib/telemetry";
 import { AgentFactory } from "./agent-factory";
 import { getScenario } from "./scenario-library";
 import { getProfile } from "./population-profiles";
-import { createAndRunEnvironments } from "./environment-manager";
+import { createAndRunEnvironments, assignAgents } from "./environment-manager";
 import type { EnvironmentPairResult } from "./environment-manager";
 import { welchTTest, cohensD, mean, standardDeviation } from "./statistical-testing";
 import { generateExperimentReport } from "./experiment-report";
 import type { MetricResult, ExperimentReport } from "./experiment-report";
-import type { ScenarioConfig } from "./types";
+import type { ScenarioConfig, GeneratedPersona } from "./types";
 import type { ExperimentMode } from "./environment";
 import { scoreTrajectory } from "./llm-scorer";
+import { createExperimentRecord, persistEnvironmentPair, completeExperiment, failExperiment } from "./persistence";
+import { persistExperimentScores } from "./score-persistence";
+import { loadExistingAgents } from "./existing-agents";
 
 interface RunnerOptions {
   scenario: string;
@@ -18,6 +21,9 @@ interface RunnerOptions {
   dryRun?: boolean;
   scale?: number;
   mode?: ExperimentMode;
+  persist?: boolean;
+  populationSource?: "generated" | "existing";
+  sourceAgentIds?: string[];
 }
 
 interface DryRunResult {
@@ -88,7 +94,7 @@ async function scoreEnvironmentsLlm(
   return scores;
 }
 
-async function runExperiment(options: RunnerOptions): Promise<ExperimentReport | DryRunResult> {
+async function runExperiment(options: RunnerOptions): Promise<(ExperimentReport & { experimentId?: string }) | DryRunResult> {
   return withNewTrace("experiment.run", "evaluation.experiment", async () => {
     const seed = options.seed ?? 42;
     const scale = options.scale ?? 1.0;
@@ -113,6 +119,20 @@ async function runExperiment(options: RunnerOptions): Promise<ExperimentReport |
       dryRun: options.dryRun ?? false,
     });
 
+    // Create experiment record if persisting
+    let experimentId: string | undefined;
+    if (options.persist) {
+      const record = await createExperimentRecord({
+        scenario: scaledScenario,
+        seed,
+        scale,
+        mode,
+        populationSource: options.populationSource ?? "generated",
+        ...(options.sourceAgentIds && { sourceAgentIds: options.sourceAgentIds }),
+      });
+      experimentId = record.id;
+    }
+
     if (options.dryRun) {
       return {
         dryRun: true as const,
@@ -131,72 +151,125 @@ async function runExperiment(options: RunnerOptions): Promise<ExperimentReport |
     const runs = options.runs ?? 1;
     const totalAgents = scaledScenario.agents_per_environment * scaledScenario.total_environments;
 
-    // Accumulate scores across all runs
-    const allTreatmentScores: Record<string, number[]> = {};
-    const allControlScores: Record<string, number[]> = {};
-    for (const dim of scaledScenario.evaluation_dimensions) {
-      allTreatmentScores[dim] = [];
-      allControlScores[dim] = [];
-    }
-
-    for (let run = 0; run < runs; run++) {
-      const runSeed = seed + run;
-
-      // 1. Generate agents
-      const factory = new AgentFactory();
-      const agents = factory.generate(totalAgents, profile, {
-        seed: runSeed,
-        templateOnly: true,
-      });
-
-      logInfo("Agents generated", {
-        run: run + 1,
-        totalRuns: runs,
-        count: agents.length,
-        profile: scaledScenario.population_profile,
-      });
-
-      // 2. Create and run environments (T/C pairs)
-      const envResult = await createAndRunEnvironments(scaledScenario, agents, runSeed, mode);
-
-      // 3. Score all environments
-      const scoreFn = mode === "llm" ? scoreEnvironmentsLlm : scoreEnvironmentsTemplate;
-      const tScores = await scoreFn(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
-      const cScores = await scoreFn(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
-
+    try {
+      // Accumulate scores across all runs
+      const allTreatmentScores: Record<string, number[]> = {};
+      const allControlScores: Record<string, number[]> = {};
       for (const dim of scaledScenario.evaluation_dimensions) {
-        allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
-        allControlScores[dim]?.push(...(cScores[dim] ?? []));
+        allTreatmentScores[dim] = [];
+        allControlScores[dim] = [];
       }
+
+      let lastAgents: GeneratedPersona[] = [];
+
+      for (let run = 0; run < runs; run++) {
+        const runSeed = seed + run;
+
+        // 1. Generate or load agents
+        let agents: GeneratedPersona[];
+        if (options.populationSource === "existing" && options.sourceAgentIds) {
+          agents = await loadExistingAgents(options.sourceAgentIds);
+        } else {
+          const factory = new AgentFactory();
+          agents = factory.generate(totalAgents, profile, {
+            seed: runSeed,
+            templateOnly: true,
+          });
+        }
+
+        lastAgents = agents;
+
+        logInfo("Agents ready", {
+          run: run + 1,
+          totalRuns: runs,
+          count: agents.length,
+          profile: scaledScenario.population_profile,
+          source: options.populationSource ?? "generated",
+        });
+
+        // 2. Create and run environments (T/C pairs)
+        const envResult = await createAndRunEnvironments(scaledScenario, agents, runSeed, mode);
+
+        // Persist environment pairs if needed
+        if (options.persist && experimentId) {
+          const agentGroups = assignAgents(
+            agents,
+            scaledScenario.total_environments,
+            scaledScenario.agents_per_environment,
+            runSeed,
+          );
+          for (const [pairIndex, pair] of envResult.pairs.entries()) {
+            const pairAgents = agentGroups[pairIndex] ?? [];
+            await persistEnvironmentPair(
+              experimentId,
+              pairIndex + 1,
+              pair,
+              pairAgents,
+              options.populationSource ?? "generated",
+            );
+          }
+        }
+
+        // 3. Score all environments
+        const scoreFn = mode === "llm" ? scoreEnvironmentsLlm : scoreEnvironmentsTemplate;
+        const tScores = await scoreFn(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
+        const cScores = await scoreFn(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
+
+        for (const dim of scaledScenario.evaluation_dimensions) {
+          allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
+          allControlScores[dim]?.push(...(cScores[dim] ?? []));
+        }
+      }
+
+      // 4. Compute statistics per dimension across all runs
+      const metrics: Record<string, MetricResult> = {};
+      for (const dim of scaledScenario.evaluation_dimensions) {
+        const tScores = allTreatmentScores[dim] ?? [];
+        const cScores = allControlScores[dim] ?? [];
+        const tTest = welchTTest(tScores, cScores);
+        const effectSize = cohensD(tScores, cScores);
+
+        metrics[dim] = {
+          treatment: { mean: mean(tScores), sd: standardDeviation(tScores) },
+          control: { mean: mean(cScores), sd: standardDeviation(cScores) },
+          delta: mean(tScores) - mean(cScores),
+          tTest,
+          effectSize,
+        };
+      }
+
+      countMetric("experiment.completed", 1);
+
+      // 5. Generate report (use original scenario.id for identification)
+      const report = generateExperimentReport({
+        scenario: scenario.id,
+        seed,
+        agentsCount: totalAgents,
+        environmentsCount: scaledScenario.total_environments,
+        metrics,
+      });
+
+      // Persist report and scores if needed
+      if (options.persist && experimentId) {
+        await completeExperiment(experimentId, report);
+        // For generated populations, the DB agent ID follows the pattern from persistGeneratedPersona
+        const scoreAgentId = options.sourceAgentIds?.[0]
+          ?? (lastAgents[0]
+            ? `exp-agent-${experimentId.slice(0, 8)}-${lastAgents[0].name.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}`
+            : "experiment");
+        await persistExperimentScores(experimentId, report, scoreAgentId);
+      }
+
+      if (experimentId) {
+        return { ...report, experimentId };
+      }
+      return report;
+    } catch (error) {
+      if (options.persist && experimentId) {
+        await failExperiment(experimentId, error instanceof Error ? error.message : String(error));
+      }
+      throw error;
     }
-
-    // 4. Compute statistics per dimension across all runs
-    const metrics: Record<string, MetricResult> = {};
-    for (const dim of scaledScenario.evaluation_dimensions) {
-      const tScores = allTreatmentScores[dim] ?? [];
-      const cScores = allControlScores[dim] ?? [];
-      const tTest = welchTTest(tScores, cScores);
-      const effectSize = cohensD(tScores, cScores);
-
-      metrics[dim] = {
-        treatment: { mean: mean(tScores), sd: standardDeviation(tScores) },
-        control: { mean: mean(cScores), sd: standardDeviation(cScores) },
-        delta: mean(tScores) - mean(cScores),
-        tTest,
-        effectSize,
-      };
-    }
-
-    countMetric("experiment.completed", 1);
-
-    // 5. Generate report (use original scenario.id for identification)
-    return generateExperimentReport({
-      scenario: scenario.id,
-      seed,
-      agentsCount: totalAgents,
-      environmentsCount: scaledScenario.total_environments,
-      metrics,
-    });
   });
 }
 
