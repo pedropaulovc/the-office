@@ -6,12 +6,34 @@ vi.mock("@sentry/nextjs", () => ({
   metrics: { count: vi.fn(), distribution: vi.fn() },
 }));
 
-import { runExperiment, scoreEnvironments } from "../runner";
+import { runExperiment, scoreEnvironments, TREATMENT_EFFECTS, treatmentScale } from "../runner";
 import { parseArgs, isDryRunResult } from "../cli";
 import type { ExperimentReport } from "../experiment-report";
 import type { DryRunResult } from "../runner";
 import type { EnvironmentPairResult } from "../environment-manager";
 import type { EnvironmentResult } from "../environment";
+import type { ScenarioConfig } from "../types";
+
+/** Minimal scenario for scoreEnvironments tests. */
+const TEST_SCENARIO: ScenarioConfig = {
+  id: "test",
+  name: "Test",
+  description: "Test scenario",
+  type: "brainstorming",
+  population_profile: "averageCustomer",
+  agents_per_environment: 2,
+  total_environments: 1,
+  steps_per_environment: 3,
+  facilitator_prompts: [],
+  agent_order: "sequential_random",
+  treatment: {
+    action_correction: true,
+    variety_intervention: true,
+    correction_dimensions: ["adherence", "consistency"],
+    correction_threshold: 7,
+  },
+  evaluation_dimensions: ["adherence", "consistency"],
+};
 
 function mockEnvironmentResult(envId: number, agentNames: string[], stepsCount: number): EnvironmentResult {
   const agents = agentNames.map((name) => ({
@@ -123,6 +145,23 @@ describe("runner", () => {
       }
     });
 
+    it("treatment and control means differ (treatment effects applied)", () => {
+      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+      // At least one dimension should show a non-trivial delta
+      const hasNonTrivialDelta = Object.values(result.metrics).some(
+        (m) => Math.abs(m.delta) > 0.1,
+      );
+      expect(hasNonTrivialDelta).toBe(true);
+    });
+
+    it("within-group standard deviation is non-zero", () => {
+      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+      for (const metric of Object.values(result.metrics)) {
+        expect(metric.treatment.sd).toBeGreaterThan(0.01);
+        expect(metric.control.sd).toBeGreaterThan(0.01);
+      }
+    });
+
     it("is deterministic with the same seed", () => {
       const result1 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       const result2 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
@@ -156,7 +195,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "consistency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions);
+      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
 
       // 2 agents in 1 environment = 2 scores per dimension
       expect(scores.adherence).toHaveLength(2);
@@ -172,7 +211,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "fluency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions);
+      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
 
       for (const dim of dimensions) {
         const dimScores = scores[dim];
@@ -182,6 +221,99 @@ describe("runner", () => {
           expect(score).toBeLessThanOrEqual(9);
         }
       }
+    });
+
+    it("treatment and control produce different scores", () => {
+      const pairs: EnvironmentPairResult[] = [
+        {
+          environmentId: 1,
+          treatment: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
+          control: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
+        },
+      ];
+      const dimensions = ["adherence", "consistency", "ideas_quantity"];
+      const tScores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      const cScores = scoreEnvironments(pairs, "control", dimensions, TEST_SCENARIO, 42);
+
+      // Treatment and control must differ for at least one dimension
+      const hasDifference = dimensions.some((dim) => {
+        const tMean = (tScores[dim] ?? []).reduce((s, v) => s + v, 0) / (tScores[dim]?.length ?? 1);
+        const cMean = (cScores[dim] ?? []).reduce((s, v) => s + v, 0) / (cScores[dim]?.length ?? 1);
+        return Math.abs(tMean - cMean) > 0.1;
+      });
+      expect(hasDifference).toBe(true);
+    });
+
+    it("within-group variance is non-zero", () => {
+      const pairs: EnvironmentPairResult[] = [
+        {
+          environmentId: 1,
+          treatment: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
+          control: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
+        },
+      ];
+      const dimensions = ["adherence"];
+      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      const vals = scores.adherence ?? [];
+      const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+      const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / (vals.length - 1);
+      expect(variance).toBeGreaterThan(0.01);
+    });
+
+    it("is deterministic with the same seed", () => {
+      const pairs: EnvironmentPairResult[] = [
+        {
+          environmentId: 1,
+          treatment: mockEnvironmentResult(1, ["Alice", "Bob"], 3),
+          control: mockEnvironmentResult(1, ["Alice", "Bob"], 3),
+        },
+      ];
+      const dimensions = ["adherence", "consistency"];
+      const scores1 = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      const scores2 = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      expect(scores1).toEqual(scores2);
+    });
+  });
+
+  describe("treatmentScale", () => {
+    it("returns 1.0 for AC+VI", () => {
+      expect(treatmentScale(TEST_SCENARIO)).toBe(1.0);
+    });
+
+    it("returns 0.5 for AC only", () => {
+      const acOnly = { ...TEST_SCENARIO, treatment: { ...TEST_SCENARIO.treatment, variety_intervention: false } };
+      expect(treatmentScale(acOnly)).toBe(0.5);
+    });
+
+    it("returns 0.7 for VI only", () => {
+      const viOnly = { ...TEST_SCENARIO, treatment: { ...TEST_SCENARIO.treatment, action_correction: false } };
+      expect(treatmentScale(viOnly)).toBe(0.7);
+    });
+
+    it("returns 0 when both disabled", () => {
+      const none = {
+        ...TEST_SCENARIO,
+        treatment: { ...TEST_SCENARIO.treatment, action_correction: false, variety_intervention: false },
+      };
+      expect(treatmentScale(none)).toBe(0);
+    });
+  });
+
+  describe("TREATMENT_EFFECTS", () => {
+    it("has effects for all standard dimensions", () => {
+      expect(TREATMENT_EFFECTS).toHaveProperty("adherence");
+      expect(TREATMENT_EFFECTS).toHaveProperty("consistency");
+      expect(TREATMENT_EFFECTS).toHaveProperty("fluency");
+      expect(TREATMENT_EFFECTS).toHaveProperty("convergence");
+      expect(TREATMENT_EFFECTS).toHaveProperty("ideas_quantity");
+    });
+
+    it("ideas_quantity is positive (treatment increases ideas)", () => {
+      expect(TREATMENT_EFFECTS.ideas_quantity).toBeGreaterThan(0);
+    });
+
+    it("consistency is negative (treatment trades consistency)", () => {
+      expect(TREATMENT_EFFECTS.consistency).toBeLessThan(0);
     });
   });
 
