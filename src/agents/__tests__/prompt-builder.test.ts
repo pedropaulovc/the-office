@@ -197,4 +197,52 @@ describe("buildSystemPrompt", () => {
 
     expect(result).toContain("[2025-06-15T14:30:00.000Z] jim: Bears, beets, Battlestar Galactica.");
   });
+
+  it("includes Conversation Guidance section when interventionNudge is provided (AC-7.1.12)", async () => {
+    const { buildSystemPrompt } = await import("../prompt-builder");
+    const result = buildSystemPrompt({
+      agent: {
+        id: "michael",
+        displayName: "Michael Scott",
+        systemPrompt: "Persona.",
+      },
+      memoryBlocks: [],
+      recentMessages: [],
+      interventionNudge: "Challenge the group's thinking with a bold perspective.",
+    });
+
+    expect(result).toContain("### Conversation Guidance");
+    expect(result).toContain("Challenge the group's thinking with a bold perspective.");
+  });
+
+  it("omits Conversation Guidance section when interventionNudge is null", async () => {
+    const { buildSystemPrompt } = await import("../prompt-builder");
+    const result = buildSystemPrompt({
+      agent: {
+        id: "michael",
+        displayName: "Michael Scott",
+        systemPrompt: "Persona.",
+      },
+      memoryBlocks: [],
+      recentMessages: [],
+      interventionNudge: null,
+    });
+
+    expect(result).not.toContain("### Conversation Guidance");
+  });
+
+  it("omits Conversation Guidance section when interventionNudge is undefined", async () => {
+    const { buildSystemPrompt } = await import("../prompt-builder");
+    const result = buildSystemPrompt({
+      agent: {
+        id: "michael",
+        displayName: "Michael Scott",
+        systemPrompt: "Persona.",
+      },
+      memoryBlocks: [],
+      recentMessages: [],
+    });
+
+    expect(result).not.toContain("### Conversation Guidance");
+  });
 });

@@ -70,11 +70,42 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       ? await getRecentMessages(run.channelId)
       : [];
 
+    // 3.5. Evaluate interventions (channel-only, fail-open)
+    let interventionNudge: string | null = null;
+    if (run.channelId) {
+      try {
+        const { evaluateInterventions } = await import(
+          "@/features/evaluation/interventions/evaluate-interventions"
+        );
+        const interventionResult = await evaluateInterventions(
+          run.agentId,
+          run.channelId,
+          recentMessages,
+        );
+        interventionNudge = interventionResult.nudgeText;
+        if (interventionNudge) {
+          logInfo("orchestrator.intervention.fired", {
+            runId: run.id,
+            agentId: run.agentId,
+            channelId: run.channelId,
+            nudgeLength: interventionNudge.length,
+          });
+        }
+      } catch (err) {
+        logWarn("orchestrator.intervention.failed", {
+          runId: run.id,
+          agentId: run.agentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     // 4. Build system prompt
     const systemPrompt = buildSystemPrompt({
       agent,
       memoryBlocks,
       recentMessages,
+      interventionNudge,
     });
 
     // 5. Create MCP server with tools

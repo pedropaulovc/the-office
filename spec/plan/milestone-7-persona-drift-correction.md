@@ -246,12 +246,15 @@ Nudges are transient — appended to the system prompt, NOT stored in memory.
 - [ ] [AC-7.1.19] Sentry spans and logs for intervention evaluation and nudge injection
 
 ### Demo
-1. Seed a channel conversation where 4 agents all agree with each other
-2. Enable anti-convergence intervention for the next agent to respond
-3. Show the textual precondition triggering (LLM detects agreement)
-4. Show the character-aware nudge being injected into the system prompt
-5. Show the agent's response is more diverse than without the intervention
-6. Demonstrate a variety intervention with a functional precondition (fires after 7 messages)
+
+All steps use the intervention APIs — no source code reading required.
+
+1. **Show character-aware nudge templates**: `GET /api/evaluations/interventions/nudges?agentId=michael` — verify Michael gets leadership-themed nudges. Compare with `?agentId=dwight` (authority/beet-farming themed).
+2. **Trigger anti-convergence on a convergent conversation**: `POST /api/evaluations/interventions/evaluate` with 10 messages where every agent agrees on the same topic (e.g., switching paper suppliers). Verify `fired: true` and `nudgeText` contains the character-aware devil's advocate nudge.
+3. **Verify non-convergent conversation does NOT fire**: Same endpoint with messages containing genuine disagreement (e.g., Jim vs Dwight, Angela's conditions, Oscar's trade-offs). Verify `fired: false` and `nudgeText: null`.
+4. **Confirm DB logging**: `GET /api/evaluations/interventions` — verify both fired and unfired interventions are logged with correct `interventionType`, `fired` status, and `nudgeText`.
+5. **Check Sentry trace**: Grep the dev server log for the evaluate request's trace ID. Use `scripts/sentry-trace.sh <trace-id> --full` to show the LLM judge input (trajectory + claim) and output (result, reasoning, confidence).
+6. **Invoke an agent in a channel**: Use the dev toolbar "Invoke agent" button on `#general`. Verify the Sentry trace shows `evaluateInterventions` span at orchestrator step 3.5, with both `intervention.evaluate` child spans for anti-convergence and variety checks.
 
 ---
 

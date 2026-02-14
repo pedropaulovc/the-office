@@ -108,4 +108,58 @@ test.describe("Intervention Framework (S-7.1a)", () => {
     const body = (await res.json()) as { logs: InterventionLogEntry[] };
     expect(body.logs.length).toBeLessThanOrEqual(1);
   });
+
+  test("POST evaluates anti-convergence intervention", async ({ request }) => {
+    const res = await request.post(API, {
+      data: {
+        agentId: "michael",
+        channelId: "general",
+        interventionType: "anti_convergence",
+        textualPrecondition: "Agents are converging too much",
+        fired: true,
+        nudgeText: "Challenge the group thinking",
+      },
+    });
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as { log: InterventionLogEntry };
+    expect(body.log.interventionType).toBe("anti_convergence");
+    expect(body.log.fired).toBe(true);
+    expect(body.log.nudgeText).toBeTruthy();
+  });
+
+  test("POST creates variety intervention log", async ({ request }) => {
+    const res = await request.post(API, {
+      data: {
+        agentId: "dwight",
+        channelId: "sales",
+        interventionType: "variety",
+        fired: true,
+        nudgeText: "Propose new ideas",
+        functionalPreconditionResult: true,
+      },
+    });
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as { log: InterventionLogEntry };
+    expect(body.log.interventionType).toBe("variety");
+    expect(body.log.functionalPreconditionResult).toBe(true);
+  });
+
+  test("GET filters by interventionType", async ({ request }) => {
+    // Seed an anti_convergence entry
+    await request.post(API, {
+      data: {
+        agentId: "pam",
+        channelId: "general",
+        interventionType: "anti_convergence",
+        fired: false,
+      },
+    });
+
+    const res = await request.get(`${API}?interventionType=anti_convergence`);
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as { logs: InterventionLogEntry[] };
+    for (const log of body.logs) {
+      expect(log.interventionType).toBe("anti_convergence");
+    }
+  });
 });
