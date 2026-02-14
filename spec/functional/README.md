@@ -122,6 +122,7 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 | 8 | Scheduling | [scheduling.md](scheduling.md) | Autonomous triggers, scheduler loop |
 | 9 | REST API | [api.md](api.md) | Full CRUD for all entities, OpenAPI doc, route map |
 | 10 | Evaluation | [evaluation.md](evaluation.md) | Persona drift measurement, correction, CI harness |
+| 11 | Persona Simulation Dashboard | [persona-simulation-dashboard.md](persona-simulation-dashboard.md) | Experiment management, Table 1 results, drill-down to Slack, eval/config/monitoring UI |
 
 ## What We Do NOT Build
 

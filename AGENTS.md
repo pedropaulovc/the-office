@@ -30,7 +30,7 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 
 Read-only Slack clone (The Office theme). Next.js App Router, Tailwind v4, TypeScript. Single-page, state-driven navigation via `src/context/AppContext.tsx`.
 
-**Layout:** `WorkspaceSidebar (68px) | ChannelSidebar (240px) | ChatPanel (flex-1) | ThreadPanel (360px, conditional)` — orchestrated by `WorkspaceShell`.
+**Layout:** Top-level `AppShell` renders a `TabBar` (Slack | Dashboard) + conditional content. Slack tab: `WorkspaceShell` → `WorkspaceSidebar (68px) | ChannelSidebar (240px) | ChatPanel (flex-1) | ThreadPanel (360px, conditional)`. Dashboard tab: `DashboardShell` → `DashboardSidebar (240px) | Content (flex-1)` with pages for Experiments, Evals, Config, Monitoring.
 
 **Data:** All data flows from Neon PostgreSQL via API routes to the frontend. `src/db/seed.ts` populates the DB with 16 Office characters, 7 channels, 8 DM conversations, ~130 messages, memory blocks, and read cursors (for computed unread counts). `src/data/` retains only `users.ts` (user constants shared by seed + frontend). Channels can be `public`, `private`, or `dm` (private filtered by `memberIds`). Messages use `t(daysAgo, hour, min)` for relative timestamps in the seed script.
 
@@ -91,6 +91,7 @@ graph TD
     M6 --> M8[M8: Evaluation Harness]
     M5 --> M8
     M7 --> M8
+    M8 --> M9[M9: Persona Simulation Dashboard]
 ```
 
 ### Milestones
@@ -105,6 +106,7 @@ graph TD
 | M6: Persona Drift Measurement | S-6.0a – S-6.6 | `spec/plan/milestone-6-persona-drift-measurement.md` |
 | M7: Persona Drift Correction | S-7.0a – S-7.3 | `spec/plan/milestone-7-persona-drift-correction.md` |
 | M8: Evaluation Harness | S-8.0 – S-8.7 | `spec/plan/milestone-8-evaluation-harness.md` |
+| M9: Persona Simulation Dashboard | S-9.0 – S-9.6 | `spec/plan/milestone-9-persona-simulation-dashboard.md` |
 
 ### Horizontal Requirements
 
