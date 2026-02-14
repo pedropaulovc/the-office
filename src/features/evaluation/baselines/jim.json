@@ -1,0 +1,21 @@
+{
+  "agentId": "jim",
+  "capturedAt": "2026-02-13T00:00:00Z",
+  "dimensions": {
+    "adherence": 7.12
+  },
+  "propositionScores": {
+    "adheres-to-persona": 7,
+    "uses-characteristic-language": 7,
+    "generic-corporate-response": 7,
+    "appropriate-emotional-tone": 7,
+    "jim-sarcasm-dry-wit": 8,
+    "jim-pranks-on-dwight": 7,
+    "jim-references-pam": 7,
+    "jim-laid-back-demeanor": 8,
+    "jim-camera-look-asides": 6,
+    "jim-deflects-with-humor": 7,
+    "jim-disinterest-corporate": 7,
+    "jim-takes-hierarchy-seriously-antipattern": 7
+  }
+}

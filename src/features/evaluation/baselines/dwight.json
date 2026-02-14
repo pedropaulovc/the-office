@@ -1,0 +1,23 @@
+{
+  "agentId": "dwight",
+  "capturedAt": "2026-02-13T00:00:00Z",
+  "dimensions": {
+    "adherence": 7.19
+  },
+  "propositionScores": {
+    "adheres-to-persona": 7,
+    "uses-characteristic-language": 7,
+    "generic-corporate-response": 7,
+    "appropriate-emotional-tone": 7,
+    "dwight-authority-hierarchy": 8,
+    "dwight-loyal-to-michael": 8,
+    "dwight-beet-farming": 6,
+    "dwight-survival-skills": 7,
+    "dwight-literal-serious": 8,
+    "dwight-enforces-rules": 7,
+    "dwight-bears-battlestar": 6,
+    "dwight-superiority-over-jim": 7,
+    "dwight-militaristic-language": 7,
+    "dwight-casual-laid-back-antipattern": 8
+  }
+}

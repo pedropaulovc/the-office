@@ -19,6 +19,8 @@ function parseCliArgs() {
       threshold: { type: "string", default: "5.0" },
       window: { type: "string", default: "7d" },
       "mock-judge": { type: "boolean", default: false },
+      "update-baseline": { type: "boolean", default: false },
+      "regression-delta": { type: "string", default: "1.0" },
       output: { type: "string" },
     },
   });
@@ -40,6 +42,8 @@ function parseCliArgs() {
     threshold: parseFloat(values.threshold),
     window: values.window,
     mockJudge: values["mock-judge"],
+    updateBaseline: values["update-baseline"],
+    regressionDelta: parseFloat(values["regression-delta"]),
     output: values.output ?? null,
   };
 }
@@ -53,6 +57,8 @@ async function main() {
     threshold: args.threshold,
     window: args.window,
     mockJudge: args.mockJudge,
+    updateBaseline: args.updateBaseline,
+    regressionDelta: args.regressionDelta,
   };
 
   const result = await runEvaluation(options);

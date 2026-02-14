@@ -24,6 +24,19 @@ export function generateHumanReport(result: HarnessResult): string {
       .join(" | ");
 
     lines.push(`  ${agentId.padEnd(12)} ${status.padEnd(6)} overall: ${agentResult.overall.toFixed(1)}  ${dimensionScores}`);
+
+    if (agentResult.baselineDelta) {
+      const deltas = Object.entries(agentResult.baselineDelta)
+        .map(([dim, d]) => `${dim}: ${d >= 0 ? "+" : ""}${d.toFixed(2)}`)
+        .join(", ");
+      lines.push(`${"".padEnd(14)}baseline delta: ${deltas}`);
+    }
+
+    if (agentResult.regressions && agentResult.regressions.length > 0) {
+      for (const reg of agentResult.regressions) {
+        lines.push(`${"".padEnd(14)}REGRESSION ${reg.dimension}: ${reg.baseline.toFixed(2)} -> ${reg.current.toFixed(2)} (${reg.delta.toFixed(2)})`);
+      }
+    }
   }
 
   lines.push("\u2500".repeat(80));

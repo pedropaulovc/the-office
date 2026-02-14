@@ -12,6 +12,8 @@ const harnessRequestSchema = z.object({
   threshold: z.number().min(0).max(9).default(5.0),
   mockJudge: z.boolean().default(false),
   window: z.string().regex(/^\d+[dhw]$/, "Expected format: Nd, Nh, or Nw (e.g. 7d, 24h, 2w)").optional(),
+  updateBaseline: z.boolean().default(false),
+  regressionDelta: z.number().min(0).max(9).default(1.0),
 });
 
 export async function POST(request: Request) {
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { agents, dimensions, threshold, mockJudge, window: windowParam } = parsed.data;
+    const { agents, dimensions, threshold, mockJudge, window: windowParam, updateBaseline, regressionDelta } = parsed.data;
 
     const result = await runEvaluation({
       agents,
@@ -35,6 +37,8 @@ export async function POST(request: Request) {
       threshold,
       mockJudge,
       ...(windowParam != null && { window: windowParam }),
+      updateBaseline,
+      regressionDelta,
     });
 
     logInfo("harness evaluation complete", {
