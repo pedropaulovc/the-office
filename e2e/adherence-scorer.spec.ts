@@ -22,13 +22,13 @@ interface EvaluationRunResponse {
 }
 
 test.describe("adherence scorer API", () => {
-  // Real LLM (Haiku) — 5 messages scored against 4 propositions in parallel (~6s)
+  // Real LLM (Haiku) — messages scored against 14 propositions (4 default + 10 character) in parallel
   test("POST /api/evaluations/adherence scores Michael's messages", async ({ request }) => {
-    test.setTimeout(15_000);
+    test.setTimeout(30_000);
 
     const response = await request.post("/api/evaluations/adherence", {
       data: { agentId: "michael" },
-      timeout: 12_000,
+      timeout: 25_000,
     });
     expect(response.status()).toBe(201);
 
