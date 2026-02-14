@@ -25,12 +25,11 @@ export function DashboardSidebar() {
             key={id}
             onClick={() => { switchDashboardPage(id); }}
             data-testid={`dashboard-nav-${id}`}
-            className={`flex w-full items-center gap-2 rounded-md mx-2 px-2 py-1.5 text-sm transition-colors ${
+            className={`flex w-[calc(100%-16px)] items-center gap-2 rounded-md mx-2 px-2 py-1.5 text-sm transition-colors ${
               activeDashboardPage === id
                 ? 'bg-slack-channel-active text-slack-sidebar-text-active font-semibold'
                 : 'text-slack-sidebar-text hover:bg-slack-sidebar-hover'
             }`}
-            style={{ width: 'calc(100% - 16px)' }}
           >
             <Icon className="h-4 w-4 shrink-0 opacity-70" />
             <span>{label}</span>
