@@ -233,9 +233,11 @@ export async function runCorrectionPipeline(
       });
       countMetric("gate.pipeline.regeneration", 1, { agentId });
 
+      await logCorrectionAttempt(agentId, messageText, messageText, attempt, "regeneration_requested", options);
+
       return {
         finalText: messageText,
-        outcome: "passed", // placeholder - caller must check feedback != null
+        outcome: "regeneration_requested",
         attempts: state.attempts,
         bestAttempt: selectBestAttempt(state.attempts),
         feedback,

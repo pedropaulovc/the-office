@@ -11,7 +11,7 @@ function computeStats(logs: CorrectionLog[]): GateStatistics {
   const totalActions = logs.length;
 
   const originalPassed = logs.filter((l) => l.outcome === "passed");
-  const regenerations = logs.filter((l) => l.stage === "regeneration");
+  const regenerations = logs.filter((l) => l.stage === "regeneration" || l.outcome === "regeneration_requested");
   const regenSuccesses = logs.filter((l) => l.outcome === "regeneration_success");
   const directCorrections = logs.filter((l) => l.stage === "direct_correction");
   const dcSuccesses = logs.filter((l) => l.outcome === "direct_correction_success");
@@ -45,11 +45,11 @@ function computeStats(logs: CorrectionLog[]): GateStatistics {
   }
 
   for (const log of logs) {
-    const scores = log.dimensionScores as Array<{
+    const scores = log.dimensionScores as {
       dimension: QualityDimension;
       score: number;
       passed: boolean;
-    }>;
+    }[];
     if (!Array.isArray(scores)) continue;
     for (const ds of scores) {
       if (!ALL_DIMENSIONS.includes(ds.dimension)) continue;

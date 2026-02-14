@@ -18,7 +18,7 @@ interface QualityCheckResponse {
 interface PipelineResponse {
   finalText: string;
   outcome: string;
-  attempts: Array<{ stage: string; attemptNumber: number; messageText: string }>;
+  attempts: { stage: string; attemptNumber: number; messageText: string }[];
   bestAttempt: { stage: string; messageText: string };
   feedback: unknown;
   totalDurationMs: number;

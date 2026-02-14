@@ -105,6 +105,7 @@ export const correctionLogs = pgTable(
     outcome: text("outcome", {
       enum: [
         "passed",
+        "regeneration_requested",
         "regeneration_success",
         "direct_correction_success",
         "forced_through",

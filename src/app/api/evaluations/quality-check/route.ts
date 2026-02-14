@@ -26,6 +26,7 @@ const qualityCheckRequestSchema = z.object({
           fluency: dimensionConfigSchema.optional(),
           suitability: dimensionConfigSchema.optional(),
         })
+        .strict()
         .optional(),
       similarity: z
         .object({
@@ -34,6 +35,7 @@ const qualityCheckRequestSchema = z.object({
         })
         .optional(),
     })
+    .strict()
     .optional(),
   // Pipeline options (S-7.0b)
   pipeline: z
@@ -43,8 +45,9 @@ const qualityCheckRequestSchema = z.object({
       maxCorrectionAttempts: z.number().int().min(1).max(10).optional(),
       continueOnFailure: z.boolean().optional(),
     })
+    .strict()
     .optional(),
-});
+}).strict();
 
 function mergeConfig(
   overrides?: z.infer<typeof qualityCheckRequestSchema>["config"],

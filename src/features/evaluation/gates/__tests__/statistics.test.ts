@@ -145,6 +145,20 @@ describe("computeStats", () => {
     expect(stats.similarityFailureCount).toBe(2);
   });
 
+  it("counts regeneration_requested toward regenerationCount but not regenerationSuccessCount", () => {
+    const logs = [
+      createMockCorrectionLog({ outcome: "regeneration_requested", stage: "original", totalScore: 10 }),
+      createMockCorrectionLog({ outcome: "regeneration_requested", stage: "regeneration", totalScore: 14 }),
+      createMockCorrectionLog({ outcome: "regeneration_success", stage: "regeneration", totalScore: 22 }),
+    ];
+
+    const stats = computeStats(logs);
+
+    expect(stats.regenerationCount).toBe(3);
+    expect(stats.regenerationSuccessCount).toBe(1);
+    expect(stats.regenerationFailureRate).toBeCloseTo(2 / 3);
+  });
+
   it("ignores non-array dimensionScores gracefully", () => {
     const logs = [
       createMockCorrectionLog({ dimensionScores: null as unknown as [] }),

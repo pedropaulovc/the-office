@@ -50,6 +50,7 @@ export type CorrectionStage = 'original' | 'regeneration' | 'direct_correction';
 
 export type CorrectionOutcome =
   | 'passed'
+  | 'regeneration_requested'
   | 'regeneration_success'
   | 'direct_correction_success'
   | 'forced_through'
@@ -81,13 +82,13 @@ export const DEFAULT_PIPELINE_CONFIG: CorrectionPipelineConfig = {
 
 export interface RegenerationFeedback {
   tentativeAction: string;
-  failedDimensions: Array<{
+  failedDimensions: {
     dimension: QualityDimension;
     score: number;
     threshold: number;
     reasoning: string;
     recommendation: string;
-  }>;
+  }[];
   attemptNumber: number;
   maxAttempts: number;
 }

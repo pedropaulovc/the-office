@@ -84,7 +84,7 @@ correction_logs
   correction_stage text NOT NULL    -- 'original' | 'regeneration' | 'direct_correction'
   attempt_number  integer NOT NULL
   outcome         text NOT NULL
-                  -- 'passed' | 'regeneration_success' | 'direct_correction_success' | 'forced_through' | 'timeout_pass_through'
+                  -- 'passed' | 'regeneration_requested' | 'regeneration_success' | 'direct_correction_success' | 'forced_through' | 'timeout_pass_through'
   token_usage     jsonb
   created_at      timestamptz NOT NULL DEFAULT now()
   INDEX(agent_id, created_at)

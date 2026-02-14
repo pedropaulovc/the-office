@@ -127,8 +127,10 @@ This is faster than regeneration (one LLM call vs. full agent turn) and can succ
 - [ ] [AC-7.0.10] "Best-scoring" = attempt with highest SUM of all dimension scores across ALL stages (original + regeneration + direct correction), matching TinyTroupe's `total_score` aggregation. After all enabled stages exhausted, best-scoring attempt committed if `continue_on_failure` is true (default), else error returned.
 - [ ] [AC-7.0.11] Quality checks use action-level trajectory windows: `first_n: 5, last_n: 10` (narrower than offline evaluation)
 - [ ] [AC-7.0.12] Quality checks skip if agent has fewer than a configurable minimum number of prior actions (`minimum_required_qty_of_actions`, default 0)
-- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, correction stage (`original` | `regeneration` | `direct_correction`), and outcome (`passed` | `regeneration_success` | `direct_correction_success` | `forced_through` | `timeout_pass_through`)
+- [ ] [AC-7.0.13] `correction_logs` table records every gate invocation with: original text, per-dimension scores, per-dimension reasoning, similarity score, attempt number, correction stage (`original` | `regeneration` | `direct_correction`), and outcome (`passed` | `regeneration_requested` | `regeneration_success` | `direct_correction_success` | `forced_through` | `timeout_pass_through`). Intermediate regeneration attempts (where the pipeline returns feedback for agent retry) are logged immediately with outcome `regeneration_requested`, not deferred until terminal outcome.
 - [ ] [AC-7.0.14] Gate is a no-op when all quality checks disabled (configurable per agent — see S-7.3)
+- [ ] [AC-7.0.14a] **API input validation**: The quality-check API route uses `.strict()` on config/dimensions Zod schemas so that unrecognized keys cause a 400 validation error. This prevents silent misconfiguration where a malformed `config` (e.g., dimensions at wrong nesting level) is silently stripped and falls through to defaults with all dimensions disabled.
+- [ ] [AC-7.0.14b] **Pipeline outcome for regeneration feedback**: When the pipeline returns regeneration feedback (i.e., `feedback != null`), the outcome MUST be `regeneration_requested`, NOT `passed`. The `passed` outcome is reserved for messages that genuinely pass all quality checks. This ensures the API response is unambiguous without requiring callers to cross-check `outcome` against `feedback != null`.
 - [ ] [AC-7.0.15] LLM judge calls have a 5-second timeout per dimension; on timeout, that dimension passes (fail-open)
 - [ ] [AC-7.0.16] Statistics tracked (matching TinyTroupe's `ActionGenerator.get_statistics()`): `total_actions`, `original_pass_count`, `original_pass_rate`, `regeneration_count`, `regeneration_success_count`, `regeneration_failure_rate`, `regeneration_mean_score`, `regeneration_sd_score`, `direct_correction_count`, `direct_correction_success_count`, `direct_correction_failure_rate`, `direct_correction_mean_score`, `direct_correction_sd_score`, `forced_through_count`, `similarity_failure_count`, per-dimension failure counts and mean scores
 - [ ] [AC-7.0.17] `getGateStatistics(agentId, timeWindow)` returns aggregated statistics matching the full set above
@@ -137,15 +139,16 @@ This is faster than regeneration (one LLM call vs. full agent turn) and can succ
 - [ ] [AC-7.0.19] Sentry spans for gate evaluation and each dimension check
 
 ### Demo
-1. Enable all four quality dimensions for Michael (threshold = 7, matching TinyTroupe default), with both regeneration and direct correction enabled
+1. Enable all four quality dimensions for Michael (threshold = 7, matching TinyTroupe default), with both regeneration and direct correction enabled. Request shape: `{ agentId, messageText, config: { dimensions: { persona_adherence: { enabled, threshold }, ... }, similarity: { enabled, threshold } }, pipeline: { enableRegeneration, enableDirectCorrection, maxCorrectionAttempts, continueOnFailure } }`
 2. Seed the system so Michael will receive a message
-3. Show a normal response passing all enabled checks (adherence, self-consistency, fluency, suitability)
+3. Show a normal response passing all enabled checks (adherence, self-consistency, fluency, suitability) — outcome `passed`
 4. Use `BadActionInjector` to produce a persona-violating response
-5. Show Stage 1 (Regeneration): gate catches per-dimension failures, returns feedback with reasoning + recommendations_for_improvement, agent retries
+5. Show Stage 1 (Regeneration): gate catches per-dimension failures, returns feedback with reasoning + recommendations_for_improvement — outcome `regeneration_requested`, correction_logs entry created immediately
 6. Show escalating "be more radical" instruction on second regeneration failure
-7. Show Stage 2 (Direct Correction): LLM extracts corrective rules and rewrites the action text
-8. Show the `correction_logs` entries with per-dimension scores, correction stage, and similarity score
+7. Show Stage 2 (Direct Correction): LLM extracts corrective rules and rewrites the action text — outcome `direct_correction_success`
+8. Show the `correction_logs` entries with per-dimension scores, correction stage, and similarity score (should include intermediate `regeneration_requested` entries)
 9. Show `getGateStatistics()` output with full statistics across both stages
+10. Show that sending a malformed config (e.g., dimensions at wrong nesting level) returns 400 validation error
 
 ---
 

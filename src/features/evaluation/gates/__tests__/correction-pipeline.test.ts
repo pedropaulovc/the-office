@@ -148,10 +148,19 @@ describe("runCorrectionPipeline", () => {
       { runId: "run-2" },
     );
 
+    expect(result.outcome).toBe("regeneration_requested");
     expect(result.feedback).not.toBeNull();
     expect(result.feedback?.failedDimensions).toHaveLength(1);
     expect(result.feedback?.failedDimensions[0]?.dimension).toBe("persona_adherence");
     expect(result.feedback?.attemptNumber).toBe(1);
+
+    // Intermediate attempt is logged to DB
+    expect(mockCreateCorrectionLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: "michael",
+        outcome: "regeneration_requested",
+      }),
+    );
   });
 
   it("returns forced_through after max regeneration attempts", async () => {
@@ -329,7 +338,7 @@ describe("formatFeedbackForAgent", () => {
     };
 
     const result = formatFeedbackForAgent(feedback);
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result) as { type: string; instruction: string };
 
     expect(parsed.type).toBe("quality_check_failed");
     expect(parsed.instruction).toContain("MORE RADICAL");
