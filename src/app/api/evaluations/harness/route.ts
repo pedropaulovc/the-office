@@ -11,6 +11,7 @@ const harnessRequestSchema = z.object({
     .default(["adherence"]),
   threshold: z.number().min(0).max(9).default(5.0),
   mockJudge: z.boolean().default(false),
+  window: z.string().regex(/^\d+[dhw]$/, "Expected format: Nd, Nh, or Nw (e.g. 7d, 24h, 2w)").optional(),
 });
 
 export async function POST(request: Request) {
@@ -26,13 +27,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const { agents, dimensions, threshold, mockJudge } = parsed.data;
+    const { agents, dimensions, threshold, mockJudge, window: windowParam } = parsed.data;
 
     const result = await runEvaluation({
       agents,
       dimensions,
       threshold,
       mockJudge,
+      ...(windowParam != null && { window: windowParam }),
     });
 
     logInfo("harness evaluation complete", {

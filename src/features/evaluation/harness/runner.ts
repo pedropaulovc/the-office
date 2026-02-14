@@ -1,16 +1,18 @@
 import type { EvaluationDimension } from "@/features/evaluation/types";
 import { loadPropositionsForDimension } from "@/features/evaluation/proposition-loader";
-import { scorePropositions, type BatchScoreResult } from "@/features/evaluation/proposition-engine";
+import { scorePropositions, type BatchScoreResult, type TrajectoryEntry } from "@/features/evaluation/proposition-engine";
 import { createMockScorer } from "./mock-judge";
 import { getMockScores } from "./mock-scores";
 import { applyInvertedScore } from "@/features/evaluation/proposition-loader";
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { withSpan, logInfo, logWarn, countMetric } from "@/lib/telemetry";
+import { getAgentMessagesInWindow } from "@/db/queries/messages";
 
 export interface HarnessOptions {
   agents: string[];
   dimensions: EvaluationDimension[];
   threshold: number;
   mockJudge: boolean;
+  window?: string;
 }
 
 export interface DimensionResult {
@@ -34,6 +36,38 @@ export interface HarnessResult {
     failed: number;
     failedAgents: string[];
   };
+}
+
+const WINDOW_PATTERN = /^(\d+)([dhw])$/;
+
+/**
+ * Parse a duration string like "7d", "24h", "2w" into start/end dates.
+ * Supported units: d=days, h=hours, w=weeks.
+ */
+export function parseWindow(str: string): { windowStart: Date; windowEnd: Date } {
+  const match = WINDOW_PATTERN.exec(str);
+  if (!match) {
+    throw new Error(`Invalid window format "${str}". Expected format: Nd, Nh, or Nw (e.g. 7d, 24h, 2w)`);
+  }
+
+  const [, amountStr, unit] = match;
+  if (!amountStr || !unit) {
+    throw new Error(`Invalid window format "${str}". Expected format: Nd, Nh, or Nw (e.g. 7d, 24h, 2w)`);
+  }
+  const amount = parseInt(amountStr, 10);
+
+  const windowEnd = new Date();
+  const windowStart = new Date(windowEnd);
+
+  if (unit === "d") {
+    windowStart.setDate(windowStart.getDate() - amount);
+  } else if (unit === "h") {
+    windowStart.setHours(windowStart.getHours() - amount);
+  } else if (unit === "w") {
+    windowStart.setDate(windowStart.getDate() - amount * 7);
+  }
+
+  return { windowStart, windowEnd };
 }
 
 const ALL_AGENTS = [
@@ -109,8 +143,35 @@ async function evaluateDimension(
     ? createMockScorer(getMockScores(agentId))
     : scorePropositions;
 
-  // For mock mode, we create a minimal trajectory
-  const trajectory = [{ type: "action" as const, agentName: agentId, text: "Sample message for evaluation" }];
+  let trajectory: TrajectoryEntry[];
+
+  if (options.mockJudge) {
+    trajectory = [{ type: "action", agentName: agentId, text: "Sample message for evaluation" }];
+  } else {
+    const { windowStart, windowEnd } = parseWindow(options.window ?? "7d");
+    const dbMessages = await getAgentMessagesInWindow(agentId, windowStart, windowEnd);
+
+    if (dbMessages.length > 0) {
+      trajectory = dbMessages.map((msg) => ({
+        type: "action" as const,
+        agentName: msg.userId,
+        text: msg.text,
+      }));
+      logInfo("harness.trajectoryLoaded", {
+        agentId,
+        messageCount: dbMessages.length,
+        windowStart: windowStart.toISOString(),
+        windowEnd: windowEnd.toISOString(),
+      });
+    } else {
+      logWarn("harness.noMessagesFound", {
+        agentId,
+        window: options.window ?? "7d",
+      });
+      trajectory = [{ type: "action", agentName: agentId, text: "Sample message for evaluation" }];
+    }
+  }
+
   const context = { trajectory };
 
   const batchResult: BatchScoreResult = await scorer(propositions, context);

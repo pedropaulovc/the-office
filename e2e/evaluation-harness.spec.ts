@@ -98,6 +98,35 @@ test.describe("evaluation harness API", () => {
     expect(result.summary.failedAgents.length).toBeGreaterThan(0);
   });
 
+  test("POST /api/evaluations/harness with window parameter accepts valid format", async ({ request }) => {
+    const response = await request.post("/api/evaluations/harness", {
+      data: {
+        agents: ["michael"],
+        dimensions: ["adherence"],
+        threshold: 5.0,
+        mockJudge: true,
+        window: "30d",
+      },
+    });
+    expect(response.status()).toBe(200);
+
+    const result = (await response.json()) as HarnessResult;
+    expect(result.agents.michael).toBeDefined();
+    expect(result.summary.total).toBe(1);
+  });
+
+  test("POST /api/evaluations/harness rejects invalid window format", async ({ request }) => {
+    const response = await request.post("/api/evaluations/harness", {
+      data: {
+        agents: ["michael"],
+        dimensions: ["adherence"],
+        mockJudge: true,
+        window: "invalid",
+      },
+    });
+    expect(response.status()).toBe(400);
+  });
+
   test("summary counts match agent results", async ({ request }) => {
     const response = await request.post("/api/evaluations/harness", {
       data: {

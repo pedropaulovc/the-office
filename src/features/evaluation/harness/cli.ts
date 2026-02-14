@@ -1,3 +1,6 @@
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { parseArgs } from "node:util";
 import { writeFile } from "node:fs/promises";
 import { runEvaluation, type HarnessOptions } from "./runner";
@@ -14,6 +17,7 @@ function parseCliArgs() {
       agents: { type: "string", default: "all" },
       dimensions: { type: "string", default: "adherence" },
       threshold: { type: "string", default: "5.0" },
+      window: { type: "string", default: "7d" },
       "mock-judge": { type: "boolean", default: false },
       output: { type: "string" },
     },
@@ -34,6 +38,7 @@ function parseCliArgs() {
     agents,
     dimensions,
     threshold: parseFloat(values.threshold),
+    window: values.window,
     mockJudge: values["mock-judge"],
     output: values.output ?? null,
   };
@@ -46,6 +51,7 @@ async function main() {
     agents: args.agents,
     dimensions: args.dimensions,
     threshold: args.threshold,
+    window: args.window,
     mockJudge: args.mockJudge,
   };
 

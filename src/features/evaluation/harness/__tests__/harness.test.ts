@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { HarnessResult } from "../runner";
+import type { DbMessage } from "@/db/schema";
 
 const mockStartSpan = vi.fn();
 const mockLoggerInfo = vi.fn();
@@ -21,6 +22,23 @@ vi.mock("@sentry/nextjs", () => ({
 mockStartSpan.mockImplementation(
   (_opts: unknown, cb: (span: unknown) => unknown) => cb({}),
 );
+
+const mockGetAgentMessagesInWindow = vi.fn();
+const mockScorePropositionsFn = vi.fn();
+
+vi.mock("@/db/queries/messages", () => ({
+  getAgentMessagesInWindow: (...args: unknown[]): unknown => mockGetAgentMessagesInWindow(...args),
+}));
+
+vi.mock("@/features/evaluation/proposition-engine", async () => {
+  const actual = await vi.importActual<typeof import("@/features/evaluation/proposition-engine")>(
+    "@/features/evaluation/proposition-engine",
+  );
+  return {
+    ...actual,
+    scorePropositions: (...args: unknown[]): unknown => mockScorePropositionsFn(...args),
+  };
+});
 
 describe("evaluation harness", () => {
   beforeEach(() => {
@@ -79,6 +97,118 @@ describe("evaluation harness", () => {
 
       const scores = getMockScores("unknown-agent");
       expect(scores).toBeDefined();
+    });
+  });
+
+  describe("parseWindow", () => {
+    it("parses days", async () => {
+      const { parseWindow } = await import("../runner");
+
+      const before = Date.now();
+      const { windowStart, windowEnd } = parseWindow("7d");
+      const after = Date.now();
+
+      expect(windowEnd.getTime()).toBeGreaterThanOrEqual(before);
+      expect(windowEnd.getTime()).toBeLessThanOrEqual(after);
+
+      const diffMs = windowEnd.getTime() - windowStart.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      expect(diffDays).toBeCloseTo(7, 0);
+    });
+
+    it("parses hours", async () => {
+      const { parseWindow } = await import("../runner");
+      const { windowStart, windowEnd } = parseWindow("24h");
+
+      const diffMs = windowEnd.getTime() - windowStart.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      expect(diffHours).toBeCloseTo(24, 0);
+    });
+
+    it("parses weeks", async () => {
+      const { parseWindow } = await import("../runner");
+      const { windowStart, windowEnd } = parseWindow("2w");
+
+      const diffMs = windowEnd.getTime() - windowStart.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      expect(diffDays).toBeCloseTo(14, 0);
+    });
+
+    it("throws on invalid format", async () => {
+      const { parseWindow } = await import("../runner");
+      expect(() => parseWindow("abc")).toThrow("Invalid window format");
+      expect(() => parseWindow("7x")).toThrow("Invalid window format");
+      expect(() => parseWindow("")).toThrow("Invalid window format");
+    });
+  });
+
+  describe("trajectory loading", () => {
+    const mockBatchResult = {
+      results: [{ score: 7, reasoning: "mock", confidence: 0.9, tokenUsage: { input_tokens: 0, output_tokens: 0 } }],
+      tokenUsage: { input_tokens: 0, output_tokens: 0 },
+    };
+
+    it("uses DB messages for real-mode trajectory", async () => {
+      mockScorePropositionsFn.mockResolvedValue(mockBatchResult);
+
+      const fakeMessages: DbMessage[] = [
+        {
+          id: "msg-1",
+          channelId: "general",
+          parentMessageId: null,
+          userId: "michael",
+          text: "That's what she said!",
+          createdAt: new Date("2026-02-10T10:00:00Z"),
+        },
+        {
+          id: "msg-2",
+          channelId: "general",
+          parentMessageId: null,
+          userId: "michael",
+          text: "I am the world's best boss.",
+          createdAt: new Date("2026-02-11T10:00:00Z"),
+        },
+      ];
+
+      mockGetAgentMessagesInWindow.mockResolvedValue(fakeMessages);
+
+      const { runEvaluation } = await import("../runner");
+
+      const result = await runEvaluation({
+        agents: ["michael"],
+        dimensions: ["adherence"],
+        threshold: 5.0,
+        mockJudge: false,
+        window: "30d",
+      });
+
+      expect(mockGetAgentMessagesInWindow).toHaveBeenCalledWith(
+        "michael",
+        expect.any(Date),
+        expect.any(Date),
+      );
+      expect(result.agents.michael).toBeDefined();
+    });
+
+    it("falls back to placeholder when no DB messages found", async () => {
+      mockScorePropositionsFn.mockResolvedValue(mockBatchResult);
+      mockGetAgentMessagesInWindow.mockResolvedValue([]);
+
+      // logWarn calls console.warn — allow it for this test
+      console.warn = vi.fn();
+
+      const { runEvaluation } = await import("../runner");
+
+      const result = await runEvaluation({
+        agents: ["michael"],
+        dimensions: ["adherence"],
+        threshold: 5.0,
+        mockJudge: false,
+        window: "7d",
+      });
+
+      expect(result.agents.michael).toBeDefined();
+      expect(console.warn).toHaveBeenCalled();
     });
   });
 
