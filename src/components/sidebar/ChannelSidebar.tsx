@@ -12,7 +12,7 @@ export default function ChannelSidebar() {
   const dms = getDmsForUser(currentUserId);
 
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col bg-slack-aubergine h-screen">
+    <aside className="flex w-[240px] shrink-0 flex-col bg-slack-aubergine h-full">
       {/* Workspace header */}
       <div className="flex h-12 items-center px-4 border-b border-slack-aubergine-light">
         <button className="flex items-center gap-1 text-slack-sidebar-text-active font-bold text-base hover:opacity-80 transition-opacity">

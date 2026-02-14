@@ -11,7 +11,7 @@ export default function WorkspaceShell() {
   const isThreadOpen = threadPanel.state === 'open';
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex flex-1 w-full overflow-hidden">
       <WorkspaceSidebar />
       <ChannelSidebar />
       <ChatPanel />
