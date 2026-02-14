@@ -1,8 +1,81 @@
 import { execSync, spawn } from "child_process";
 import { copyFileSync, createWriteStream, mkdirSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { platform, tmpdir } from "os";
 import { getWorktreeLetter } from "./neon-branch.js";
+
+const IS_WINDOWS = platform() === "win32";
+
+/**
+ * Kills zombie `next start` processes from previous E2E runs for THIS worktree only.
+ * Mirrors the zombie cleanup pattern in dev.js but targets `next start` instead of `next dev`.
+ */
+function killZombieE2eProcesses() {
+  const pids = IS_WINDOWS ? findZombiePidsWindows() : findZombiePidsUnix();
+  if (pids.length === 0) return;
+
+  console.log(`Killing ${pids.length} zombie E2E process(es): PIDs ${pids.join(", ")}`);
+  for (const pid of pids) {
+    try {
+      if (IS_WINDOWS) {
+        execSync(`taskkill /PID ${pid} /T /F`, { stdio: ["pipe", "pipe", "pipe"] });
+      } else {
+        process.kill(Number(pid), "SIGKILL");
+      }
+    } catch {
+      // Process may have already exited
+    }
+  }
+}
+
+function findZombiePidsWindows() {
+  const projectPath = process.cwd().replace(/\//g, "\\");
+  try {
+    const output = execSync(
+      `pwsh.exe -NoProfile -Command "` +
+        `$escaped = [regex]::Escape('${projectPath.replace(/'/g, "''")}'); ` +
+        `Get-CimInstance Win32_Process | ` +
+        `Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match $escaped -and $_.CommandLine -match 'next\\W+start' } | ` +
+        `Select-Object -ExpandProperty ProcessId"`,
+      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
+    );
+    return output.trim().split(/\r?\n/).filter((pid) => /^\d+$/.test(pid.trim())).map((pid) => pid.trim());
+  } catch {
+    return [];
+  }
+}
+
+function findZombiePidsUnix() {
+  try {
+    const psOutput = execSync("ps ax -o pid,args", { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    const projectPath = process.cwd();
+    return psOutput
+      .split(/\n/)
+      .filter((line) => line.includes(projectPath) && /\bnext\s+start\b/.test(line))
+      .map((line) => line.trim().split(/\s+/)[0])
+      .filter((pid) => /^\d+$/.test(pid) && pid !== String(process.pid));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Kill the server process tree. On Windows, `child.kill()` only kills the shell
+ * wrapper — the actual `node next start` child survives. Use `taskkill /T` to
+ * kill the entire tree.
+ */
+function killServerTree(serverProcess) {
+  if (!serverProcess?.pid) return;
+  try {
+    if (IS_WINDOWS) {
+      execSync(`taskkill /PID ${serverProcess.pid} /T /F`, { stdio: ["pipe", "pipe", "pipe"] });
+    } else {
+      serverProcess.kill("SIGTERM");
+    }
+  } catch {
+    // Process may have already exited
+  }
+}
 
 const timestamp = new Date()
   .toISOString()
@@ -44,6 +117,8 @@ if (externalPreview) {
 // ---------- Local mode ----------
 // Provision a dedicated Neon branch, build, start a local server, run tests.
 
+killZombieE2eProcesses();
+
 const letter = getWorktreeLetter();
 
 if (letter) {
@@ -77,9 +152,9 @@ logStream.write(`=== E2E server started at ${new Date().toISOString()} ===\n`);
 
 console.log(`Starting Next.js server (log: test-results/${timestamp}/server.log)...`);
 
-const server = spawn("npx", ["next", "start", "--port", "0"], {
+const nextBin = join("node_modules", "next", "dist", "bin", "next");
+const server = spawn(process.execPath, [nextBin, "start", "--port", "0"], {
   stdio: ["ignore", "pipe", "pipe"],
-  shell: true,
   env: { ...process.env, SENTRY_TRACE_LOG: "1" },
 });
 
@@ -134,13 +209,21 @@ const playwright = spawn("npx", ["playwright", "test", ...extraArgs], {
   },
 });
 
+// Ensure server is killed on interruption (Ctrl+C, SIGTERM)
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, () => {
+    killServerTree(server);
+    process.exit(1);
+  });
+}
+
 const exitCode = await new Promise((resolve) => {
   playwright.on("close", (code) => resolve(code ?? 1));
 });
 
 // ---------- Cleanup ----------
 
-server.kill();
+killServerTree(server);
 logStream.write(`\n=== E2E server stopped at ${new Date().toISOString()} ===\n`);
 await new Promise((resolve) => logStream.end(resolve));
 
