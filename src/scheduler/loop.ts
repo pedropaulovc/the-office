@@ -91,7 +91,7 @@ export function startScheduler(): () => void {
   });
 
   const intervalId = setInterval(() => {
-    tick().catch((err) => {
+    tick().catch((err: unknown) => {
       logError("scheduler: tick failed", {
         error: err instanceof Error ? err.message : String(err),
       });
