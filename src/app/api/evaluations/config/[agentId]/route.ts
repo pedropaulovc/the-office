@@ -41,7 +41,7 @@ const updateConfigSchema = z.object({
   // Repetition Suppression
   repetitionSuppressionEnabled: z.boolean().optional(),
   repetitionThreshold: z.number().min(0).max(1).optional(),
-});
+}).strict();
 
 export async function GET(
   _request: Request,

@@ -276,6 +276,16 @@ Orchestrator → [overlap > threshold?] → inject "recent messages + avoid phra
 - Purely algorithmic detection (no LLM call)
 - Lists specific repeated n-grams for the agent to avoid
 
+## Configuration API Behavior
+
+The config API uses **flat DB-column keys** for PATCH requests (e.g., `gateAdherenceEnabled`) and returns **nested resolved config** from GET requests. The PATCH schema uses `.strict()` — unrecognized keys return 400 with validation errors instead of being silently stripped.
+
+The quality-check API route (`POST /api/evaluations/quality-check`) accepts an optional `config` override in the request body. **When `config` is omitted, the route falls back to the agent's DB config** via `resolveConfig(agentId)`. This allows:
+- **Standalone testing**: Pass explicit `config` to test specific dimension combinations
+- **Production behavior**: Omit `config` to use the agent's persisted settings
+
+All quality checks — both standalone API calls and orchestrator pipeline invocations — log to `correction_logs` with `tokenUsage` from the LLM judge calls. This ensures the cost tracker has complete data regardless of entry point.
+
 ## Evaluation Harness
 
 CLI tool for dev-time and CI persona testing:

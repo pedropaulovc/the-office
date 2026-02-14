@@ -345,10 +345,10 @@ Configuration is stored in `agent_evaluation_config` table. Cost is tracked via 
   - Repetition: `repetition_suppression_enabled`, `repetition_threshold`
 - [ ] [AC-7.3.2] Default config used when no agent-specific config exists (all mechanisms disabled by default, matching TinyTroupe's `ENABLE_QUALITY_CHECKS=False` default)
 - [ ] [AC-7.3.3] `resolveConfig()` merges agent-specific overrides with defaults
-- [ ] [AC-7.3.4] Config API: GET list, GET single, PATCH update — returns resolved config
-- [ ] [AC-7.3.5] Cost tracker aggregates token usage from `correction_logs`, `intervention_logs`, and LLM judge calls
+- [ ] [AC-7.3.4] Config API: GET list, GET single, PATCH update — returns resolved config. PATCH uses flat DB-column keys (e.g., `gateAdherenceEnabled`) with `.strict()` Zod validation (unrecognized keys return 400, not silently stripped).
+- [ ] [AC-7.3.5] Cost tracker aggregates token usage from `correction_logs`, `intervention_logs`, and LLM judge calls. Token usage is surfaced through `GateResult.tokenUsage` from LLM judge calls and persisted in `correction_logs.token_usage` for all invocations (standalone API and orchestrator pipeline).
 - [ ] [AC-7.3.6] Cost API returns per-agent and total costs for a time window, broken down by mechanism and dimension
-- [ ] [AC-7.3.7] All correction mechanisms read thresholds from config instead of hardcoded values
+- [ ] [AC-7.3.7] All correction mechanisms read thresholds from config instead of hardcoded values. The quality-check API route (`POST /api/evaluations/quality-check`) falls back to the agent's DB config when no `config` override is provided in the request body.
 - [ ] [AC-7.3.8] Migration generated and applied for `agent_evaluation_config` table
 - [ ] [AC-7.3.9] Seed default configs for all 16 agents (all mechanisms disabled by default)
 - [ ] [AC-7.3.10] Unit tests for config resolution, cost aggregation

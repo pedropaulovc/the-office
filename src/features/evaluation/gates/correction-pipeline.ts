@@ -380,6 +380,7 @@ async function logCorrectionAttempt(
       dimensionScores: attempt.gateResult.dimensionResults,
       similarityScore: attempt.gateResult.similarityResult?.score ?? null,
       totalScore: attempt.gateResult.totalScore,
+      tokenUsage: attempt.gateResult.tokenUsage ?? null,
       durationMs: null,
     });
   } catch {

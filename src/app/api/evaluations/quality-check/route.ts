@@ -4,8 +4,10 @@ import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 import { logInfo, countMetric } from "@/lib/telemetry";
 import { checkActionQuality } from "@/features/evaluation/gates/action-correction";
 import { runCorrectionPipeline } from "@/features/evaluation/gates/correction-pipeline";
-import { DEFAULT_GATE_CONFIG, DEFAULT_PIPELINE_CONFIG, type GateConfig, type CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
+import { type GateConfig, type CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
 import { getAgent } from "@/db/queries";
+import { resolveConfig } from "@/features/evaluation/config";
+import { createCorrectionLog } from "@/db/queries/correction-logs";
 
 const dimensionConfigSchema = z.object({
   enabled: z.boolean(),
@@ -50,11 +52,12 @@ const qualityCheckRequestSchema = z.object({
 }).strict();
 
 function mergeConfig(
+  dbConfig: GateConfig,
   overrides?: z.infer<typeof qualityCheckRequestSchema>["config"],
 ): GateConfig {
-  if (!overrides) return DEFAULT_GATE_CONFIG;
+  if (!overrides) return dbConfig;
 
-  const base = structuredClone(DEFAULT_GATE_CONFIG);
+  const base = structuredClone(dbConfig);
 
   if (overrides.dimensions) {
     for (const key of Object.keys(overrides.dimensions) as (keyof typeof overrides.dimensions)[]) {
@@ -74,15 +77,16 @@ function mergeConfig(
 
 function mergePipelineConfig(
   gateConfig: GateConfig,
+  dbPipelineConfig: CorrectionPipelineConfig,
   pipelineOverrides?: z.infer<typeof qualityCheckRequestSchema>["pipeline"],
 ): CorrectionPipelineConfig {
   return {
     ...gateConfig,
-    enableRegeneration: pipelineOverrides?.enableRegeneration ?? DEFAULT_PIPELINE_CONFIG.enableRegeneration,
-    enableDirectCorrection: pipelineOverrides?.enableDirectCorrection ?? DEFAULT_PIPELINE_CONFIG.enableDirectCorrection,
-    maxCorrectionAttempts: pipelineOverrides?.maxCorrectionAttempts ?? DEFAULT_PIPELINE_CONFIG.maxCorrectionAttempts,
-    continueOnFailure: pipelineOverrides?.continueOnFailure ?? DEFAULT_PIPELINE_CONFIG.continueOnFailure,
-    minimumRequiredQtyOfActions: DEFAULT_PIPELINE_CONFIG.minimumRequiredQtyOfActions,
+    enableRegeneration: pipelineOverrides?.enableRegeneration ?? dbPipelineConfig.enableRegeneration,
+    enableDirectCorrection: pipelineOverrides?.enableDirectCorrection ?? dbPipelineConfig.enableDirectCorrection,
+    maxCorrectionAttempts: pipelineOverrides?.maxCorrectionAttempts ?? dbPipelineConfig.maxCorrectionAttempts,
+    continueOnFailure: pipelineOverrides?.continueOnFailure ?? dbPipelineConfig.continueOnFailure,
+    minimumRequiredQtyOfActions: dbPipelineConfig.minimumRequiredQtyOfActions,
   };
 }
 
@@ -100,7 +104,14 @@ export async function POST(request: Request) {
     }
 
     const { agentId, messageText, conversationContext, recentMessages } = parsed.data;
-    const gateConfig = mergeConfig(parsed.data.config);
+
+    // Fall back to DB config when no config override provided
+    const resolvedConfig = await resolveConfig(agentId);
+    const dbGateConfig: GateConfig = {
+      dimensions: resolvedConfig.pipeline.dimensions,
+      similarity: resolvedConfig.pipeline.similarity,
+    };
+    const gateConfig = mergeConfig(dbGateConfig, parsed.data.config);
     const agent = await getAgent(agentId);
 
     const qualityOptions = {
@@ -111,7 +122,7 @@ export async function POST(request: Request) {
 
     // Use full pipeline when pipeline options provided
     if (parsed.data.pipeline) {
-      const pipelineConfig = mergePipelineConfig(gateConfig, parsed.data.pipeline);
+      const pipelineConfig = mergePipelineConfig(gateConfig, resolvedConfig.pipeline, parsed.data.pipeline);
 
       const result = await runCorrectionPipeline(
         agentId,
@@ -130,7 +141,7 @@ export async function POST(request: Request) {
       return jsonResponse(result, { status: 201 });
     }
 
-    // Single-shot quality check (backwards compatible)
+    // Single-shot quality check
     const result = await checkActionQuality(
       agentId,
       messageText,
@@ -138,6 +149,27 @@ export async function POST(request: Request) {
       gateConfig,
       qualityOptions,
     );
+
+    // Log to correction_logs for cost tracking
+    try {
+      await createCorrectionLog({
+        agentId,
+        runId: null,
+        channelId: null,
+        originalText: messageText,
+        finalText: messageText,
+        stage: "original",
+        attemptNumber: 1,
+        outcome: result.passed ? "passed" : "forced_through",
+        dimensionScores: result.dimensionResults,
+        similarityScore: result.similarityResult?.score ?? null,
+        totalScore: result.totalScore,
+        tokenUsage: result.tokenUsage ?? null,
+        durationMs: null,
+      });
+    } catch {
+      logInfo("quality-check.logFailed", { agentId });
+    }
 
     logInfo("quality-check completed", { agentId, passed: result.passed });
     countMetric("api.evaluations.quality_check", 1);
