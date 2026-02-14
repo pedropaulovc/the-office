@@ -1,3 +1,6 @@
+export type TopLevelTab = 'slack' | 'dashboard';
+export type DashboardPage = 'experiments' | 'evals' | 'config' | 'monitoring';
+
 export type Presence = 'active' | 'away' | 'offline';
 export type ChannelKind = 'public' | 'private' | 'dm';
 export type ViewKind = 'channel' | 'dm';
