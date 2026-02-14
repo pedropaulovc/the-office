@@ -514,8 +514,8 @@ async function callJudge(
 
       logInfo("proposition-engine.callJudge.request", {
         model: JUDGE_MODEL,
-        systemPromptLength: system.length,
-        userPromptLength: user.length,
+        systemPrompt: system,
+        userPrompt: user,
       });
 
       let response;
@@ -555,8 +555,8 @@ async function callJudge(
       logInfo("proposition-engine.callJudge.response", {
         inputTokens: tokenUsage.input_tokens,
         outputTokens: tokenUsage.output_tokens,
-        responseLength: text.length,
         durationMs,
+        judgeOutput: text,
       });
 
       return { text, tokenUsage };
@@ -701,6 +701,7 @@ export async function scoreProposition(
         propositionId: proposition.id,
         score: result.score,
         confidence: result.confidence,
+        reasoning: result.reasoning,
         durationMs,
       });
       distributionMetric("evaluation.judge_score", result.score, "none", {
@@ -772,6 +773,7 @@ export async function checkProposition(
         propositionId: proposition.id,
         result: parsed.result,
         confidence: parsed.confidence,
+        reasoning: parsed.reasoning,
         durationMs,
       });
       distributionMetric("evaluation.judge_latency_ms", durationMs, "millisecond", {

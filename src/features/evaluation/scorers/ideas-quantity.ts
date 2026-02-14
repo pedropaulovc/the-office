@@ -185,7 +185,8 @@ async function callIdeasEnumeration(
 
       logInfo("scoreIdeasQuantity.callLLM.request", {
         model: JUDGE_MODEL,
-        userPromptLength: userPrompt.length,
+        systemPrompt: IDEAS_SYSTEM_PROMPT,
+        userPrompt,
       });
 
       let response;
@@ -223,8 +224,8 @@ async function callIdeasEnumeration(
       logInfo("scoreIdeasQuantity.callLLM.response", {
         inputTokens: tokenUsage.input_tokens,
         outputTokens: tokenUsage.output_tokens,
-        responseLength: text.length,
         durationMs,
+        judgeOutput: text,
       });
       distributionMetric("evaluation.ideas_quantity_latency_ms", durationMs, "millisecond");
 
