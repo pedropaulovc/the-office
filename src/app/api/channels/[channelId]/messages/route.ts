@@ -6,5 +6,7 @@ interface RouteContext { params: Promise<{ channelId: string }> }
 export async function GET(_request: Request, context: RouteContext) {
   const { channelId } = await context.params;
   const msgs = await getChannelMessages(channelId);
-  return jsonResponse(msgs);
+  // Add createdAt alias alongside existing timestamp field
+  const enriched = msgs.map((m) => ({ ...m, createdAt: m.timestamp }));
+  return jsonResponse(enriched);
 }

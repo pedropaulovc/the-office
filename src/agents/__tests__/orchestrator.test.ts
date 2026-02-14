@@ -111,6 +111,8 @@ vi.mock("@/lib/telemetry", () => ({
   logInfo: vi.fn(),
   logError: vi.fn(),
   logWarn: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: vi.fn(),
   distributionMetric: vi.fn(),
 }));
@@ -317,6 +319,7 @@ describe("orchestrator", () => {
       memoryBlocks: [memoryBlock],
       recentMessages: [expect.objectContaining({ userId: "dwight" })],
       interventionNudge: null,
+      repetitionContext: null,
     });
     expect(mockQuery).toHaveBeenCalled();
     expect(result.status).toBe("completed");

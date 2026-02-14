@@ -25,6 +25,7 @@ import {
   logInfo,
   logWarn,
   logError,
+  logChunked,
   countMetric,
   distributionMetric,
 } from "@/lib/telemetry";
@@ -100,12 +101,48 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       }
     }
 
+    // 3.6. Check repetition suppression (fail-open)
+    let repetitionContext: string | null = null;
+    try {
+      const { checkRepetitionSuppression } = await import(
+        "@/features/evaluation/interventions/repetition-suppression"
+      );
+      const repetitionResult = await checkRepetitionSuppression(run.agentId);
+      repetitionContext = repetitionResult.context;
+      if (repetitionContext) {
+        logInfo("orchestrator.repetition.detected", {
+          runId: run.id,
+          agentId: run.agentId,
+          overlapScore: repetitionResult.overlapScore,
+        });
+      }
+    } catch (err) {
+      logWarn("orchestrator.repetition.failed", {
+        runId: run.id,
+        agentId: run.agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // 4. Build system prompt
+    if (interventionNudge) {
+      logChunked(`orchestrator.prompt.interventionNudge.${run.agentId}`, interventionNudge, {
+        runId: run.id,
+        agentId: run.agentId,
+      });
+    }
+    if (repetitionContext) {
+      logChunked(`orchestrator.prompt.repetitionContext.${run.agentId}`, repetitionContext, {
+        runId: run.id,
+        agentId: run.agentId,
+      });
+    }
     const systemPrompt = buildSystemPrompt({
       agent,
       memoryBlocks,
       recentMessages,
       interventionNudge,
+      repetitionContext,
     });
 
     // 5. Create MCP server with tools
@@ -159,12 +196,12 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       async (querySpan) => {
 
         // Log inputs inside sdk.query span so they're linked to it
-        logInfo(`sdk.input.system_prompt.${run.agentId} | ${truncate(systemPrompt)}`, {
+        logChunked(`sdk.input.system_prompt.${run.agentId}`, systemPrompt, {
           runId: run.id,
           agentId: run.agentId,
           length: systemPrompt.length,
         });
-        logInfo(`sdk.input.trigger.${run.agentId} | ${prompt}`, {
+        logChunked(`sdk.input.trigger.${run.agentId}`, prompt, {
           runId: run.id,
           agentId: run.agentId,
         });
@@ -206,12 +243,12 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   });
 
                   if (thinking) {
-                    logInfo(`sdk.thinking.${run.agentId} | ${truncate(thinking)}`, {
+                    logChunked(`sdk.thinking.${run.agentId}`, thinking, {
                       runId: run.id,
                       step,
                     });
                   }
-                  logInfo(`sdk.response.${run.agentId} | ${truncate(content)}`, {
+                  logChunked(`sdk.response.${run.agentId}`, content, {
                     runId: run.id,
                     step,
                   });
@@ -226,7 +263,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                       toolName: toolUse.name,
                       toolInput: toolUse.input as Record<string, unknown>,
                     });
-                    logInfo(`sdk.tool_call.${run.agentId} | ${toolUse.name} ${truncate(inputStr)}`, {
+                    logChunked(`sdk.tool_call.${run.agentId}`, `${toolUse.name} ${inputStr}`, {
                       runId: run.id,
                       toolName: toolUse.name,
                       toolUseId: toolUse.id,
@@ -249,7 +286,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                 messageType: "user_message",
                 content: userContent,
               });
-              logInfo(`sdk.user_message.${run.agentId} | ${truncate(userContent)}`, {
+              logChunked(`sdk.user_message.${run.agentId}`, userContent, {
                 runId: run.id,
               });
               if (msg.tool_use_result != null) {
@@ -263,7 +300,7 @@ async function executeRunInner(run: Run): Promise<RunResult> {
                   messageType: "tool_return_message",
                   content: toolResult,
                 });
-                logInfo(`sdk.tool_return.${run.agentId} | ${truncate(toolResult)}`, {
+                logChunked(`sdk.tool_return.${run.agentId}`, toolResult, {
                   runId: run.id,
                 });
               }
@@ -397,13 +434,6 @@ async function executeRunInner(run: Run): Promise<RunResult> {
 }
 
 // --- Private helpers ---
-
-const LOG_MAX_CHARS = 8000;
-
-function truncate(value: string, max = LOG_MAX_CHARS): string {
-  if (value.length <= max) return value;
-  return value.slice(0, max) + "…";
-}
 
 function formatTriggerPrompt(run: Run): string {
   if (run.triggerPrompt) {

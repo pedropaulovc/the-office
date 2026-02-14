@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 const MAX_ATTR_LENGTH = 8196;
+const LOG_CHUNK_SIZE = 5000;
 
 function truncateAttributes(
   attrs?: Record<string, string | number | boolean>,
@@ -52,6 +53,62 @@ export function logError(
 ): void {
   Sentry.logger.error(message, truncateAttributes(attributes));
   console.error(`[error] ${message}`, attributes ?? "");
+}
+
+/**
+ * Logs a long string as multiple chunked messages.
+ * Each chunk is emitted as `{baseName}.1`, `.2`, etc.
+ * Always suffixed — even single-chunk messages get `.1`.
+ */
+export function logChunked(
+  baseName: string,
+  value: string,
+  attributes?: Record<string, string | number | boolean>,
+): void {
+  const totalChunks = Math.ceil(value.length / LOG_CHUNK_SIZE) || 1;
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = value.slice(i * LOG_CHUNK_SIZE, (i + 1) * LOG_CHUNK_SIZE);
+    logInfo(`${baseName}.${i + 1} | ${chunk}`, {
+      ...attributes,
+      chunk: i + 1,
+      totalChunks,
+    });
+  }
+}
+
+/**
+ * Chunks structured attribute values that exceed LOG_CHUNK_SIZE.
+ * Returns an array of attribute objects, each with values within the limit.
+ * Short attributes return a single-element array.
+ */
+export function logChunkedAttrs(
+  baseName: string,
+  attributes: Record<string, string | number | boolean>,
+): void {
+  const longKeys = Object.entries(attributes).filter(
+    ([, v]) => typeof v === "string" && v.length > LOG_CHUNK_SIZE,
+  );
+
+  if (longKeys.length === 0) {
+    logInfo(`${baseName}.1`, { ...attributes, chunk: 1, totalChunks: 1 });
+    return;
+  }
+
+  // Find the longest value to determine chunk count
+  const maxLen = Math.max(...longKeys.map(([, v]) => (v as string).length));
+  const totalChunks = Math.ceil(maxLen / LOG_CHUNK_SIZE);
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunked: Record<string, string | number | boolean> = { chunk: i + 1, totalChunks };
+    for (const [k, v] of Object.entries(attributes)) {
+      if (typeof v === "string" && v.length > LOG_CHUNK_SIZE) {
+        chunked[k] = v.slice(i * LOG_CHUNK_SIZE, (i + 1) * LOG_CHUNK_SIZE);
+      } else {
+        chunked[k] = v;
+      }
+    }
+    logInfo(`${baseName}.${i + 1}`, chunked);
+  }
 }
 
 /**

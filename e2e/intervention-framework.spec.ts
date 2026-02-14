@@ -162,4 +162,48 @@ test.describe("Intervention Framework (S-7.1a)", () => {
       expect(log.interventionType).toBe("anti_convergence");
     }
   });
+
+  test("agent messages for repetition detection are retrievable via channel endpoint (S-7.2)", async ({
+    request,
+  }) => {
+    // Create a channel with unique ID
+    const channelId = `e2e-rep-${Date.now()}`;
+    const channelRes = await request.post("/api/channels", {
+      data: {
+        id: channelId,
+        name: channelId,
+        kind: "public",
+      },
+    });
+    expect(channelRes.status()).toBe(201);
+
+    // Post multiple messages from the same agent
+    const agentId = "michael";
+    const texts = [
+      "That is what she said, classic line",
+      "That is what she said, always funny",
+      "That is what she said, gets me every time",
+    ];
+
+    for (const text of texts) {
+      const msgRes = await request.post("/api/messages", {
+        data: {
+          channelId,
+          userId: agentId,
+          text,
+        },
+      });
+      expect(msgRes.status()).toBe(201);
+    }
+
+    // Retrieve messages via channel endpoint
+    const getRes = await request.get(`/api/channels/${channelId}/messages`);
+    expect(getRes.status()).toBe(200);
+    const messages = (await getRes.json()) as { userId: string; text: string }[];
+    const agentMessages = messages.filter((m) => m.userId === agentId);
+    expect(agentMessages.length).toBe(3);
+    for (const text of texts) {
+      expect(agentMessages.some((m) => m.text === text)).toBe(true);
+    }
+  });
 });

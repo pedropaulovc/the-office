@@ -101,4 +101,106 @@ describe("telemetry helpers", () => {
       attributes: { route: "/api" },
     });
   });
+
+  // --- logChunked ---
+
+  it("logChunked emits a single log for short strings", async () => {
+    const { logChunked } = await import("../telemetry");
+    logChunked("test.name", "short value", { agentId: "michael" });
+
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      "test.name.1 | short value",
+      expect.objectContaining({ agentId: "michael", chunk: 1, totalChunks: 1 }),
+    );
+  });
+
+  it("logChunked splits long strings into numbered chunks", async () => {
+    const { logChunked } = await import("../telemetry");
+    // Create a string that's 12k chars — should produce 3 chunks at 5k each
+    const longValue = "A".repeat(12_000);
+    logChunked("sdk.input.system_prompt.michael", longValue, { runId: "r1" });
+
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(3);
+
+    // Chunk 1
+    expect(mockLoggerInfo).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("sdk.input.system_prompt.michael.1 | "),
+      expect.objectContaining({ runId: "r1", chunk: 1, totalChunks: 3 }),
+    );
+
+    // Chunk 2
+    expect(mockLoggerInfo).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("sdk.input.system_prompt.michael.2 | "),
+      expect.objectContaining({ runId: "r1", chunk: 2, totalChunks: 3 }),
+    );
+
+    // Chunk 3
+    expect(mockLoggerInfo).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("sdk.input.system_prompt.michael.3 | "),
+      expect.objectContaining({ runId: "r1", chunk: 3, totalChunks: 3 }),
+    );
+
+    // Each chunk's message body is <=5000 chars of the value
+    const firstMsg = String(mockLoggerInfo.mock.calls[0]?.[0]);
+    const prefix = "sdk.input.system_prompt.michael.1 | ";
+    expect(firstMsg.length - prefix.length).toBe(5000);
+  });
+
+  it("logChunked handles exactly 5000 chars without splitting", async () => {
+    const { logChunked } = await import("../telemetry");
+    const exact = "B".repeat(5000);
+    logChunked("test.exact", exact);
+
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      `test.exact.1 | ${exact}`,
+      expect.objectContaining({ chunk: 1, totalChunks: 1 }),
+    );
+  });
+
+  // --- logChunkedAttrs ---
+
+  it("logChunkedAttrs emits a single log when all attrs are short", async () => {
+    const { logChunkedAttrs } = await import("../telemetry");
+    logChunkedAttrs("judge.request", { model: "haiku", prompt: "short" });
+
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      "judge.request.1",
+      expect.objectContaining({ model: "haiku", prompt: "short", chunk: 1, totalChunks: 1 }),
+    );
+  });
+
+  it("logChunkedAttrs splits long attribute values into numbered logs", async () => {
+    const { logChunkedAttrs } = await import("../telemetry");
+    const longPrompt = "X".repeat(10_000);
+    logChunkedAttrs("judge.request", {
+      model: "haiku",
+      systemPrompt: longPrompt,
+    });
+
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(2);
+
+    // Chunk 1: first 5k of systemPrompt, model preserved
+    expect(mockLoggerInfo).toHaveBeenNthCalledWith(
+      1,
+      "judge.request.1",
+      expect.objectContaining({ model: "haiku", chunk: 1, totalChunks: 2 }),
+    );
+    const chunk1Attrs = mockLoggerInfo.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect((chunk1Attrs.systemPrompt as string).length).toBe(5000);
+
+    // Chunk 2: next 5k of systemPrompt
+    expect(mockLoggerInfo).toHaveBeenNthCalledWith(
+      2,
+      "judge.request.2",
+      expect.objectContaining({ model: "haiku", chunk: 2, totalChunks: 2 }),
+    );
+    const chunk2Attrs = mockLoggerInfo.mock.calls[1]?.[1] as Record<string, unknown>;
+    expect((chunk2Attrs.systemPrompt as string).length).toBe(5000);
+  });
 });

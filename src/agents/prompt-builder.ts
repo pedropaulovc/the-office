@@ -12,6 +12,7 @@ export interface BuildSystemPromptInput {
   memoryBlocks: PromptMemoryBlock[];
   recentMessages: PromptMessage[];
   interventionNudge?: string | null;
+  repetitionContext?: string | null;
 }
 
 const MAX_RECENT_MESSAGES = 20;
@@ -57,6 +58,11 @@ function assemblePrompt(input: BuildSystemPromptInput): string {
   // 5. Intervention nudge (transient — not stored in memory)
   if (input.interventionNudge) {
     sections.push(`### Conversation Guidance\n\n${input.interventionNudge}`);
+  }
+
+  // 6. Repetition suppression context (transient)
+  if (input.repetitionContext) {
+    sections.push(input.repetitionContext);
   }
 
   return sections.join("\n\n---\n\n");

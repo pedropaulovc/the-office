@@ -21,6 +21,8 @@ vi.mock("@/lib/telemetry", () => ({
   logInfo: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: vi.fn(),
   withSpan: vi.fn((_n: string, _o: string, fn: () => unknown) => fn()),
 }));

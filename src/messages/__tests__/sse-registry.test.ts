@@ -6,6 +6,8 @@ const mockCountMetric = vi.fn();
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_n: string, _o: string, fn: () => unknown) => fn(),
   logInfo: (...args: unknown[]) => { mockLogInfo(...args); },
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: (...args: unknown[]) => { mockCountMetric(...args); },
 }));
 
