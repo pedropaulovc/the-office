@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-config({ path: ".env.local" });
+config({ path: ".env.local", quiet: true });
 
 import { parseArgs } from "node:util";
 import { writeFile } from "node:fs/promises";

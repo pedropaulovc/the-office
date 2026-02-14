@@ -849,8 +849,13 @@ Summary of every route, grouped by resource.
 | POST | `/api/evaluations/fluency` | M6 (S-6.3) |
 | POST | `/api/evaluations/convergence` | M6 (S-6.4) |
 | POST | `/api/evaluations/ideas-quantity` | M6 (S-6.6) |
-| GET | `/api/evaluations/baselines` | M8 (S-8.2) |
-| GET | `/api/evaluations/baselines/[agentId]` | M8 (S-8.2) |
+| GET | `/api/evaluations/baselines` | M6 (S-6.5) |
+| GET | `/api/evaluations/baselines/[agentId]` | M6 (S-6.5) |
+| POST | `/api/evaluations/baselines` | M6 (S-6.5) |
+| GET | `/api/evaluations/golden-baselines` | M8 (S-8.2) |
+| GET | `/api/evaluations/golden-baselines/[agentId]` | M8 (S-8.2) |
+| POST | `/api/evaluations/harness` | M8 (S-8.1) |
+| POST | `/api/evaluations/harness/report` | M8 (S-8.3) |
 | POST | `/api/evaluations/quality-check` | M7 (S-7.0) |
 | GET | `/api/evaluations/quality-check/stats` | M7 (S-7.0) |
 | GET | `/api/evaluations/correction-logs` | M7 (S-7.0) |

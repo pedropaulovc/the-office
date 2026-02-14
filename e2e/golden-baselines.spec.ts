@@ -25,7 +25,48 @@ interface HarnessResult {
   };
 }
 
+interface GoldenBaseline {
+  agentId: string;
+  capturedAt: string;
+  dimensions: Record<string, number>;
+  propositionScores: Record<string, number>;
+}
+
 test.describe("golden baselines API", () => {
+  test("GET /api/evaluations/golden-baselines lists all committed baselines", async ({ request }) => {
+    const response = await request.get("/api/evaluations/golden-baselines");
+    expect(response.status()).toBe(200);
+
+    const baselines = (await response.json()) as GoldenBaseline[];
+    expect(baselines.length).toBeGreaterThanOrEqual(3);
+
+    const agentIds = baselines.map((b) => b.agentId);
+    expect(agentIds).toContain("michael");
+    expect(agentIds).toContain("dwight");
+    expect(agentIds).toContain("jim");
+
+    for (const b of baselines) {
+      expect(b.capturedAt).toBeTruthy();
+      expect(b.dimensions).toBeDefined();
+      expect(b.propositionScores).toBeDefined();
+    }
+  });
+
+  test("GET /api/evaluations/golden-baselines/michael returns Michael baseline", async ({ request }) => {
+    const response = await request.get("/api/evaluations/golden-baselines/michael");
+    expect(response.status()).toBe(200);
+
+    const baseline = (await response.json()) as GoldenBaseline;
+    expect(baseline.agentId).toBe("michael");
+    expect(typeof baseline.dimensions.adherence).toBe("number");
+    expect(Object.keys(baseline.propositionScores).length).toBeGreaterThan(0);
+  });
+
+  test("GET /api/evaluations/golden-baselines/nonexistent returns 404", async ({ request }) => {
+    const response = await request.get("/api/evaluations/golden-baselines/nonexistent-agent");
+    expect(response.status()).toBe(404);
+  });
+
   test("harness includes baseline delta for agents with golden baselines", async ({ request }) => {
     // Michael, Dwight, Jim have committed golden baselines
     const response = await request.post("/api/evaluations/harness", {

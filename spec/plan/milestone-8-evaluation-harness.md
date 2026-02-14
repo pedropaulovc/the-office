@@ -196,6 +196,8 @@ Golden baselines are the "expected" persona quality scores, committed to the rep
 |------|---------|
 | `src/features/evaluation/baselines/` | Directory for golden baseline JSON files (one per character, 16 total) |
 | `src/features/evaluation/harness/baseline-manager.ts` | `loadGoldenBaseline(agentId)`, `saveGoldenBaseline(agentId, scores)`, `detectRegressions(agentId, current, baseline, delta)` |
+| `src/app/api/evaluations/golden-baselines/route.ts` | `GET` — list all golden baselines |
+| `src/app/api/evaluations/golden-baselines/[agentId]/route.ts` | `GET` — get golden baseline for one agent |
 
 ### Files to modify
 
@@ -203,6 +205,32 @@ Golden baselines are the "expected" persona quality scores, committed to the rep
 |------|--------|
 | `src/features/evaluation/harness/cli.ts` | Add `--update-baseline` and `--regression-delta` flags |
 | `src/features/evaluation/harness/report.ts` | Include regression detection in the report: `regressions` field per agent |
+
+### API Routes
+
+#### `GET /api/evaluations/golden-baselines`
+
+List all golden baseline JSON files committed to the repository.
+
+**Response 200:**
+```json
+[
+  {
+    "agentId": "michael",
+    "capturedAt": "2026-02-13T00:00:00Z",
+    "dimensions": { "adherence": 7.23 },
+    "propositionScores": { "michael-self-centered-humor": 8 }
+  }
+]
+```
+
+#### `GET /api/evaluations/golden-baselines/[agentId]`
+
+Get the golden baseline for a single agent.
+
+**Response 200:** Single golden baseline object.
+
+**Response 404:** `{ "error": "No golden baseline found for agent 'kevin'" }`
 
 ### Acceptance Criteria
 - [ ] [AC-8.2.1] Golden baselines stored as JSON files in `src/features/evaluation/baselines/` (one per agent)
@@ -215,13 +243,15 @@ Golden baselines are the "expected" persona quality scores, committed to the rep
 - [ ] [AC-8.2.8] `--update-baseline` generates golden baselines from current evaluation run
 - [ ] [AC-8.2.9] Unit tests for regression detection logic with various delta values
 - [ ] [AC-8.2.10] Baselines for at least 3 characters (Michael, Dwight, Jim) committed to repository as initial golden baselines
+- [ ] [AC-8.2.11] `GET /api/evaluations/golden-baselines` returns all committed golden baselines
+- [ ] [AC-8.2.12] `GET /api/evaluations/golden-baselines/[agentId]` returns a single golden baseline or 404
 
 ### Demo
-1. Run `npm run eval:run -- --agents michael --mock-judge --update-baseline` to capture golden baseline
-2. Show the JSON file created in `src/features/evaluation/baselines/michael.json`
-3. Modify Michael's persona to introduce drift
-4. Run the evaluation again without `--update-baseline`
-5. Show the regression detected in the report
+1. `GET /api/evaluations/golden-baselines` — show all committed baselines
+2. `GET /api/evaluations/golden-baselines/michael` — show Michael's baseline
+3. `POST /api/evaluations/harness` with `{ "agents": ["michael"], "mockJudge": false }` — run live evaluation
+4. Show `baselineDelta` and `regressions` in the response
+5. `POST /api/evaluations/harness` with `{ "agents": ["michael"], "mockJudge": false, "regressionDelta": 0.01 }` — force regression detection
 
 ---
 
@@ -265,6 +295,22 @@ For PRs that do NOT touch these files, the check is skipped (not blocked).
 |------|---------|
 | `.github/workflows/persona-evaluation.yml` | GitHub Actions workflow for persona regression testing |
 | `src/features/evaluation/harness/ci-reporter.ts` | Formats evaluation report as GitHub PR comment markdown |
+| `src/app/api/evaluations/harness/report/route.ts` | `POST` — format a HarnessResult as PR comment markdown |
+
+### API Routes
+
+#### `POST /api/evaluations/harness/report`
+
+Format a HarnessResult as a GitHub PR comment markdown table. Useful for previewing CI output and integrating with external tools.
+
+**Request body:** A `HarnessResult` object (same shape as the response from `POST /api/evaluations/harness`).
+
+**Response 200:**
+```json
+{
+  "markdown": "<!-- persona-evaluation-report -->\n## Persona Evaluation Report\n\n| Agent | Adherence | Overall | Status |\n..."
+}
+```
 
 ### Acceptance Criteria
 - [ ] [AC-8.3.1] GitHub Actions workflow triggers on PRs modifying persona-related files
@@ -276,13 +322,12 @@ For PRs that do NOT touch these files, the check is skipped (not blocked).
 - [ ] [AC-8.3.7] CI reporter formats markdown table with per-agent, per-dimension scores and delta from baseline
 - [ ] [AC-8.3.8] Workflow completes in under 60 seconds (mock-judge mode, no LLM calls)
 - [ ] [AC-8.3.9] Unit tests for CI reporter markdown generation
+- [ ] [AC-8.3.10] `POST /api/evaluations/harness/report` formats HarnessResult as PR comment markdown
 
 ### Demo
-1. Create a branch that modifies Michael's system prompt
-2. Push the branch and open a PR
-3. Show the GitHub Actions workflow triggering
-4. Show the PR comment with evaluation results
-5. Show the check passing or failing based on regression detection
+1. `POST /api/evaluations/harness` with `{ "agents": ["michael","dwight"], "mockJudge": false }` — run live evaluation
+2. `POST /api/evaluations/harness/report` with the result — show formatted PR comment markdown
+3. Show the GitHub Actions workflow file and explain trigger conditions
 
 ---
 

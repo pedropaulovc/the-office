@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { logInfo, countMetric } from "@/lib/telemetry";
 
@@ -17,6 +17,16 @@ export interface Regression {
 }
 
 const BASELINES_DIR = resolve(process.cwd(), "src/features/evaluation/baselines");
+
+export function listGoldenBaselines(): GoldenBaseline[] {
+  if (!existsSync(BASELINES_DIR)) return [];
+  return readdirSync(BASELINES_DIR)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => {
+      const content = readFileSync(join(BASELINES_DIR, f), "utf-8");
+      return JSON.parse(content) as GoldenBaseline;
+    });
+}
 
 export function loadGoldenBaseline(agentId: string): GoldenBaseline | null {
   const filePath = join(BASELINES_DIR, `${agentId}.json`);

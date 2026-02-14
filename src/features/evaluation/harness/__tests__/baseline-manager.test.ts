@@ -40,6 +40,31 @@ describe("baseline-manager", () => {
     });
   });
 
+  describe("listGoldenBaselines", () => {
+    it("returns all committed golden baselines", async () => {
+      const { listGoldenBaselines } = await import("../baseline-manager");
+      const baselines = listGoldenBaselines();
+
+      expect(baselines.length).toBeGreaterThanOrEqual(3);
+      const agentIds = baselines.map((b) => b.agentId);
+      expect(agentIds).toContain("michael");
+      expect(agentIds).toContain("dwight");
+      expect(agentIds).toContain("jim");
+    });
+
+    it("each baseline has required fields", async () => {
+      const { listGoldenBaselines } = await import("../baseline-manager");
+      const baselines = listGoldenBaselines();
+
+      for (const b of baselines) {
+        expect(b.agentId).toBeDefined();
+        expect(b.capturedAt).toBeDefined();
+        expect(b.dimensions).toBeDefined();
+        expect(b.propositionScores).toBeDefined();
+      }
+    });
+  });
+
   describe("detectRegressions", () => {
     it("detects no regressions when scores are within delta", async () => {
       const { detectRegressions } = await import("../baseline-manager");

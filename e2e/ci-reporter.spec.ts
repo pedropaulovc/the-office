@@ -75,9 +75,9 @@ test.describe("CI reporter API", () => {
     }
   });
 
-  test("ci-reporter format endpoint produces valid markdown", async ({ request }) => {
-    // Run harness and use the result to validate markdown structure
-    const response = await request.post("/api/evaluations/harness", {
+  test("POST /api/evaluations/harness/report formats result as PR comment", async ({ request }) => {
+    // Run harness first
+    const harnessResponse = await request.post("/api/evaluations/harness", {
       data: {
         agents: ["michael"],
         dimensions: ["adherence"],
@@ -85,22 +85,29 @@ test.describe("CI reporter API", () => {
         mockJudge: true,
       },
     });
-    expect(response.status()).toBe(200);
+    expect(harnessResponse.status()).toBe(200);
 
-    const result = (await response.json()) as HarnessResult;
+    const harnessResult = (await harnessResponse.json()) as HarnessResult;
 
-    // Validate the result has all required ci-reporter fields
-    expect(result.agents).toBeDefined();
-    expect(result.summary).toBeDefined();
-    expect(result.summary.total).toBeGreaterThan(0);
+    // Format as PR comment via the report API
+    const reportResponse = await request.post("/api/evaluations/harness/report", {
+      data: harnessResult,
+    });
+    expect(reportResponse.status()).toBe(200);
 
-    // Verify agent result has dimension scores (needed for markdown table)
-    const michael = result.agents.michael;
-    expect(michael).toBeDefined();
-    const adherence = michael?.dimensions.adherence as DimensionResult;
-    expect(typeof adherence.score).toBe("number");
-    expect(adherence.score).toBeGreaterThanOrEqual(0);
-    expect(adherence.score).toBeLessThanOrEqual(9);
+    const { markdown } = (await reportResponse.json()) as { markdown: string };
+    expect(markdown).toContain("<!-- persona-evaluation-report -->");
+    expect(markdown).toContain("## Persona Evaluation Report");
+    expect(markdown).toContain("michael");
+    expect(markdown).toContain("PASS");
+    expect(markdown).toContain("Adherence");
+  });
+
+  test("report API returns 400 for invalid input", async ({ request }) => {
+    const response = await request.post("/api/evaluations/harness/report", {
+      data: { invalid: true },
+    });
+    expect(response.status()).toBe(400);
   });
 
   test("multiple agents produce distinct rows for ci-reporter", async ({ request }) => {

@@ -288,12 +288,21 @@ All quality checks — both standalone API calls and orchestrator pipeline invoc
 
 ## Evaluation Harness
 
-CLI tool for dev-time and CI persona testing:
+All harness operations are available via both CLI and API:
 
+**CLI:**
 ```
 npm run eval:run -- [options]
 npm run eval:baseline -- --agents michael,dwight
 ```
+
+**API:**
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/evaluations/harness` | Run evaluation (live or mock judge) |
+| GET | `/api/evaluations/golden-baselines` | List all golden baselines |
+| GET | `/api/evaluations/golden-baselines/[agentId]` | Get golden baseline for one agent |
+| POST | `/api/evaluations/harness/report` | Format HarnessResult as PR comment markdown |
 
 ### Modes
 
@@ -305,11 +314,11 @@ npm run eval:baseline -- --agents michael,dwight
 
 ### Golden Baselines
 
-JSON files committed to `src/features/evaluation/baselines/`. Regression = score drops >1.0 point below baseline.
+JSON files committed to `src/features/evaluation/baselines/`. Regression = score drops >1.0 point below baseline. Accessible via `GET /api/evaluations/golden-baselines` (list all) and `GET /api/evaluations/golden-baselines/[agentId]` (single agent). These are distinct from DB-backed baselines in `evaluation_runs.is_baseline` (S-6.5) — golden baselines are the CI regression source of truth.
 
 ### CI Workflow
 
-GitHub Actions on PRs touching persona-related files. Runs mock-judge mode (<60s). Posts PR comment with scores table. Fails on regressions.
+GitHub Actions on PRs touching persona-related files. Runs mock-judge mode (<60s). Posts PR comment with scores table (formatted via `POST /api/evaluations/harness/report`). Fails on regressions.
 
 ## Experiment Infrastructure (Table 1 Reproduction)
 
