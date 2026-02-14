@@ -11,7 +11,7 @@ const NUDGE_TYPES: NudgeType[] = [
 ];
 
 export async function GET(request: Request) {
-  return apiHandler("api.evaluations.interventions.nudges", "http.server", async () => {
+  return apiHandler("api.evaluations.interventions.nudges", "http.server", () => {
     const url = new URL(request.url);
     const agentId = url.searchParams.get("agentId");
     const nudgeType = url.searchParams.get("nudgeType") as NudgeType | null;
