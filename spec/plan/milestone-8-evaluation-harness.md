@@ -141,13 +141,13 @@ Options:
 | `package.json` | Add `"eval:run": "npx tsx src/features/evaluation/harness/cli.ts"` |
 
 ### Acceptance Criteria
-- [ ] [AC-8.1.1] CLI accepts `--agents`, `--dimensions`, `--threshold`, `--mock-judge`, `--synthetic`, `--output` flags
+- [ ] [AC-8.1.1] CLI accepts `--agents`, `--dimensions`, `--threshold`, `--mock-judge`, `--window`, `--output` flags (`--synthetic` deferred to follow-up)
 - [ ] [AC-8.1.2] Runs all five dimension scorers for specified agents
 - [ ] [AC-8.1.3] Produces structured JSON report with per-agent, per-dimension scores and pass/fail
 - [ ] [AC-8.1.4] Exit code 0 when all agents pass, exit code 1 when any fail
 - [ ] [AC-8.1.5] `--mock-judge` mode returns pre-recorded scores without LLM calls (fast, free, deterministic)
-- [ ] [AC-8.1.6] `--synthetic` mode generates conversations from canned prompts before evaluating
-- [ ] [AC-8.1.7] Report includes baseline delta when baselines exist (from S-6.5)
+- [ ] [AC-8.1.6] `--synthetic` mode generates conversations from canned prompts before evaluating (**deferred** — requires `synthetic.ts` + `prompts/` directory; will be a follow-up story)
+- [ ] [AC-8.1.7] Report includes baseline delta when baselines exist (from S-6.5) (**deferred** to S-8.2 — requires golden baseline storage)
 - [ ] [AC-8.1.8] Human-readable summary printed to stderr alongside JSON to stdout
 - [ ] [AC-8.1.9] Unit tests for report generation, CLI argument parsing, mock judge behavior
 - [ ] [AC-8.1.10] Full integration test: run harness with mock judge, verify report structure and exit code

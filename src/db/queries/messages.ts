@@ -1,4 +1,4 @@
-import { eq, and, isNull, inArray, sql, desc } from "drizzle-orm";
+import { eq, and, isNull, inArray, sql, desc, gte, lte } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   channels,
@@ -291,6 +291,30 @@ export async function getRecentAgentMessages(agentId: string, limit = 5): Promis
       .limit(limit);
     return rows.reverse();
   });
+}
+
+/**
+ * Get all messages by a specific agent within a time window, across all channels.
+ * Used by the evaluation harness to build agent trajectories from real data.
+ */
+export function getAgentMessagesInWindow(
+  agentId: string,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<DbMessage[]> {
+  return withSpan("getAgentMessagesInWindow", "db.query", () =>
+    db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.userId, agentId),
+          gte(messages.createdAt, windowStart),
+          lte(messages.createdAt, windowEnd),
+        ),
+      )
+      .orderBy(messages.createdAt),
+  );
 }
 
 export function updateMessage(
