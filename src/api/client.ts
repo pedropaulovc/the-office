@@ -22,6 +22,16 @@ export async function fetchChannels(): Promise<ChannelView[]> {
   return response.json() as Promise<ChannelView[]>;
 }
 
+export async function fetchChannel(channelId: string): Promise<ChannelView> {
+  const response = await fetch(`/api/channels/${encodeURIComponent(channelId)}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch channel: ${response.status}`);
+  }
+
+  return response.json() as Promise<ChannelView>;
+}
+
 export async function fetchChannelMessages(channelId: string): Promise<Message[]> {
   const response = await fetch(`/api/channels/${encodeURIComponent(channelId)}/messages`);
 

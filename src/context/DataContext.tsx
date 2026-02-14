@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
 import { useSSE } from '@/hooks/use-sse';
-import { fetchChannelMessages } from '@/api/client';
+import { fetchChannel, fetchChannelMessages } from '@/api/client';
 import type { Message } from '@/types';
 import type { SSEEvent } from '@/messages/sse-registry';
 import { DataContext, type AgentView } from './data-context-def';
@@ -65,13 +65,23 @@ export function DataProvider({
     [agentMap],
   );
 
+  const [dynamicChannels, setDynamicChannels] = useState<ChannelView[]>([]);
+
+  const allChannels = useMemo(
+    () => {
+      const seen = new Set(initialChannels.map(ch => ch.id));
+      return [...initialChannels, ...dynamicChannels.filter(ch => !seen.has(ch.id))];
+    },
+    [initialChannels, dynamicChannels],
+  );
+
   const channelMap = useMemo(() => {
     const map = new Map<string, ChannelView>();
-    for (const ch of initialChannels) {
+    for (const ch of allChannels) {
       map.set(ch.id, ch);
     }
     return map;
-  }, [initialChannels]);
+  }, [allChannels]);
 
   const getChannel = useMemo(
     () => (id: string): ChannelView | undefined => channelMap.get(id),
@@ -80,10 +90,10 @@ export function DataProvider({
 
   const getDmsForUser = useMemo(
     () => (userId: string): ChannelView[] =>
-      initialChannels.filter(
+      allChannels.filter(
         (ch) => ch.kind === 'dm' && ch.memberIds.includes(userId),
       ),
-    [initialChannels],
+    [allChannels],
   );
 
   const getDmOtherParticipant = useMemo(
@@ -118,6 +128,16 @@ export function DataProvider({
         setMessagesLoading(prev => ({ ...prev, [channelId]: false }));
       });
   }, []);
+
+  const loadExperimentChannel = useCallback(async (channelId: string) => {
+    if (channelMap.has(channelId)) return;
+    const channel = await fetchChannel(channelId);
+    setDynamicChannels(prev => {
+      if (prev.some(ch => ch.id === channelId)) return prev;
+      return [...prev, channel];
+    });
+    loadMessages(channelId);
+  }, [channelMap, loadMessages]);
 
   const handleSSEEvent = useCallback((event: SSEEvent) => {
     switch (event.type) {
@@ -307,7 +327,7 @@ export function DataProvider({
     () => ({
       agents,
       getAgent,
-      channels: initialChannels,
+      channels: allChannels,
       getChannel,
       getDmsForUser,
       getDmOtherParticipant,
@@ -315,10 +335,11 @@ export function DataProvider({
       messages,
       messagesLoading,
       loadMessages,
+      loadExperimentChannel,
       appendMessage,
       typingAgents,
     }),
-    [agents, getAgent, initialChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount, messages, messagesLoading, loadMessages, appendMessage, typingAgents],
+    [agents, getAgent, allChannels, getChannel, getDmsForUser, getDmOtherParticipant, getUnreadCount, messages, messagesLoading, loadMessages, loadExperimentChannel, appendMessage, typingAgents],
   );
 
   return (

@@ -18,6 +18,7 @@ export interface DataContextValue {
   messages: Record<string, Message[]>;
   messagesLoading: Record<string, boolean>;
   loadMessages: (channelId: string) => void;
+  loadExperimentChannel: (channelId: string) => Promise<void>;
   appendMessage: (channelId: string, message: Message) => void;
   typingAgents: Record<string, string[]>;
 }
