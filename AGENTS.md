@@ -113,6 +113,7 @@ graph TD
 ### Horizontal Requirements
 
 - **Branch immediately**: The very first thing you do when starting any new work is create a feature branch off `main`: `git checkout -b feature/my-feature main`. Never commit directly to the worktree branch — a pre-commit hook will block it. Each story = one PR on its own feature branch, targeting `main`.
+- **Merge strategy**: Always use regular merge commits (`gh pr merge --merge`), never squash or rebase merge. This preserves individual commit history per story.
 - Each schema story = one DB migration, tested and validated
 - Testing is mandatory: unit tests + integration tests + 1-2 E2E tests for user-facing features
 - Every story must be demoable with a live demo before claiming completion
