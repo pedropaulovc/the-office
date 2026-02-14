@@ -56,7 +56,7 @@ export async function parseRequestJson(request: Request): Promise<unknown> {
 export function apiHandler(
   name: string,
   op: string,
-  handler: () => Promise<NextResponse>,
+  handler: () => NextResponse | Promise<NextResponse>,
 ): Promise<NextResponse> {
   return Sentry.startSpan({ name, op }, async () => {
     try {
