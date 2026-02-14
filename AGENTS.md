@@ -263,6 +263,17 @@ Each E2E run captures the full Next.js server stdout (including `[sentry]` trace
 #### E2E tests in this project are rock solid
 All E2E tests go through a stress test where they run 10x in parallel and 10x in sequence every new push to main in search of race conditions and flakiness. You may check the stress test health looking at the workflow history of the ci-cd-main workflow on GitHub.
 
+## Demos
+
+When the user asks for a "demo", this means following the demo playbook from the relevant `spec/plan/` milestone file **manually, one step at a time**, using headed Playwright (via the `playwright-cli` skill). This is a hands-on walkthrough — NOT running tests.
+
+**Rules:**
+- **Never run tests as a demo.** Tests running is unacceptable as a demo. The user wants to see the feature working interactively in a real browser.
+- **Follow the spec playbook step by step.** Open the relevant milestone spec, find the demo playbook, and execute each step manually in headed Playwright.
+- **Add shim UI if needed.** If the demo requires UI that doesn't exist yet (e.g., a button to trigger an action, a temporary form), create minimal shim components to make the demo possible. Delete the shim code when the demo is complete.
+- **Headed mode only.** The user must be able to see the browser. Always use headed mode so they can follow along and assist.
+- **One step at a time.** Pause between steps to let the user observe. Don't rush through the entire playbook in one go.
+
 ## Manual testing
 You have access to Playwright via playwright-cli skill. Make sure to **only use it in headed mode** so the user can see your work and assist you. Use it sparingly in the following situations:
  * You are stuck trying to reproduce a bug through code analysis or test cases. `evaluate` is invaluable to capture runtime information such as computed styles or library side effects.
