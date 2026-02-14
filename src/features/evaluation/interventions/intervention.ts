@@ -132,19 +132,8 @@ export class Intervention {
           if (!result.passed) allPassed = false;
         }
 
-        // Short-circuit: skip LLM calls if functional already failed
-        if (!allPassed) {
-          return this.buildResult(
-            false,
-            preconditionResults,
-            null,
-            totalTokenUsage,
-            start,
-          );
-        }
-
-        // Textual precondition
-        if (this.textualPreconditionClaim) {
+        // Textual precondition (skip LLM call if functional already failed)
+        if (allPassed && this.textualPreconditionClaim) {
           const result = await evaluateTextualPrecondition(
             this.textualPreconditionClaim,
             scoringContext,
@@ -156,19 +145,8 @@ export class Intervention {
           if (!result.passed) allPassed = false;
         }
 
-        // Short-circuit: skip propositional if textual failed
-        if (!allPassed) {
-          return this.buildResult(
-            false,
-            preconditionResults,
-            null,
-            totalTokenUsage,
-            start,
-          );
-        }
-
-        // Propositional precondition
-        if (this.propositionalPreconditionConfig) {
+        // Propositional precondition (skip if earlier precondition failed)
+        if (allPassed && this.propositionalPreconditionConfig) {
           const { proposition, threshold } =
             this.propositionalPreconditionConfig;
           const result = await evaluatePropositionalPrecondition(
@@ -200,7 +178,7 @@ export class Intervention {
           start,
         );
 
-        // Log to DB
+        // Log to DB (always, including short-circuited unfired interventions)
         const agentTarget = this.targets.find((t) => t.type === "agent");
         const channelTarget = this.targets.find((t) => t.type === "channel");
         if (agentTarget) {

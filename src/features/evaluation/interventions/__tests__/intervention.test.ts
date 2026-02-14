@@ -306,7 +306,7 @@ describe("Intervention", () => {
     expect(logData.nudgeText).toBe("nudge text");
   });
 
-  it("does not log to DB when precondition short-circuits", async () => {
+  it("logs to DB even when precondition short-circuits", async () => {
     const intervention = new Intervention({ type: "agent", id: "michael" })
       .setFunctionalPrecondition(() => false)
       .setEffect(() => "nudge");
@@ -314,8 +314,13 @@ describe("Intervention", () => {
     const result = await intervention.evaluate(makeContext());
 
     expect(result.fired).toBe(false);
-    // Short-circuit paths return before reaching DB logging
-    expect(mockCreateInterventionLog).not.toHaveBeenCalled();
+    expect(mockCreateInterventionLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: "michael",
+        fired: false,
+        functionalPreconditionResult: false,
+      }),
+    );
   });
 
   it("logs to DB when all preconditions evaluated (propositional fails)", async () => {
