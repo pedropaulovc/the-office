@@ -8,6 +8,7 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
+import { channels } from "./messages";
 
 // --- Experiments ---
 
@@ -51,7 +52,8 @@ export const experimentEnvironments = pgTable(
       .references(() => experiments.id, { onDelete: "cascade" }),
     environmentIndex: integer("environment_index").notNull(),
     group: text("group", { enum: ["treatment", "control"] }).notNull(),
-    channelId: text("channel_id"),
+    channelId: text("channel_id")
+      .references(() => channels.id),
     agentIds: text("agent_ids").array(),
     trajectory: jsonb("trajectory"),
   },

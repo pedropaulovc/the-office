@@ -5,6 +5,7 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
+import { experiments } from "./experiments";
 
 // --- Channels ---
 
@@ -13,7 +14,8 @@ export const channels = pgTable("channels", {
   name: text("name").notNull(),
   kind: text("kind", { enum: ["public", "private", "dm"] }).notNull(),
   topic: text("topic").notNull().default(""),
-  experimentId: uuid("experiment_id"),
+  experimentId: uuid("experiment_id")
+    .references(() => experiments.id),
 });
 
 export type Channel = typeof channels.$inferSelect;

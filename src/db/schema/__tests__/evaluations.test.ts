@@ -72,8 +72,8 @@ describe("evaluations schema", () => {
       expect(idx).toBeDefined();
     });
 
-    it("has a foreign key to agents", () => {
-      expect(config.foreignKeys.length).toBe(1);
+    it("has foreign keys to agents and experiments", () => {
+      expect(config.foreignKeys.length).toBe(2);
     });
 
     it("exports EvaluationRun select type", () => {

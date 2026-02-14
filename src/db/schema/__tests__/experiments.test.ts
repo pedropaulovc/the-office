@@ -152,8 +152,8 @@ describe("experiments schema", () => {
       expect(idx).toBeDefined();
     });
 
-    it("has a foreign key to experiments with cascade delete", () => {
-      expect(config.foreignKeys.length).toBe(1);
+    it("has foreign keys to experiments and channels", () => {
+      expect(config.foreignKeys.length).toBe(2);
     });
 
     it("exports ExperimentEnvironment select type", () => {

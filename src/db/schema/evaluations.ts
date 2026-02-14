@@ -10,6 +10,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { agents } from "./agents";
+import { experiments } from "./experiments";
 
 // --- Evaluation Runs ---
 
@@ -32,7 +33,8 @@ export const evaluationRuns = pgTable(
     overallScore: real("overall_score"),
     isBaseline: boolean("is_baseline").notNull().default(false),
     tokenUsage: jsonb("token_usage"),
-    experimentId: uuid("experiment_id"),
+    experimentId: uuid("experiment_id")
+      .references(() => experiments.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
