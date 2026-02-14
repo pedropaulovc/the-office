@@ -125,12 +125,23 @@ print_spans() {
 }
 
 # --- Logs ---
+# Known custom attribute fields emitted by the evaluation system.
+# The /events/?dataset=ourlogs endpoint returns these as columns.
+LOG_ATTR_FIELDS="systemPrompt,userPrompt,judgeOutput,model,reasoning,channelId,agentId,runId,count,sampleSize,score,confidence,result,inputTokens,outputTokens,durationMs,error"
+
 print_logs() {
   echo "=== LOGS ==="
   echo ""
 
+  # Build field params: core fields + all known attribute fields
+  local field_params="field=timestamp&field=timestamp_precise&field=severity&field=message"
+  IFS=',' read -ra attrs <<< "$LOG_ATTR_FIELDS"
+  for attr in "${attrs[@]}"; do
+    field_params="${field_params}&field=${attr}"
+  done
+
   local logs
-  logs=$(fetch_paginated "$SENTRY_BASE/organizations/$SENTRY_ORG/trace-logs/?dataset=ourlogs&field=timestamp_precise&field=severity&field=message&orderby=-timestamp&per_page=1000&project=-1&query=trace%3A$TRACE_ID&statsPeriod=14d&traceId=$TRACE_ID")
+  logs=$(fetch_paginated "$SENTRY_BASE/organizations/$SENTRY_ORG/events/?dataset=ourlogs&${field_params}&orderby=timestamp&per_page=100&project=$SENTRY_PROJECT_ID&query=trace%3A$TRACE_ID&statsPeriod=14d")
 
   local count
   count=$(echo "$logs" | jq 'length')
@@ -140,18 +151,38 @@ print_logs() {
     return
   fi
 
-  if [[ "$TRUNCATE" == "true" ]]; then
-    echo "$logs" | jq -r --argjson max "$MAX_LOG_CHARS" '
-      sort_by(.timestamp_precise) | .[] |
-      if (.message | length) > $max then
-        "  \(.severity) | \(.message[:$max])… [truncated, use --full]"
-      else
-        "  \(.severity) | \(.message)"
-      end
-    '
-  else
-    echo "$logs" | jq -r 'sort_by(.timestamp_precise) | .[] | "  \(.severity) | \(.message)"'
-  fi
+  echo "$logs" | jq -r --argjson max "$MAX_LOG_CHARS" --argjson trunc "$([[ "$TRUNCATE" == "true" ]] && echo "true" || echo "false")" '
+    sort_by(.timestamp_precise) | .[] |
+    # Collect non-null, non-core attributes
+    (to_entries | map(
+      select(
+        .key != "timestamp_precise" and .key != "severity" and .key != "message" and
+        .key != "id" and .key != "project.id" and .key != "project.name" and .key != "trace" and
+        .key != "severity_number" and .key != "timestamp" and
+        .value != null and .value != ""
+      )
+    )) as $attrs |
+    # Format: severity | message
+    "  \(.severity) | \(.message)" +
+    # Append attributes if any exist
+    if ($attrs | length) > 0 then
+      "\n" + (
+        $attrs | map(
+          "    " + .key + ": " + (
+            if (.value | type) == "string" then
+              if $trunc and ((.value | length) > $max) then
+                (.value[:$max] + "… [truncated, use --full]")
+              else
+                .value
+              end
+            else
+              (.value | tostring)
+            end
+          )
+        ) | join("\n")
+      )
+    else "" end
+  '
 }
 
 # --- Main ---
