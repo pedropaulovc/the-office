@@ -226,7 +226,7 @@ Filterable table of action correction events:
 | Timestamp | When the correction occurred |
 | Agent | Which agent was corrected |
 | Stage | original, regeneration, direct_correction |
-| Outcome | passed, regeneration_success, direct_correction_success, forced_through, timeout_pass_through |
+| Outcome | passed, regeneration_requested, regeneration_success, direct_correction_success, forced_through, timeout_pass_through |
 | Scores | Per-dimension scores (adherence, consistency, fluency, suitability) |
 
 Filters: agent, outcome, date range.

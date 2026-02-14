@@ -3,7 +3,8 @@ import { z } from "zod/v4";
 import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
 import { logInfo, countMetric } from "@/lib/telemetry";
 import { checkActionQuality } from "@/features/evaluation/gates/action-correction";
-import { DEFAULT_GATE_CONFIG, type GateConfig } from "@/features/evaluation/gates/types";
+import { runCorrectionPipeline } from "@/features/evaluation/gates/correction-pipeline";
+import { DEFAULT_GATE_CONFIG, DEFAULT_PIPELINE_CONFIG, type GateConfig, type CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
 import { getAgent } from "@/db/queries";
 
 const dimensionConfigSchema = z.object({
@@ -25,6 +26,7 @@ const qualityCheckRequestSchema = z.object({
           fluency: dimensionConfigSchema.optional(),
           suitability: dimensionConfigSchema.optional(),
         })
+        .strict()
         .optional(),
       similarity: z
         .object({
@@ -33,8 +35,19 @@ const qualityCheckRequestSchema = z.object({
         })
         .optional(),
     })
+    .strict()
     .optional(),
-});
+  // Pipeline options (S-7.0b)
+  pipeline: z
+    .object({
+      enableRegeneration: z.boolean().optional(),
+      enableDirectCorrection: z.boolean().optional(),
+      maxCorrectionAttempts: z.number().int().min(1).max(10).optional(),
+      continueOnFailure: z.boolean().optional(),
+    })
+    .strict()
+    .optional(),
+}).strict();
 
 function mergeConfig(
   overrides?: z.infer<typeof qualityCheckRequestSchema>["config"],
@@ -59,6 +72,20 @@ function mergeConfig(
   return base;
 }
 
+function mergePipelineConfig(
+  gateConfig: GateConfig,
+  pipelineOverrides?: z.infer<typeof qualityCheckRequestSchema>["pipeline"],
+): CorrectionPipelineConfig {
+  return {
+    ...gateConfig,
+    enableRegeneration: pipelineOverrides?.enableRegeneration ?? DEFAULT_PIPELINE_CONFIG.enableRegeneration,
+    enableDirectCorrection: pipelineOverrides?.enableDirectCorrection ?? DEFAULT_PIPELINE_CONFIG.enableDirectCorrection,
+    maxCorrectionAttempts: pipelineOverrides?.maxCorrectionAttempts ?? DEFAULT_PIPELINE_CONFIG.maxCorrectionAttempts,
+    continueOnFailure: pipelineOverrides?.continueOnFailure ?? DEFAULT_PIPELINE_CONFIG.continueOnFailure,
+    minimumRequiredQtyOfActions: DEFAULT_PIPELINE_CONFIG.minimumRequiredQtyOfActions,
+  };
+}
+
 export async function POST(request: Request) {
   return apiHandler("api.evaluations.quality-check", "http.server", async () => {
     const body = await parseRequestJson(request);
@@ -73,20 +100,43 @@ export async function POST(request: Request) {
     }
 
     const { agentId, messageText, conversationContext, recentMessages } = parsed.data;
-    const config = mergeConfig(parsed.data.config);
-
+    const gateConfig = mergeConfig(parsed.data.config);
     const agent = await getAgent(agentId);
 
+    const qualityOptions = {
+      agentName: agent?.displayName ?? agentId,
+      persona: agent?.systemPrompt ?? undefined,
+      recentMessages,
+    };
+
+    // Use full pipeline when pipeline options provided
+    if (parsed.data.pipeline) {
+      const pipelineConfig = mergePipelineConfig(gateConfig, parsed.data.pipeline);
+
+      const result = await runCorrectionPipeline(
+        agentId,
+        messageText,
+        conversationContext ?? [],
+        pipelineConfig,
+        qualityOptions,
+      );
+
+      logInfo("quality-check pipeline completed", {
+        agentId,
+        outcome: result.outcome,
+      });
+      countMetric("api.evaluations.quality_check_pipeline", 1);
+
+      return jsonResponse(result, { status: 201 });
+    }
+
+    // Single-shot quality check (backwards compatible)
     const result = await checkActionQuality(
       agentId,
       messageText,
       conversationContext ?? [],
-      config,
-      {
-        agentName: agent?.displayName ?? agentId,
-        persona: agent?.systemPrompt ?? undefined,
-        recentMessages,
-      },
+      gateConfig,
+      qualityOptions,
     );
 
     logInfo("quality-check completed", { agentId, passed: result.passed });

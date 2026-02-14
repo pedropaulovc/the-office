@@ -84,3 +84,50 @@ export const evaluationScores = pgTable(
 
 export type EvaluationScore = typeof evaluationScores.$inferSelect;
 export type NewEvaluationScore = typeof evaluationScores.$inferInsert;
+
+// --- Correction Logs ---
+
+export const correctionLogs = pgTable(
+  "correction_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    runId: uuid("run_id"),
+    channelId: text("channel_id"),
+    originalText: text("original_text").notNull(),
+    finalText: text("final_text").notNull(),
+    stage: text("stage", {
+      enum: ["original", "regeneration", "direct_correction"],
+    }).notNull(),
+    attemptNumber: integer("attempt_number").notNull(),
+    outcome: text("outcome", {
+      enum: [
+        "passed",
+        "regeneration_requested",
+        "regeneration_success",
+        "direct_correction_success",
+        "forced_through",
+        "timeout_pass_through",
+      ],
+    }).notNull(),
+    dimensionScores: jsonb("dimension_scores").notNull(),
+    similarityScore: real("similarity_score"),
+    totalScore: real("total_score").notNull(),
+    tokenUsage: jsonb("token_usage"),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("correction_logs_agent_created_idx").on(
+      table.agentId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export type CorrectionLog = typeof correctionLogs.$inferSelect;
+export type NewCorrectionLog = typeof correctionLogs.$inferInsert;
