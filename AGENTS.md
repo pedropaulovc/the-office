@@ -13,6 +13,8 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 - `npm run db:push` — push schema to Neon (dev)
 - `npm run db:seed` — seed all tables from mock data (idempotent)
 - `npm run db:generate` — generate migration files
+
+**Always use `npm run` scripts**: Never invoke `vitest`, `playwright`, `next dev`, or `next start` directly. The `npm run` wrappers (`test`, `test:e2e`, `dev`) handle critical preconditions: killing zombie processes from previous runs, provisioning Neon branches, seeding data, and configuring environment variables. Running the underlying tools directly bypasses all of this and leads to orphaned processes and stale state.
 - `npm run db:migrate` — run migrations (production)
 
 **Environment setup:** The `.env.local` file (with `DATABASE_URL_UNPOOLED` and other secrets) is NOT checked into git. `npm run dev` automatically pulls env vars from Vercel and writes `.env.local` before starting the dev server — you do NOT need to create or manage this file manually. If `db:push`, `db:seed`, or other DB commands fail with an empty URL, run `npm run dev` first so it generates `.env.local`.
