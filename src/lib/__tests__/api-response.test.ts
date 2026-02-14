@@ -12,6 +12,8 @@ vi.mock("@sentry/nextjs", () => ({
 
 vi.mock("@/lib/telemetry", () => ({
   logError: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
 }));
 
 describe("api-response helpers", () => {

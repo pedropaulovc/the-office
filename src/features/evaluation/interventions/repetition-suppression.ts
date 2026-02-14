@@ -1,10 +1,11 @@
 import { extractNgrams, computeCorpusRepetition } from "@/features/evaluation/utils/ngram";
 import { getRecentAgentMessages } from "@/db/queries";
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { withSpan, logInfo, logChunked, countMetric } from "@/lib/telemetry";
 
-const DEFAULT_THRESHOLD = 0.3;
+const DEFAULT_THRESHOLD = 0.25;
 const DEFAULT_N = 3;
-const DEFAULT_MESSAGE_COUNT = 5;
+const DEFAULT_FETCH_COUNT = 10;
+const DEFAULT_DETECT_WINDOW = 5;
 
 export interface RepetitionCheckResult {
   detected: boolean;
@@ -79,29 +80,45 @@ export async function checkRepetitionSuppression(
     "checkRepetitionSuppression",
     "evaluation.repetition",
     async () => {
-      const recentMessages = await getRecentAgentMessages(agentId, DEFAULT_MESSAGE_COUNT);
-      const messageTexts = recentMessages.map((m) => m.text);
+      // Fetch a wider window to avoid seed-data displacement, but detect on last N
+      const recentMessages = await getRecentAgentMessages(agentId, DEFAULT_FETCH_COUNT);
+      const allTexts = recentMessages.map((m) => m.text);
+      const detectTexts = allTexts.slice(-DEFAULT_DETECT_WINDOW);
 
-      if (messageTexts.length < 2) {
+      // Log the exact messages used for detection
+      const msgSummary = recentMessages
+        .map((m, i) => `  ${i + 1}. [${m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)}] "${m.text.slice(0, 120)}"`)
+        .join("\n");
+      logInfo(`repetitionSuppression.messages.${agentId} | ${allTexts.length} fetched, ${detectTexts.length} in detect window:\n${msgSummary}`, {
+        agentId,
+        fetchedCount: allTexts.length,
+        detectCount: detectTexts.length,
+      });
+
+      if (detectTexts.length < 2) {
         logInfo("repetitionSuppression.skipped", { agentId, reason: "insufficient_messages" });
         return { detected: false, overlapScore: 0, repeatedNgrams: [], context: null };
       }
 
-      const { detected, overlapScore } = detectRepetition(messageTexts, threshold);
-      const repeatedNgrams = detected ? findRepeatedNgrams(messageTexts) : [];
-      const context = detected ? buildRepetitionContext(messageTexts, repeatedNgrams) : null;
+      const { detected, overlapScore } = detectRepetition(detectTexts, threshold);
+      const repeatedNgrams = detected ? findRepeatedNgrams(detectTexts) : [];
+      const context = detected ? buildRepetitionContext(detectTexts, repeatedNgrams) : null;
 
       countMetric("repetitionSuppression.checked", 1, {
         agentId,
         detected: String(detected),
       });
 
-      logInfo("repetitionSuppression.result", {
+      logInfo(`repetitionSuppression.result.${agentId} | detected=${detected} overlap=${overlapScore.toFixed(4)} threshold=${threshold} ngrams=${repeatedNgrams.length}`, {
         agentId,
         detected,
         overlapScore,
         repeatedNgramCount: repeatedNgrams.length,
       });
+
+      if (context) {
+        logChunked(`repetitionSuppression.context.${agentId}`, context, { agentId });
+      }
 
       return { detected, overlapScore, repeatedNgrams, context };
     },

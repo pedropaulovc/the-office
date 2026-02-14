@@ -26,6 +26,8 @@ vi.mock("@/lib/telemetry", () => ({
   logInfo: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: vi.fn(),
   distributionMetric: vi.fn(),
 }));
@@ -217,7 +219,7 @@ describe("repetition-suppression", () => {
       expect.objectContaining({ agentId: "michael", detected: "true" }),
     );
     expect(logInfo).toHaveBeenCalledWith(
-      "repetitionSuppression.result",
+      expect.stringContaining("repetitionSuppression.result.michael"),
       expect.objectContaining({
         agentId: "michael",
         detected: true,

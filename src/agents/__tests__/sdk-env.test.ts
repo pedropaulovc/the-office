@@ -8,6 +8,8 @@ vi.mock("@/lib/telemetry", () => ({
   logInfo: (msg: string, attrs: Record<string, string>) => { mockLogInfo(msg, attrs); },
   logError: (msg: string, attrs: Record<string, string>) => { mockLogError(msg, attrs); },
   logWarn: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: (name: string, value: number, attrs: Record<string, string>) => { mockCountMetric(name, value, attrs); },
 }));
 

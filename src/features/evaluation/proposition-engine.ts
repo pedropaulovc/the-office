@@ -11,6 +11,7 @@ import {
   logInfo,
   logWarn,
   logError,
+  logChunkedAttrs,
   countMetric,
   distributionMetric,
 } from "@/lib/telemetry";
@@ -512,7 +513,7 @@ async function callJudge(
     async () => {
       const start = Date.now();
 
-      logInfo("proposition-engine.callJudge.request", {
+      logChunkedAttrs("proposition-engine.callJudge.request", {
         model: JUDGE_MODEL,
         systemPrompt: system,
         userPrompt: user,
@@ -552,7 +553,7 @@ async function callJudge(
         output_tokens: response.usage.output_tokens,
       };
 
-      logInfo("proposition-engine.callJudge.response", {
+      logChunkedAttrs("proposition-engine.callJudge.response", {
         inputTokens: tokenUsage.input_tokens,
         outputTokens: tokenUsage.output_tokens,
         durationMs,

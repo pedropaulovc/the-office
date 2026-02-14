@@ -28,6 +28,8 @@ vi.mock("@/messages/sse-registry", () => ({
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_n: string, _o: string, fn: () => unknown) => fn(),
   logInfo: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: vi.fn(),
 }));
 

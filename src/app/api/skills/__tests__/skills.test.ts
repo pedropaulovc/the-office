@@ -12,6 +12,8 @@ vi.mock("../skills-loader", () => ({
 vi.mock("@/lib/telemetry", () => ({
   withSpan: (_n: string, _o: string, fn: () => unknown) => fn(),
   logInfo: vi.fn(),
+  logChunked: vi.fn(),
+  logChunkedAttrs: vi.fn(),
   countMetric: vi.fn(),
 }));
 

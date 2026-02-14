@@ -91,7 +91,11 @@ export function startScheduler(): () => void {
   });
 
   const intervalId = setInterval(() => {
-    void tick();
+    tick().catch((err) => {
+      logError("scheduler: tick failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }, SCHEDULER_INTERVAL_MS);
 
   return () => {

@@ -12,6 +12,11 @@ function t(daysAgo: number, hour: number, min: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   d.setHours(hour, min, 0, 0);
+  // Ensure timestamps are always in the past — if the computed time is in
+  // the future (e.g. daysAgo=0 with an hour later than now), push it back a day.
+  if (d.getTime() > Date.now()) {
+    d.setDate(d.getDate() - 1);
+  }
   return d;
 }
 
