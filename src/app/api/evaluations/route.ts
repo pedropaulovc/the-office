@@ -149,6 +149,8 @@ async function executeHarnessForRun(
       agentId,
       error: err instanceof Error ? err.message : String(err),
     });
-    await updateEvaluationRunStatus(runId, { status: "failed" }).catch(() => {});
+    await updateEvaluationRunStatus(runId, { status: "failed" }).catch(
+      /* best-effort status update */ Function.prototype as () => void,
+    );
   }
 }

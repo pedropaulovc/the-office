@@ -160,7 +160,7 @@ export function listEvaluationRuns(
         entry = {};
         scoreLookup.set(row.evaluationRunId, entry);
       }
-      entry[row.dimension] = Number(row.avgScore);
+      entry[row.dimension] = row.avgScore;
     }
 
     return runs.map((run) => ({

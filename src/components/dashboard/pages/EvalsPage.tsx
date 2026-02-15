@@ -91,7 +91,7 @@ function getLatestScoresPerDimension(
   if (!latest) return {};
 
   // Use real per-dimension scores from the API
-  const dimScores = latest.dimensionScores ?? {};
+  const dimScores = latest.dimensionScores;
   const scores: Partial<Record<EvalDimension, number>> = {};
   for (const dim of ALL_DIMENSIONS) {
     const dimScore = dimScores[dim];
