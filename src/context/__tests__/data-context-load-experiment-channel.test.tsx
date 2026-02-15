@@ -140,6 +140,29 @@ describe('DataContext loadExperimentChannel', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/channels/general/members');
   });
 
+  it('skips facilitator when loading missing agents', async () => {
+    const existingChannel = makeChannel({ id: 'general', name: 'general', memberIds: ['michael', 'facilitator'] });
+
+    // fetchChannelMembers returns member IDs including facilitator
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(['michael', 'facilitator']) });
+
+    render(
+      <Wrapper channels={[existingChannel]}>
+        <ChannelChecker channelId="general" />
+      </Wrapper>,
+    );
+
+    await user.click(screen.getByTestId('load-channel'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Only fetchChannelMembers was called — facilitator should NOT trigger a fetchAgent call
+    expect(fetchMock).toHaveBeenCalledWith('/api/channels/general/members');
+  });
+
   it('handles fetch errors gracefully without crashing', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 404 });
 

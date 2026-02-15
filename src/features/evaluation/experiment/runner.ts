@@ -8,7 +8,7 @@ import { welchTTest, cohensD, mean, standardDeviation } from "./statistical-test
 import { generateExperimentReport } from "./experiment-report";
 import type { MetricResult, ExperimentReport } from "./experiment-report";
 import type { ScenarioConfig, GeneratedPersona } from "./types";
-import type { ExperimentMode } from "./environment";
+import type { ExperimentMode, AgentAction } from "./environment";
 import { scoreTrajectory } from "./llm-scorer";
 import { createExperimentRecord, persistEnvironmentPair, completeExperiment, failExperiment, updateProgress } from "./persistence";
 import { updateExperiment } from "@/db/queries/experiments";
@@ -53,7 +53,7 @@ function scoreEnvironmentsTemplate(
   for (const pair of pairs) {
     const result = pair[group];
     for (const agent of result.agents) {
-      const agentActions = result.trajectory.filter((a) => a.agentName === agent.name);
+      const agentActions = result.trajectory.filter((a): a is AgentAction => a.type === "message" && a.agentName === agent.name);
       const baseScore = 5 + agentActions.length * 0.3;
 
       for (const dim of dimensions) {
@@ -83,11 +83,11 @@ async function scoreEnvironmentsLlm(
   }
 
   // Build all scoring tasks up front
-  const tasks: { agent: (typeof pairs)[0][typeof group]["agents"][0]; actions: ReturnType<typeof pairs[0][typeof group]["trajectory"]["filter"]> }[] = [];
+  const tasks: { agent: (typeof pairs)[0][typeof group]["agents"][0]; actions: AgentAction[] }[] = [];
   for (const pair of pairs) {
     const result = pair[group];
     for (const agent of result.agents) {
-      tasks.push({ agent, actions: result.trajectory.filter((a) => a.agentName === agent.name) });
+      tasks.push({ agent, actions: result.trajectory.filter((a): a is AgentAction => a.type === "message" && a.agentName === agent.name) });
     }
   }
 

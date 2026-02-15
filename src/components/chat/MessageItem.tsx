@@ -16,7 +16,25 @@ interface MessageItemProps {
 export default function MessageItem({ message, showHeader, isThread = false }: MessageItemProps) {
   const { getAgent } = useData();
   const user = getAgent(message.userId);
-  const initials = getInitials(user.displayName);
+  const isFacilitator = message.userId === 'facilitator';
+  const initials = isFacilitator ? 'F' : getInitials(user.displayName);
+
+  if (isFacilitator) {
+    return (
+      <div className="group relative flex gap-2 px-5 py-2 my-1 mx-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-500 text-white font-bold text-xs">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Facilitator</span>
+            <Timestamp isoString={message.timestamp} />
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap italic">{message.text}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group relative flex gap-2 px-5 py-1.5 hover:bg-slack-message-hover transition-colors">
