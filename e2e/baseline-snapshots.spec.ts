@@ -11,7 +11,7 @@ test.describe("baseline snapshots", () => {
       const response = await route.fetch();
       const msgs = (await response.json()) as { text: string }[];
       const lastSeedIdx = msgs.findIndex((m) =>
-        m.text.includes("That's what she said!"),
+        m.text.includes("That's what she said! ...wait, that doesn't work there. Or does it?"),
       );
       const filtered =
         lastSeedIdx !== -1 ? msgs.slice(0, lastSeedIdx + 1) : msgs;
