@@ -10,7 +10,7 @@ import {
 } from "@/db/queries";
 import type { Run } from "@/db/schema";
 import { buildSystemPrompt } from "@/agents/prompt-builder";
-import { getToolkit, type ToolResult } from "@/tools/registry";
+import { getToolkit, type ToolResult, type ThinkingRef } from "@/tools/registry";
 import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
 import { MAX_CHAIN_DEPTH } from "@/agents/constants";
@@ -167,8 +167,9 @@ async function executeRunInner(run: Run): Promise<RunResult> {
         persona: agent.systemPrompt,
       },
     };
+    const thinkingRef: ThinkingRef = { current: null };
     const { definitions, handlers } = getToolkit(
-      run.agentId, run.id, run.channelId, run.chainDepth, executeRun, toolOptions,
+      run.agentId, run.id, run.channelId, run.chainDepth, executeRun, toolOptions, thinkingRef,
     );
 
     // 6. Broadcast agent_typing
@@ -223,6 +224,31 @@ async function executeRunInner(run: Run): Promise<RunResult> {
         stepNumber: turns,
         modelId: agent.modelId,
       });
+
+      // Extract thinking blocks from response
+      const thinkingContent = response.content
+        .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+        .map((b) => b.thinking)
+        .join("\n");
+
+      if (thinkingContent) {
+        // Accumulate thinking: append to any existing thinking from prior turns
+        thinkingRef.current = thinkingRef.current
+          ? `${thinkingRef.current}\n${thinkingContent}`
+          : thinkingContent;
+
+        await createRunMessage({
+          runId: run.id,
+          stepId: step.id,
+          messageType: "thinking_message",
+          content: thinkingContent,
+        });
+
+        logChunked(`agent.thinking.${run.agentId}`, thinkingContent, {
+          runId: run.id,
+          turn: turns,
+        });
+      }
 
       // Extract text content from response
       const textContent = response.content

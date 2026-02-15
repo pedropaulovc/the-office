@@ -10,7 +10,7 @@ import {
   formatFeedbackForAgent,
 } from "@/features/evaluation/gates/correction-pipeline";
 import type { CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
-import type { ToolResult } from "./registry";
+import type { ToolResult, ThinkingRef } from "./registry";
 
 export interface SendMessageToolOptions {
   gateConfig?: CorrectionPipelineConfig;
@@ -30,6 +30,7 @@ export function createSendMessageTool(
   chainDepth = 0,
   executor?: RunExecutor,
   toolOptions?: SendMessageToolOptions,
+  thinkingRef?: ThinkingRef,
 ) {
   const definition: Tool = {
     name: "send_message",
@@ -78,11 +79,17 @@ export function createSendMessageTool(
       // Use the (possibly corrected) text
       const finalText = gateResult.text;
 
+      const thinking = thinkingRef?.current ?? null;
       const message = await createMessage({
         channelId: targetChannelId,
         userId: agentId,
         text: finalText,
+        thinking,
       });
+      // Clear thinking after attaching to message so the next message doesn't get stale thinking
+      if (thinkingRef) {
+        thinkingRef.current = null;
+      }
 
       connectionRegistry.broadcast(targetChannelId, {
         type: "message_created",
