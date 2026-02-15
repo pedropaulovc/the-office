@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       experimentId,
       populationSource: experiment.populationSource,
       ...(experiment.sourceAgentIds && { sourceAgentIds: experiment.sourceAgentIds }),
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       logError("Experiment run failed in background", { experimentId, error: String(err) });
     });
 
