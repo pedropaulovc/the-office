@@ -268,6 +268,20 @@ describe("runs schema", () => {
       expect(msg.id).toBe("uuid-1");
     });
 
+    it("accepts thinking_message as a valid messageType", () => {
+      const msg: RunMessage = {
+        id: "uuid-2",
+        runId: "run-1",
+        stepId: null,
+        messageType: "thinking_message",
+        content: "Internal reasoning about the conversation...",
+        toolName: null,
+        toolInput: null,
+        createdAt: new Date(),
+      };
+      expect(msg.messageType).toBe("thinking_message");
+    });
+
     it("exports NewRunMessage insert type with optional fields", () => {
       const msg: NewRunMessage = {
         runId: "run-1",

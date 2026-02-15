@@ -7,6 +7,7 @@ const MOCK_MESSAGE: DbMessage = {
   parentMessageId: null,
   userId: "michael",
   text: "That's what she said",
+  thinking: null,
   createdAt: new Date("2025-06-01T12:00:00Z"),
 };
 

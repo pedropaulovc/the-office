@@ -68,7 +68,7 @@ describe("send_message tool", () => {
     vi.clearAllMocks();
     mockCreateMessage.mockResolvedValue({
       id: "new-msg-1", channelId: "general", userId: "michael",
-      text: "Hello", parentMessageId: null, createdAt: new Date(),
+      text: "Hello", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
     mockCreateRunMessage.mockResolvedValue(undefined);
     // Default: non-DM channel (no chain trigger)
@@ -120,7 +120,7 @@ describe("send_message tool", () => {
   it("enqueues follow-up run for DM channel with incremented chain depth", async () => {
     mockCreateMessage.mockResolvedValue({
       id: "dm-msg-1", channelId: "dm-michael-dwight", userId: "michael",
-      text: "Hey Dwight", parentMessageId: null, createdAt: new Date(),
+      text: "Hey Dwight", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
     mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
@@ -146,7 +146,7 @@ describe("send_message tool", () => {
   it("does not enqueue when chain depth would reach MAX_CHAIN_DEPTH", async () => {
     mockCreateMessage.mockResolvedValue({
       id: "dm-msg-2", channelId: "dm-michael-dwight", userId: "michael",
-      text: "Again", parentMessageId: null, createdAt: new Date(),
+      text: "Again", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
     mockGetChannel.mockResolvedValue({ id: "dm-michael-dwight", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["michael", "dwight"]);
@@ -170,7 +170,7 @@ describe("send_message tool", () => {
     // Depth 0 → enqueues depth 1
     mockCreateMessage.mockResolvedValue({
       id: "dm-msg-d0", channelId: "dm-ab", userId: "agentA",
-      text: "d0", parentMessageId: null, createdAt: new Date(),
+      text: "d0", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
     mockGetChannel.mockResolvedValue({ id: "dm-ab", name: "DM", kind: "dm", topic: "", experimentId: null });
     mockListChannelMembers.mockResolvedValue(["agentA", "agentB"]);
@@ -191,7 +191,7 @@ describe("send_message tool", () => {
     mockEnqueueRun.mockClear();
     mockCreateMessage.mockResolvedValue({
       id: "dm-msg-d1", channelId: "dm-ab", userId: "agentB",
-      text: "d1", parentMessageId: null, createdAt: new Date(),
+      text: "d1", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
 
     const tool1 = createSendMessageTool("agentB", "run-1", "dm-ab", 1, exec);
@@ -207,7 +207,7 @@ describe("send_message tool", () => {
     mockEnqueueRun.mockClear();
     mockCreateMessage.mockResolvedValue({
       id: "dm-msg-d2", channelId: "dm-ab", userId: "agentA",
-      text: "d2", parentMessageId: null, createdAt: new Date(),
+      text: "d2", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
 
     const tool2 = createSendMessageTool("agentA", "run-2", "dm-ab", 2, exec);
@@ -227,7 +227,7 @@ describe("react_to_message tool", () => {
     });
     mockGetMessage.mockResolvedValue({
       id: "msg-1", channelId: "general", userId: "dwight",
-      text: "Bears.", parentMessageId: null, createdAt: new Date(),
+      text: "Bears.", thinking: null, parentMessageId: null, createdAt: new Date(),
     });
     mockCreateRunMessage.mockResolvedValue(undefined);
   });

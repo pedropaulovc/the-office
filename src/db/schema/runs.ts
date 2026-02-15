@@ -98,6 +98,7 @@ export const runMessages = pgTable(
         "assistant_message",
         "tool_call_message",
         "tool_return_message",
+        "thinking_message",
       ],
     }).notNull(),
     content: text("content").notNull(),
