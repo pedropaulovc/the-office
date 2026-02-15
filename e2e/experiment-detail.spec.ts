@@ -17,13 +17,18 @@ test.describe("experiment detail page", () => {
     });
     expect(runRes.status()).toBe(202);
 
-    // Poll until experiment completes (max 30s)
-    for (let i = 0; i < 30; i++) {
+    // Poll until experiment completes (max 45s — persistence can be slow on cold Neon branches)
+    let completed = false;
+    for (let i = 0; i < 45; i++) {
       const statusRes = await request.get(`/api/experiments/${created.id}`);
       const exp = (await statusRes.json()) as { status: string };
-      if (exp.status === "completed" || exp.status === "failed") break;
+      if (exp.status === "completed" || exp.status === "failed") {
+        completed = true;
+        break;
+      }
       await new Promise((r) => setTimeout(r, 1000));
     }
+    expect(completed).toBe(true);
   });
 
   async function navigateToDetail(page: Page) {

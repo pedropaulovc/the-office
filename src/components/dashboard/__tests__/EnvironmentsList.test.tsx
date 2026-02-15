@@ -1,7 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EnvironmentsList } from '@/components/dashboard/EnvironmentsList';
 import type { ExperimentEnvironment } from '@/hooks/use-experiment-detail';
+
+const mockNavigateToExperimentChannel = vi.fn();
+const mockLoadExperimentChannel = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/context/AppContext', () => ({
+  useApp: () => ({
+    navigateToExperimentChannel: mockNavigateToExperimentChannel,
+  }),
+}));
+
+vi.mock('@/context/useData', () => ({
+  useData: () => ({
+    loadExperimentChannel: mockLoadExperimentChannel,
+  }),
+}));
 
 function makeEnvironment(overrides: Partial<ExperimentEnvironment> = {}): ExperimentEnvironment {
   return {
@@ -87,6 +102,17 @@ describe('EnvironmentsList', () => {
     // Third cell (index 2) is the channel column
     const channelCell = Array.from(cells)[2];
     expect(channelCell?.textContent).toBe('-');
+  });
+
+  it('disables View button when channelId is null', () => {
+    const environments = [
+      makeEnvironment({ id: 'env-1', channelId: null }),
+    ];
+
+    render(<EnvironmentsList environments={environments} />);
+
+    const viewBtn = screen.getByTestId('view-in-slack');
+    expect(viewBtn).toBeDisabled();
   });
 
   it('applies correct color classes to group badges', () => {
