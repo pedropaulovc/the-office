@@ -2,6 +2,16 @@ import type { Agent, DbMessage } from "@/db/schema";
 import type { ChannelView } from "@/db/queries/messages";
 import type { Message, ThreadReply } from "@/types";
 
+export async function fetchAgent(agentId: string): Promise<Agent> {
+  const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch agent: ${response.status}`);
+  }
+
+  return response.json() as Promise<Agent>;
+}
+
 export async function fetchAgents(): Promise<Agent[]> {
   const response = await fetch("/api/agents");
 
@@ -20,6 +30,16 @@ export async function fetchChannels(): Promise<ChannelView[]> {
   }
 
   return response.json() as Promise<ChannelView[]>;
+}
+
+export async function fetchChannel(channelId: string): Promise<ChannelView> {
+  const response = await fetch(`/api/channels/${encodeURIComponent(channelId)}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch channel: ${response.status}`);
+  }
+
+  return response.json() as Promise<ChannelView>;
 }
 
 export async function fetchChannelMessages(channelId: string): Promise<Message[]> {

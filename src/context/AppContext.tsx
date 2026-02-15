@@ -12,6 +12,7 @@ interface AppContextValue {
   activeExperimentId: string | null;
   switchUser: (userId: string) => void;
   navigateTo: (view: ActiveView) => void;
+  navigateToExperimentChannel: (channelId: string) => void;
   openThread: (parentMessageId: string) => void;
   closeThread: () => void;
   switchTab: (tab: TopLevelTab) => void;
@@ -37,6 +38,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const navigateTo = useCallback((view: ActiveView) => {
     setActiveView(view);
+    setThreadPanel({ state: 'closed', parentMessageId: null });
+  }, []);
+
+  const navigateToExperimentChannel = useCallback((channelId: string) => {
+    setActiveTab('slack');
+    setActiveView({ kind: 'channel', id: channelId });
     setThreadPanel({ state: 'closed', parentMessageId: null });
   }, []);
 
@@ -66,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeExperimentId,
       switchUser,
       navigateTo,
+      navigateToExperimentChannel,
       openThread,
       closeThread,
       switchTab,

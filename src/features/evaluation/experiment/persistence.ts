@@ -93,7 +93,7 @@ export async function persistEnvironmentPair(
               const namePart = action.agentName.toLowerCase().replace(/\s+/g, "-").slice(0, 20);
               return id.includes(namePart);
             }) ?? agentIds[0] ?? "unknown"
-          : action.agentName;
+          : personas.find((p) => p.name === action.agentName)?.sourceAgentId ?? action.agentName;
         messageValues.push({ channelId, userId: agentId, text: action.text });
       }
     }
