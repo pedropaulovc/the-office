@@ -2,19 +2,28 @@ import { test, expect } from "@playwright/test";
 
 test.describe("baseline snapshots", () => {
   // Intercept #general messages API to filter out pollution from parallel
-  // test workers and agent activity on the shared Neon DB. Slices the
-  // response at the last known seed message so the page only renders seed
-  // data — eliminates the race between DB cleanup and page load.
+  // test workers and agent activity on the shared Neon DB. Keeps only
+  // messages with timestamps ≤ the last known seed message, so the page
+  // only renders seed data regardless of DB ordering quirks (the seed's
+  // t() helper can push "today" timestamps back to "yesterday", creating
+  // ties that break DB sort order assumptions).
   test.beforeEach(async ({ page }) => {
     // Filter REST response to only seed messages.
     await page.route("**/api/channels/general/messages", async (route) => {
       const response = await route.fetch();
-      const msgs = (await response.json()) as { text: string }[];
-      const lastSeedIdx = msgs.findIndex((m) =>
-        m.text.includes("That's what she said!"),
+      const msgs = (await response.json()) as { text: string; timestamp?: string; createdAt?: string }[];
+      const seedMsg = msgs.find((m) =>
+        m.text.includes("That's what she said! ...wait, that doesn't work there. Or does it?"),
       );
-      const filtered =
-        lastSeedIdx !== -1 ? msgs.slice(0, lastSeedIdx + 1) : msgs;
+      if (!seedMsg) {
+        await route.fulfill({ response, json: msgs });
+        return;
+      }
+      const seedTime = new Date(seedMsg.timestamp ?? seedMsg.createdAt ?? "").getTime();
+      const filtered = msgs.filter((m) => {
+        const msgTime = new Date(m.timestamp ?? m.createdAt ?? "").getTime();
+        return msgTime <= seedTime;
+      });
       await route.fulfill({ response, json: filtered });
     });
 
