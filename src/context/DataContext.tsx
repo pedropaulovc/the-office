@@ -136,8 +136,9 @@ export function DataProvider({
   const [typingAgents, setTypingAgents] = useState<Record<string, string[]>>({});
 
   const loadMessages = useCallback((channelId: string) => {
+    const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'true';
     setMessagesLoading(prev => ({ ...prev, [channelId]: true }));
-    fetchChannelMessages(channelId)
+    fetchChannelMessages(channelId, { debug })
       .then(data => {
         setMessages(prev => ({ ...prev, [channelId]: data }));
       })

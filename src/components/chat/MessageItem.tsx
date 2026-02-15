@@ -73,6 +73,11 @@ export default function MessageItem({ message, showHeader, isThread = false }: M
               <span className="font-bold text-sm text-gray-900">{user.displayName}</span>
               <Timestamp isoString={message.timestamp} />
             </div>
+            {message.thinking && (
+              <div className="mb-1 pl-3 border-l-2 border-gray-300">
+                <p className="text-xs text-gray-400 italic leading-relaxed whitespace-pre-wrap">{message.thinking}</p>
+              </div>
+            )}
             <p className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">{message.text}</p>
             {message.reactions.length > 0 && <MessageReactions reactions={message.reactions} />}
             {!isThread && message.threadReplyCount > 0 && (
@@ -93,6 +98,11 @@ export default function MessageItem({ message, showHeader, isThread = false }: M
             </span>
           </div>
           <div className="min-w-0 flex-1">
+            {message.thinking && (
+              <div className="mb-1 pl-3 border-l-2 border-gray-300">
+                <p className="text-xs text-gray-400 italic leading-relaxed whitespace-pre-wrap">{message.thinking}</p>
+              </div>
+            )}
             <p className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">{message.text}</p>
             {message.reactions.length > 0 && <MessageReactions reactions={message.reactions} />}
             {!isThread && message.threadReplyCount > 0 && (
