@@ -311,10 +311,12 @@ async function runExperiment(options: RunnerOptions): Promise<(ExperimentReport 
           environmentsTotal: scaledScenario.total_environments,
         });
         await completeExperiment(experimentId, report);
-        // For generated populations, the DB agent ID follows the pattern from persistGeneratedPersona
-        const scoreAgentId = options.sourceAgentIds?.[0]
-          ?? (lastAgents[0]
-            ? `exp-agent-${experimentId.slice(0, 8)}-${lastAgents[0].name.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}`
+        // Use the actual DB agent ID: sourceAgentId for existing agents, constructed ID for generated
+        const firstAgent = lastAgents[0];
+        const scoreAgentId = firstAgent?.sourceAgentId
+          ?? options.sourceAgentIds?.[0]
+          ?? (firstAgent
+            ? `exp-agent-${experimentId.slice(0, 8)}-${firstAgent.name.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}`
             : "experiment");
         await persistExperimentScores(experimentId, report, scoreAgentId);
       }

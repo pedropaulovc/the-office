@@ -29,6 +29,7 @@ export function toGeneratedPersona(agent: Agent): GeneratedPersona {
 
   return {
     name: agent.displayName,
+    sourceAgentId: agent.id,
     age: persona?.age ?? 35,
     gender: persona?.gender ?? "unspecified",
     nationality: persona?.nationality ?? "American",

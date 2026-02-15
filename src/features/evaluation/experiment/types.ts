@@ -8,6 +8,7 @@ export interface BigFiveTraits {
 
 export interface GeneratedPersona {
   name: string;
+  sourceAgentId?: string;
   age: number;
   gender: string;
   nationality: string;

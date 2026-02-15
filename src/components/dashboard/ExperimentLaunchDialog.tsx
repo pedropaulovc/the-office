@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { SWITCHABLE_USER_IDS } from '@/data/users';
 import type { CreateExperimentData } from '@/hooks/use-experiments';
 
 type PopulationSource = 'generated' | 'existing';
@@ -41,6 +42,7 @@ export function ExperimentLaunchDialog({ open, onClose, onLaunch }: ExperimentLa
         scale,
         mode,
         populationSource,
+        ...(populationSource === 'existing' && { sourceAgentIds: [...SWITCHABLE_USER_IDS] }),
       });
       onClose();
     } finally {

@@ -67,7 +67,7 @@ export async function persistEnvironmentPair(
       const agentRows = await db.insert(agentsTable).values(agentValues).returning();
       agentIds = agentRows.map((a) => a.id);
     } else {
-      agentIds = personas.map((a) => a.name);
+      agentIds = personas.map((a) => a.sourceAgentId ?? a.name);
     }
 
     const shortId = experimentId.slice(0, 8);
