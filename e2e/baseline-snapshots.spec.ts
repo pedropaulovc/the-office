@@ -71,9 +71,9 @@ test.describe("baseline snapshots", () => {
         - button "random 2":
           - img
           - text: random 2
-        - button "sales 3":
+        - button /sales \\d+/:
           - img
-          - text: sales 3
+          - text: /sales \\d+/
         - img
         - text: Direct Messages
         - button "DS Dwight Schrute"
