@@ -1,23 +1,36 @@
 {
   "agentId": "michael",
-  "capturedAt": "2026-02-13T00:00:00Z",
+  "capturedAt": "2026-02-15T19:30:34.283Z",
   "dimensions": {
-    "adherence": 7.23
+    "adherence": 7.521008403361345,
+    "consistency": 7.703703703703703,
+    "fluency": 3.6176470588235294,
+    "convergence": 0.7407407407407407
   },
   "propositionScores": {
-    "adheres-to-persona": 7,
-    "uses-characteristic-language": 7,
-    "generic-corporate-response": 7,
-    "appropriate-emotional-tone": 7,
+    "adheres-to-persona": 9,
+    "uses-characteristic-language": 9,
+    "generic-corporate-response": 9,
+    "appropriate-emotional-tone": 9,
     "michael-self-centered-humor": 8,
     "michael-thats-what-she-said": 7,
-    "michael-needs-to-be-liked": 8,
-    "michael-avoids-conflict": 7,
-    "michael-pop-culture-references": 6,
+    "michael-needs-to-be-liked": 7,
+    "michael-avoids-conflict": 6,
+    "michael-pop-culture-references": 9,
     "michael-coworkers-as-family": 8,
     "michael-inappropriate-without-realizing": 7,
     "michael-worlds-best-boss": 6,
-    "michael-malapropisms": 6,
-    "michael-dry-corporate-antipattern": 7
+    "michael-malapropisms": 2,
+    "michael-dry-corporate-antipattern": 8,
+    "consistent-tone": 8,
+    "consistent-vocabulary": 8,
+    "consistent-behavior": 7,
+    "no-repetitive-thoughts": 2,
+    "no-formulaic-patterns": 3,
+    "natural-human-like": 6,
+    "varied-structure": 4,
+    "agents-diverge": 2,
+    "distinct-vocabulary": 0,
+    "diverse-perspectives": 0
   }
 }
