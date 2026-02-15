@@ -13,7 +13,7 @@ test.describe("experiment drill-down to Slack", () => {
     const runRes = await request.post(`/api/experiments/${created.id}/run`, {
       data: {},
     });
-    expect(runRes.status()).toBe(200);
+    expect(runRes.status()).toBe(202);
   });
 
   async function navigateToDetail(page: Page) {
