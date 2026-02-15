@@ -6,7 +6,7 @@ import type { TopLevelTab } from '@/types';
 
 const tabs: { id: TopLevelTab; label: string; icon: typeof MessageSquare }[] = [
   { id: 'slack', label: 'Slack', icon: MessageSquare },
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Experiments', icon: LayoutDashboard },
 ];
 
 export function TabBar() {
