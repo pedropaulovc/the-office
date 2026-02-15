@@ -20,11 +20,19 @@ export interface AgentAction {
   text: string;
 }
 
+export interface FacilitatorEntry {
+  type: "facilitator";
+  text: string;
+  step: number;
+}
+
+export type TrajectoryEntry = AgentAction | FacilitatorEntry;
+
 export interface EnvironmentResult {
   environmentId: number;
   steps: StepResult[];
   agents: GeneratedPersona[];
-  trajectory: AgentAction[];
+  trajectory: TrajectoryEntry[];
 }
 
 // Seeded shuffle matching TinyTroupe's randomize_agents_order
@@ -66,12 +74,18 @@ export class ExperimentEnvironment {
   async run(seed: number): Promise<EnvironmentResult> {
     return withSpan("environment.run", "evaluation.experiment", async () => {
       const steps: StepResult[] = [];
-      const trajectory: AgentAction[] = [];
+      const trajectory: TrajectoryEntry[] = [];
+      const previousAgentActions: AgentAction[] = [];
 
       for (let step = 0; step < this.scenario.steps_per_environment; step++) {
-        const stepResult = await this.executeStep(step, seed + step, trajectory);
+        const stepResult = await this.executeStep(step, seed + step, previousAgentActions);
         steps.push(stepResult);
+        // Facilitator actions first, then agent actions — preserving conversation order
+        for (const fa of stepResult.facilitatorActions) {
+          trajectory.push({ type: "facilitator", text: fa.message, step: fa.step });
+        }
         trajectory.push(...stepResult.agentActions);
+        previousAgentActions.push(...stepResult.agentActions);
       }
 
       logInfo("environment completed", {

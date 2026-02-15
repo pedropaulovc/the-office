@@ -86,15 +86,20 @@ export async function persistEnvironmentPair(
       for (const agentId of agentIds) {
         memberValues.push({ channelId, userId: agentId });
       }
+      memberValues.push({ channelId, userId: "facilitator" });
 
-      for (const action of result.trajectory) {
+      for (const entry of result.trajectory) {
+        if (entry.type === "facilitator") {
+          messageValues.push({ channelId, userId: "facilitator", text: entry.text });
+          continue;
+        }
         const agentId = populationSource === "generated"
           ? agentIds.find((id) => {
-              const namePart = action.agentName.toLowerCase().replace(/\s+/g, "-").slice(0, 20);
+              const namePart = entry.agentName.toLowerCase().replace(/\s+/g, "-").slice(0, 20);
               return id.includes(namePart);
             }) ?? agentIds[0] ?? "unknown"
-          : personas.find((p) => p.name === action.agentName)?.sourceAgentId ?? action.agentName;
-        messageValues.push({ channelId, userId: agentId, text: action.text });
+          : personas.find((p) => p.name === entry.agentName)?.sourceAgentId ?? entry.agentName;
+        messageValues.push({ channelId, userId: agentId, text: entry.text });
       }
     }
 

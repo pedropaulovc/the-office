@@ -34,6 +34,24 @@ const FALLBACK_AGENT: AgentView = {
   presence: 'offline',
 };
 
+const FACILITATOR_AGENT: AgentView = {
+  id: 'facilitator',
+  displayName: 'Facilitator',
+  title: 'Experiment Moderator',
+  avatarColor: '#6B7280',
+  systemPrompt: '',
+  modelId: '',
+  maxTurns: 0,
+  maxBudgetUsd: 0,
+  sessionId: null,
+  isActive: false,
+  experimentId: null,
+  persona: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  presence: 'offline',
+};
+
 export function DataProvider({
   initialAgents,
   initialChannels,
@@ -65,6 +83,7 @@ export function DataProvider({
 
   const getAgent = useMemo(
     () => (id: string): AgentView => {
+      if (id === 'facilitator') return FACILITATOR_AGENT;
       return agentMap.get(id) ?? { ...FALLBACK_AGENT, id };
     },
     [agentMap],
@@ -147,7 +166,7 @@ export function DataProvider({
 
     // Load any missing agents (experiment agents created after page load)
     const memberIds = await fetchChannelMembers(channelId);
-    const missingIds = memberIds.filter(id => !agentMap.has(id));
+    const missingIds = memberIds.filter(id => id !== 'facilitator' && !agentMap.has(id));
     if (missingIds.length === 0) return;
 
     const fetched = await Promise.all(
