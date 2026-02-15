@@ -4,8 +4,8 @@ test.describe("experiment detail page", () => {
   test.describe.configure({ mode: "serial" });
 
   test.beforeAll(async ({ request }) => {
-    // Create and run an experiment. The POST /run is synchronous and returns
-    // a completed experiment record (the runner persists its own record).
+    // Create and run an experiment. The POST /run is async (202 Accepted).
+    // Poll until the experiment completes.
     const createRes = await request.post("/api/experiments", {
       data: { scenarioId: "brainstorming-average", scale: 0.1 },
     });
@@ -15,7 +15,15 @@ test.describe("experiment detail page", () => {
     const runRes = await request.post(`/api/experiments/${created.id}/run`, {
       data: {},
     });
-    expect(runRes.status()).toBe(200);
+    expect(runRes.status()).toBe(202);
+
+    // Poll until experiment completes (max 30s)
+    for (let i = 0; i < 30; i++) {
+      const statusRes = await request.get(`/api/experiments/${created.id}`);
+      const exp = (await statusRes.json()) as { status: string };
+      if (exp.status === "completed" || exp.status === "failed") break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   });
 
   async function navigateToDetail(page: Page) {

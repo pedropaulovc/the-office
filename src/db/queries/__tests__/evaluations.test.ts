@@ -12,6 +12,7 @@ function mockChain(result: unknown) {
   chain.from = handler;
   chain.where = handler;
   chain.orderBy = handler;
+  chain.groupBy = handler;
   chain.insert = handler;
   chain.values = handler;
   chain.returning = () => Promise.resolve(result);
@@ -194,41 +195,50 @@ describe("evaluations queries", () => {
 
   it("listEvaluationRuns returns all runs with no filters", async () => {
     const runs = [MOCK_RUN];
-    mockDb.select.mockReturnValue(mockChain(runs));
+    // First select: runs, second select: dimension score averages
+    mockDb.select
+      .mockReturnValueOnce(mockChain(runs))
+      .mockReturnValueOnce(mockChain([]));
 
     const { listEvaluationRuns } = await import("../evaluations");
     const result = await listEvaluationRuns();
 
-    expect(result).toEqual(runs);
+    expect(result).toEqual([{ ...MOCK_RUN, dimensionScores: {} }]);
     expect(mockDb.select).toHaveBeenCalled();
   });
 
   it("listEvaluationRuns filters by agentId", async () => {
-    mockDb.select.mockReturnValue(mockChain([MOCK_RUN]));
+    mockDb.select
+      .mockReturnValueOnce(mockChain([MOCK_RUN]))
+      .mockReturnValueOnce(mockChain([]));
 
     const { listEvaluationRuns } = await import("../evaluations");
     const result = await listEvaluationRuns({ agentId: "michael" });
 
-    expect(result).toEqual([MOCK_RUN]);
+    expect(result).toEqual([{ ...MOCK_RUN, dimensionScores: {} }]);
   });
 
   it("listEvaluationRuns filters by status", async () => {
-    mockDb.select.mockReturnValue(mockChain([MOCK_RUN]));
+    mockDb.select
+      .mockReturnValueOnce(mockChain([MOCK_RUN]))
+      .mockReturnValueOnce(mockChain([]));
 
     const { listEvaluationRuns } = await import("../evaluations");
     const result = await listEvaluationRuns({ status: "pending" });
 
-    expect(result).toEqual([MOCK_RUN]);
+    expect(result).toEqual([{ ...MOCK_RUN, dimensionScores: {} }]);
   });
 
   it("listEvaluationRuns filters by isBaseline", async () => {
     const baseline = createMockEvaluationRun({ isBaseline: true });
-    mockDb.select.mockReturnValue(mockChain([baseline]));
+    mockDb.select
+      .mockReturnValueOnce(mockChain([baseline]))
+      .mockReturnValueOnce(mockChain([]));
 
     const { listEvaluationRuns } = await import("../evaluations");
     const result = await listEvaluationRuns({ isBaseline: true });
 
-    expect(result).toEqual([baseline]);
+    expect(result).toEqual([{ ...baseline, dimensionScores: {} }]);
   });
 
   it("listEvaluationRuns returns empty array when no results", async () => {

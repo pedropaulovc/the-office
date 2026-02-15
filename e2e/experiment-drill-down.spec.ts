@@ -14,6 +14,14 @@ test.describe("experiment drill-down to Slack", () => {
       data: {},
     });
     expect(runRes.status()).toBe(202);
+
+    // Poll until experiment completes (max 30s)
+    for (let i = 0; i < 30; i++) {
+      const statusRes = await request.get(`/api/experiments/${created.id}`);
+      const exp = (await statusRes.json()) as { status: string };
+      if (exp.status === "completed" || exp.status === "failed") break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   });
 
   async function navigateToDetail(page: Page) {
