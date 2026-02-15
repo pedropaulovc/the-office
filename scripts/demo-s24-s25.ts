@@ -182,7 +182,7 @@ async function main() {
   header("Demo Complete");
   console.log("  All S-2.4 resolver rules demonstrated against live DB.");
   console.log("  All S-2.5 tools verified: registry, DB writes, memory, search.");
-  console.log("  Orchestrator wired to real tools (stub → getToolServer).\n");
+  console.log("  Orchestrator wired to real tools via toolkit registry.\n");
 
   process.exit(0);
 }
