@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+export type ExperimentPhase = 'setup' | 'generating_agents' | 'running_environments' | 'scoring' | 'completing';
+
+export interface ExperimentProgress {
+  phase: ExperimentPhase;
+  environmentsProcessed: number;
+  environmentsTotal: number;
+  detail?: string;
+}
+
 export interface Experiment {
   id: string;
   scenarioId: string;
@@ -11,6 +20,7 @@ export interface Experiment {
   sourceAgentIds: string[] | null;
   config: unknown;
   report: unknown;
+  progress: ExperimentProgress | null;
   agentCount: number;
   environmentCount: number;
   createdAt: string;
@@ -69,9 +79,9 @@ export function useExperiments(): UseExperimentsReturn {
 
   // Poll while any experiment is running
   useEffect(() => {
-    const hasRunning = experiments.some((e) => e.status === 'running');
+    const hasActive = experiments.some((e) => e.status === 'running' || e.status === 'pending');
 
-    if (hasRunning) {
+    if (hasActive) {
       pollTimer.current = setInterval(() => {
         void fetchExperiments();
       }, POLL_INTERVAL_MS);
@@ -98,7 +108,11 @@ export function useExperiments(): UseExperimentsReturn {
   }, [fetchExperiments]);
 
   const runExperiment = useCallback(async (id: string): Promise<unknown> => {
-    const res = await fetch(`/api/experiments/${id}/run`, { method: 'POST' });
+    const res = await fetch(`/api/experiments/${id}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
     if (!res.ok) throw new Error(`Failed to run experiment: ${res.status}`);
     const result: unknown = await res.json();
     void fetchExperiments();

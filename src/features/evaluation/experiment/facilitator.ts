@@ -29,7 +29,11 @@ export class Facilitator {
       }));
 
       if (actions.length > 0) {
-        logInfo("facilitator prompts for step", { step, count: actions.length });
+        logInfo("facilitator prompts for step", {
+          step,
+          count: actions.length,
+          prompt: messages.join(" | "),
+        });
       }
 
       return actions;

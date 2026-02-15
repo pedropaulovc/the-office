@@ -15,6 +15,7 @@ function makeExperiment(overrides: Partial<Experiment> = {}): Experiment {
     sourceAgentIds: null,
     config: null,
     report: null,
+    progress: null,
     agentCount: 4,
     environmentCount: 2,
     createdAt: new Date().toISOString(),

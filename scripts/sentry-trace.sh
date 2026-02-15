@@ -163,7 +163,7 @@ print_spans() {
 # --- Logs ---
 # Known custom attribute fields emitted by the evaluation system.
 # The /events/?dataset=ourlogs endpoint returns these as columns.
-LOG_ATTR_FIELDS="systemPrompt,userPrompt,judgeOutput,model,reasoning,channelId,agentId,runId,count,sampleSize,score,confidence,result,inputTokens,outputTokens,durationMs,error"
+LOG_ATTR_FIELDS="agentName,responseLength,output,prompt,step,persona,actionCount,dimensionCount,durationMs,scenario,environmentCount,agentsPerEnvironment,dimensions,agentId,channelId,runId,experimentId,count,sampleSize,score,confidence,result,outcome,overallScore,passed,failed,regressionCount,model,inputTokens,outputTokens,systemPrompt,userPrompt,judgeOutput,reasoning,error,chunk,totalChunks"
 
 print_logs() {
   echo "=== LOGS ==="

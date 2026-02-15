@@ -8,9 +8,9 @@ type PopulationSource = 'generated' | 'existing';
 
 const SCENARIOS = [
   { value: 'brainstorming-average', label: 'Brainstorming (Average)' },
-  { value: 'brainstorming-creative', label: 'Brainstorming (Creative)' },
+  { value: 'brainstorming-difficult-full', label: 'Brainstorming (Difficult Full)' },
+  { value: 'brainstorming-difficult-variety', label: 'Brainstorming (Difficult Variety)' },
   { value: 'debate-controversial', label: 'Debate (Controversial)' },
-  { value: 'debate-neutral', label: 'Debate (Neutral)' },
 ];
 
 export interface ExperimentLaunchDialogProps {

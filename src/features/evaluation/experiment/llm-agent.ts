@@ -1,7 +1,7 @@
 import { getAnthropicClient, JUDGE_MODEL } from "@/lib/anthropic";
 import {
   withSpan,
-  logInfo,
+  logChunkedAttrs,
   countMetric,
   distributionMetric,
 } from "@/lib/telemetry";
@@ -62,9 +62,14 @@ async function generateAgentResponse(
       "token",
     );
 
-    logInfo("Agent response generated", {
+    logChunkedAttrs("agent.response", {
       agentName: persona.name,
       responseLength: text.length,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      systemPrompt: persona.system_prompt,
+      userPrompt: userMessage,
+      output: text,
     });
 
     return {

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { FlaskConical, Plus } from 'lucide-react';
 import { useExperiments } from '@/hooks/use-experiments';
-import type { CreateExperimentData } from '@/hooks/use-experiments';
+import type { CreateExperimentData, ExperimentProgress, ExperimentPhase } from '@/hooks/use-experiments';
 import { ExperimentLaunchDialog } from '@/components/dashboard/ExperimentLaunchDialog';
 
 type ExperimentStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -23,6 +23,14 @@ const STATUS_LABELS: Record<ExperimentStatus, string> = {
   failed: 'Failed',
 };
 
+const PHASE_LABELS: Record<ExperimentPhase, string> = {
+  setup: 'Setting up',
+  generating_agents: 'Generating agents',
+  running_environments: 'Running environments',
+  scoring: 'Scoring',
+  completing: 'Completing',
+};
+
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
@@ -38,6 +46,15 @@ function formatRelativeTime(dateStr: string): string {
 
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay}d ago`;
+}
+
+function formatProgress(progress: ExperimentProgress | null): string {
+  if (!progress) return '\u2014';
+  const label = PHASE_LABELS[progress.phase];
+  if (progress.environmentsTotal > 0) {
+    return `${label} (${progress.environmentsProcessed}/${progress.environmentsTotal})`;
+  }
+  return label;
 }
 
 function StatusBadge({ status }: { status: ExperimentStatus }) {
@@ -116,6 +133,7 @@ export function ExperimentsPage() {
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 <th className="px-6 py-3">Scenario</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Progress</th>
                 <th className="px-6 py-3 text-right">Agents</th>
                 <th className="px-6 py-3 text-right">Environments</th>
                 <th className="px-6 py-3 text-right">Created</th>
@@ -134,6 +152,9 @@ export function ExperimentsPage() {
                   </td>
                   <td className="px-6 py-3">
                     <StatusBadge status={exp.status} />
+                  </td>
+                  <td className="px-6 py-3 text-sm text-gray-600" data-testid="experiment-progress">
+                    {formatProgress(exp.progress)}
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600 text-right tabular-nums">
                     {exp.agentCount}
