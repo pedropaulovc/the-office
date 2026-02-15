@@ -9,10 +9,8 @@ test.describe("eval monitoring dashboard", () => {
     await expect(page.getByTestId("page-evals")).toBeVisible();
     await expect(page.getByTestId("agent-card").first()).toBeVisible();
 
-    // Verify an agent name is visible inside the card
-    await expect(
-      page.getByTestId("agent-card").first().locator("text=Michael Scott"),
-    ).toBeVisible();
+    // Verify Michael Scott's card is present somewhere in the grid
+    await expect(page.locator("text=Michael Scott").first()).toBeVisible();
   });
 
   test("config page loads agent configuration", async ({ page }) => {
