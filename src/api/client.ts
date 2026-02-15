@@ -2,6 +2,16 @@ import type { Agent, DbMessage } from "@/db/schema";
 import type { ChannelView } from "@/db/queries/messages";
 import type { Message, ThreadReply } from "@/types";
 
+export async function fetchAgent(agentId: string): Promise<Agent> {
+  const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch agent: ${response.status}`);
+  }
+
+  return response.json() as Promise<Agent>;
+}
+
 export async function fetchAgents(): Promise<Agent[]> {
   const response = await fetch("/api/agents");
 

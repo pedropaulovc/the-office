@@ -88,13 +88,14 @@ describe('DataContext loadExperimentChannel', () => {
       id: 'exp-ch-1',
       name: 'experiment-channel',
       experimentId: 'exp-1',
+      memberIds: ['michael'],
     });
 
-    // First call: fetchChannel for the channel itself
-    // Second call: fetchChannelMessages for messages
+    // fetchChannel, fetchChannelMessages, fetchChannelMembers
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(expChannel) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(['michael']) });
 
     render(
       <Wrapper>
@@ -114,8 +115,12 @@ describe('DataContext loadExperimentChannel', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/channels/exp-ch-1');
   });
 
-  it('skips fetch if channel already exists in initial channels', async () => {
-    const existingChannel = makeChannel({ id: 'general', name: 'general' });
+  it('skips channel fetch if channel already exists but still loads missing agents', async () => {
+    const existingChannel = makeChannel({ id: 'general', name: 'general', memberIds: ['michael'] });
+
+    // fetchChannelMembers returns member IDs (michael is already in initialAgents, so no agent fetch needed)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(['michael']) });
 
     render(
       <Wrapper channels={[existingChannel]}>
@@ -127,8 +132,12 @@ describe('DataContext loadExperimentChannel', () => {
 
     await user.click(screen.getByTestId('load-channel'));
 
-    // No fetch should have been made since channel already exists
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Only fetchChannelMembers was called, not fetchChannel
+    expect(fetchMock).toHaveBeenCalledWith('/api/channels/general/members');
   });
 
   it('handles fetch errors gracefully without crashing', async () => {

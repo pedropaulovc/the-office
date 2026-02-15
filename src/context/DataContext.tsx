@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
 import { useSSE } from '@/hooks/use-sse';
-import { fetchChannel, fetchChannelMessages } from '@/api/client';
+import { fetchAgent, fetchChannel, fetchChannelMembers, fetchChannelMessages } from '@/api/client';
 import type { Message } from '@/types';
 import type { SSEEvent } from '@/messages/sse-registry';
 import { DataContext, type AgentView } from './data-context-def';
@@ -45,6 +45,8 @@ export function DataProvider({
   initialUnreads: Record<string, Record<string, number>>;
   children: ReactNode;
 }) {
+  const [dynamicAgents, setDynamicAgents] = useState<AgentView[]>([]);
+
   const agents = useMemo(
     () => initialAgents.map(toAgentView),
     [initialAgents],
@@ -55,8 +57,11 @@ export function DataProvider({
     for (const agent of agents) {
       map.set(agent.id, agent);
     }
+    for (const agent of dynamicAgents) {
+      if (!map.has(agent.id)) map.set(agent.id, agent);
+    }
     return map;
-  }, [agents]);
+  }, [agents, dynamicAgents]);
 
   const getAgent = useMemo(
     () => (id: string): AgentView => {
@@ -130,14 +135,33 @@ export function DataProvider({
   }, []);
 
   const loadExperimentChannel = useCallback(async (channelId: string) => {
-    if (channelMap.has(channelId)) return;
-    const channel = await fetchChannel(channelId);
-    setDynamicChannels(prev => {
-      if (prev.some(ch => ch.id === channelId)) return prev;
-      return [...prev, channel];
-    });
-    loadMessages(channelId);
-  }, [channelMap, loadMessages]);
+    const channelAlreadyLoaded = channelMap.has(channelId);
+    if (!channelAlreadyLoaded) {
+      const channel = await fetchChannel(channelId);
+      setDynamicChannels(prev => {
+        if (prev.some(ch => ch.id === channelId)) return prev;
+        return [...prev, channel];
+      });
+      loadMessages(channelId);
+    }
+
+    // Load any missing agents (experiment agents created after page load)
+    const memberIds = await fetchChannelMembers(channelId);
+    const missingIds = memberIds.filter(id => !agentMap.has(id));
+    if (missingIds.length === 0) return;
+
+    const fetched = await Promise.all(
+      missingIds.map(id => fetchAgent(id).then(toAgentView).catch(() => null)),
+    );
+    const newAgents = fetched.filter((a): a is AgentView => a !== null);
+    if (newAgents.length > 0) {
+      setDynamicAgents(prev => {
+        const existingIds = new Set(prev.map(a => a.id));
+        const additions = newAgents.filter(a => !existingIds.has(a.id));
+        return additions.length > 0 ? [...prev, ...additions] : prev;
+      });
+    }
+  }, [channelMap, agentMap, loadMessages]);
 
   const handleSSEEvent = useCallback((event: SSEEvent) => {
     switch (event.type) {
