@@ -1,10 +1,14 @@
 # Tools
 
-6 MCP tools that agents use to interact with the world. Registered via `createSdkMcpServer()` and scoped per agent.
+6 tools that agents use to interact with the world. Registered via a toolkit registry and scoped per agent.
 
 ## Registry
 
-`getTools(agentId)` returns the full tool array for an agent, with `agentId` bound via closure so each tool knows which agent is calling it.
+`getToolkit(agentId, runId, ...)` returns two things:
+- **definitions**: Array of tool definitions for the `tools` parameter in `messages.create()` (name, description, JSON Schema from Zod)
+- **handlers**: Map of `toolName → handler function` for dispatching tool_use blocks
+
+Each tool's `agentId` is bound via closure so it knows which agent is calling it.
 
 ## Tool Definitions
 
@@ -77,15 +81,16 @@ store_memory(content: string, tags?: string[]) → { passageId: string }
 ## Cross-Cutting Behavior
 
 All 6 tools share these behaviors:
-- **Zod validation** on all inputs at the tool boundary
-- **`agentId` via closure** — the calling agent's identity is bound when the tool set is created
+- **Zod validation** on all inputs at the tool boundary (also used to generate JSON Schema for API tool definitions via `zod-to-json-schema`)
+- **`agentId` via closure** — the calling agent's identity is bound when the toolkit is created
 - **Run message recording** — every tool call and tool return is recorded in `run_messages` as `tool_call_message` / `tool_return_message`
 - **Sentry spans** — each tool execution emits a trace span (grandchild of the run span)
+- **Return format** — `{ content: [{ type: "text", text: JSON.stringify(result) }] }` (compatible with Anthropic API tool_result blocks)
 
 ## Related
 
 - **Memory**: [memory.md](memory.md) — data model for blocks and passages
 - **User–Agent Comms**: [user-agent-comms.md](user-agent-comms.md) — messaging data model, SSE events
 - **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — `send_message` to a DM channel triggers DM chains
-- **Runtime**: [runtime.md](runtime.md) — orchestrator creates MCP server with these tools
+- **Runtime**: [runtime.md](runtime.md) — orchestrator creates toolkit with these tools
 - **Implementation**: `spec/plan/milestone-2-observability-agent-core.md` (S-2.5)

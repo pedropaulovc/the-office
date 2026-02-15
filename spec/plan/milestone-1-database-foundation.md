@@ -14,7 +14,7 @@ As a developer, I want all required packages installed and baseline Playwright s
 Install production and dev dependencies. Capture Playwright visual snapshots of all key pages (channel list, message list, DMs, threads, user switcher) BEFORE any frontend changes. These snapshots become the "before" baseline for S-1.8 validation.
 
 ### Acceptance Criteria
-- [x] [AC-1.0.1] `npm install` adds: `drizzle-orm`, `@neondatabase/serverless`, `zod`, `dotenv`, `@anthropic-ai/claude-agent-sdk`, `@sentry/nextjs`
+- [x] [AC-1.0.1] `npm install` adds: `drizzle-orm`, `@neondatabase/serverless`, `zod`, `dotenv`, `@anthropic-ai/sdk`, `@sentry/nextjs`
 - [x] [AC-1.0.2] `npm install -D` adds: `drizzle-kit`
 - [x] [AC-1.0.3] `package.json` scripts include `"db:push": "npx drizzle-kit push"`, `"db:seed": "npx tsx src/db/seed.ts"`, `"db:generate": "npx drizzle-kit generate"`, `"db:migrate": "npx drizzle-kit migrate"`
 - [x] [AC-1.0.4] `npm run build` passes
@@ -77,12 +77,12 @@ agents
   title           text NOT NULL
   avatar_color    text NOT NULL
   system_prompt   text NOT NULL     -- full personality prompt, customizable per agent
-  model_id        text NOT NULL DEFAULT 'claude-sonnet-4-5-20250929'
-  max_turns       integer NOT NULL DEFAULT 5
-  max_budget_usd  real NOT NULL DEFAULT 0.10
-  session_id      text              -- Claude Agent SDK session for resume
+  model_id        text NOT NULL DEFAULT 'claude-haiku-4-5-20251001'
+  max_turns       integer NOT NULL DEFAULT 50
   is_active       boolean NOT NULL DEFAULT true
   created_at      timestamptz NOT NULL DEFAULT now()
+  experiment_id   uuid
+  persona         jsonb
   updated_at      timestamptz NOT NULL DEFAULT now()
 ```
 

@@ -1,15 +1,15 @@
 # The Office — Functional Specification
 
-AI agent simulation of "The Office" TV show. Each character is an autonomous agent with persistent memory, communicating in a Slack-like interface. Hackathon project — no auth, no external dependencies beyond Claude Agent SDK + Neon PostgreSQL.
+AI agent simulation of "The Office" TV show. Each character is an autonomous agent with persistent memory, communicating in a Slack-like interface. Hackathon project — no auth, no external dependencies beyond the Anthropic SDK + Neon PostgreSQL.
 
 ## Architecture
 
 ```
-Claude Agent SDK (foundation)
+Anthropic SDK (foundation)
     |
     +-- Custom service layer
     |       - Agent persistence & memory
-    |       - Tool registry (MCP)
+    |       - Tool registry
     |       - Message routing & SSE
     |       - Skills (filesystem)
     |       - Scheduling
@@ -18,9 +18,9 @@ Claude Agent SDK (foundation)
 ```
 
 ```
-Slack-like UI ──> Next.js API routes ──> Orchestrator ──> Claude Agent SDK (query)
+Slack-like UI ──> Next.js API routes ──> Orchestrator ──> Anthropic SDK (messages.create)
                         |                    |                    |
-                        |                    |               MCP tools (in-process)
+                        |                    |               Tools (in-process)
                    SSE stream                |                    |
                    (real-time)               |              ┌─────┴──────┐
                         |                    |              │ Chat tools  │ send DM, post channel, react
@@ -41,7 +41,7 @@ Slack-like UI ──> Next.js API routes ──> Orchestrator ──> Claude Age
 
 | Layer | Technology | Package | Purpose |
 |-------|-----------|---------|---------|
-| **AI Foundation** | Claude Agent SDK | `@anthropic-ai/claude-agent-sdk` | Agent orchestration, LLM calls, tool execution, sessions |
+| **AI Foundation** | Anthropic SDK | `@anthropic-ai/sdk` | Agent orchestration, LLM calls, tool use |
 | **Language** | TypeScript | `typescript` | Everything |
 | **Runtime** | Node.js 18+ | — | Single process: API + agents + scheduler |
 
@@ -69,34 +69,37 @@ Slack-like UI ──> Next.js API routes ──> Orchestrator ──> Claude Age
 | `dotenv` | Env vars (Neon connection string, Anthropic API key) |
 | `zod` | Schema validation for tool inputs, agent configs |
 
-## Claude Agent SDK Usage Pattern
+## Anthropic SDK Usage Pattern
 
-Each Office character = one Claude Agent SDK `query()` call with:
-- **`systemPrompt`**: character personality + core memory blocks injected dynamically
-- **`mcpServers`**: in-process MCP server via `createSdkMcpServer()` with chat/memory tools
-- **`resume`**: session ID for conversation continuity across messages
-- **`allowedTools`**: per-character tool access
+Each Office character = one agentic loop using `messages.create()`:
+- **`system`**: character personality + core memory blocks + conversation context, assembled dynamically
+- **`tools`**: tool definitions (JSON Schema from Zod) for chat/memory tools
+- **`messages`**: conversation turns accumulated across the loop
 
 ```typescript
 // Pseudocode for handling a message to Michael Scott
-import { query, tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 
-const tools = createSdkMcpServer({
-  name: "office-tools",
-  tools: [sendDm, postChannel, react, doNothing, updateMemory, ...]
-});
+const anthropic = new Anthropic();
+const { definitions, handlers } = getToolkit(michael.id, runId);
 
-for await (const msg of query({
-  prompt: incomingMessage.text,
-  options: {
-    systemPrompt: buildPrompt(michael.coreMemory),
-    mcpServers: { "office-tools": tools },
-    resume: michael.sessionId,
-    maxTurns: 5,
-    maxBudgetUsd: 0.10,
-  }
-})) {
-  if (msg.type === "result") writeToDb(msg.result);
+const messages = [{ role: "user", content: triggerPrompt }];
+let turns = 0;
+
+while (turns < michael.maxTurns) {
+  turns++;
+  const response = await anthropic.messages.create({
+    model: michael.modelId,
+    max_tokens: 4096,
+    system: buildSystemPrompt(michael, blocks, recentMessages),
+    messages,
+    tools: definitions,
+  });
+
+  if (response.stop_reason === "end_turn") break;
+
+  // Dispatch tool_use blocks to handlers, accumulate results
+  // Push assistant + tool_result messages for next iteration
 }
 ```
 
@@ -117,7 +120,7 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 | 3 | Runtime | [runtime.md](runtime.md) | Orchestrator, mailbox queue, prompt builder, resolver, run tracking, telemetry |
 | 4 | User–Agent Communication | [user-agent-comms.md](user-agent-comms.md) | Messaging infra, POST endpoint, SSE, typing indicators |
 | 5 | Agent–Agent Communication | [agent-agent-comms.md](agent-agent-comms.md) | 1:1 DM chains, group channel responses |
-| 6 | Tools | [tools.md](tools.md) | Tool registry, 6 MCP tools |
+| 6 | Tools | [tools.md](tools.md) | Tool registry, 6 tools |
 | 7 | Skills | [skills.md](skills.md) | Filesystem knowledge system, 6 skills |
 | 8 | Scheduling | [scheduling.md](scheduling.md) | Autonomous triggers, scheduler loop |
 | 9 | REST API | [api.md](api.md) | Full CRUD for all entities, OpenAPI doc, route map |
@@ -130,10 +133,10 @@ DATABASE_URL_UNPOOLED=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/theo
 |---------|----------|
 | Folders / Files / RAG pipeline | Personality from prompts + memory, not documents |
 | Top-level Archives | Agent-scoped archival memory is enough |
-| External MCP Servers | Tools defined in-process via `createSdkMcpServer()` |
-| Sandbox Execution | Claude Agent SDK handles tool execution |
+| External MCP Servers | Tools defined in-process via toolkit registry |
+| Sandbox Execution | Tool handlers run in-process |
 | Templates | ~16 characters, manual creation is fine |
-| Provider / Model routing | Claude Agent SDK handles LLM calls |
+| Provider / Model routing | Anthropic SDK handles LLM calls |
 | Identity tracking | Single Slack workspace |
 | Batch operations | Sequential is fine for hackathon |
 | Admin / Access tokens | Single-user setup |

@@ -31,7 +31,7 @@ Each skill lives at `.skills/{name}/SKILL.md` with:
 
 ## Skill Loading
 
-Skill loading and prompt injection are handled by the Claude Agent SDK. The application is responsible for providing the `.skills/` filesystem structure and (optionally) surfacing skill metadata via API endpoints for UI/debugging.
+Skill loading and prompt injection are handled by the prompt builder. The application is responsible for providing the `.skills/` filesystem structure and (optionally) surfacing skill metadata via API endpoints for UI/debugging.
 
 ## Skill Catalog
 
