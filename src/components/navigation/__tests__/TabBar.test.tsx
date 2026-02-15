@@ -25,7 +25,7 @@ describe('TabBar', () => {
     expect(screen.getByTestId('tab-slack')).toBeDefined();
     expect(screen.getByTestId('tab-dashboard')).toBeDefined();
     expect(screen.getByText('Slack')).toBeDefined();
-    expect(screen.getByText('Dashboard')).toBeDefined();
+    expect(screen.getByText('Experiments')).toBeDefined();
   });
 
   it('highlights active slack tab', async () => {
