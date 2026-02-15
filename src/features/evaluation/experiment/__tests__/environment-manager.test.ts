@@ -142,17 +142,17 @@ describe("environment-manager", () => {
   });
 
   describe("createAndRunEnvironments", () => {
-    it("creates correct number of environment pairs", () => {
+    it("creates correct number of environment pairs", async () => {
       const scenario = smallScenario();
       const agents = Array.from({ length: 4 }, (_, i) => mockPersona(`Agent-${i}`));
-      const result = createAndRunEnvironments(scenario, agents, 42);
+      const result = await createAndRunEnvironments(scenario, agents, 42);
       expect(result.pairs).toHaveLength(2);
     });
 
-    it("treatment and control results have same agents", () => {
+    it("treatment and control results have same agents", async () => {
       const scenario = smallScenario();
       const agents = Array.from({ length: 4 }, (_, i) => mockPersona(`Agent-${i}`));
-      const result = createAndRunEnvironments(scenario, agents, 42);
+      const result = await createAndRunEnvironments(scenario, agents, 42);
 
       for (const pair of result.pairs) {
         const treatmentNames = pair.treatment.agents.map((a) => a.name).sort();
@@ -161,10 +161,10 @@ describe("environment-manager", () => {
       }
     });
 
-    it("returns correct totalAgents and totalEnvironments", () => {
+    it("returns correct totalAgents and totalEnvironments", async () => {
       const scenario = smallScenario();
       const agents = Array.from({ length: 4 }, (_, i) => mockPersona(`Agent-${i}`));
-      const result = createAndRunEnvironments(scenario, agents, 42);
+      const result = await createAndRunEnvironments(scenario, agents, 42);
       expect(result.totalAgents).toBe(4);
       expect(result.totalEnvironments).toBe(2);
     });

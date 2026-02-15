@@ -2,38 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@sentry/nextjs", () => ({
   startSpan: vi.fn((_opts: unknown, cb: (span: unknown) => unknown) => cb({})),
+  startNewTrace: vi.fn((cb: () => unknown) => cb()),
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   metrics: { count: vi.fn(), distribution: vi.fn() },
 }));
 
-import { runExperiment, scoreEnvironments, TREATMENT_EFFECTS, treatmentScale } from "../runner";
+import { runExperiment, scoreEnvironmentsTemplate } from "../runner";
 import { parseArgs, isDryRunResult } from "../cli";
 import type { ExperimentReport } from "../experiment-report";
 import type { DryRunResult } from "../runner";
 import type { EnvironmentPairResult } from "../environment-manager";
 import type { EnvironmentResult } from "../environment";
-import type { ScenarioConfig } from "../types";
-
-/** Minimal scenario for scoreEnvironments tests. */
-const TEST_SCENARIO: ScenarioConfig = {
-  id: "test",
-  name: "Test",
-  description: "Test scenario",
-  type: "brainstorming",
-  population_profile: "averageCustomer",
-  agents_per_environment: 2,
-  total_environments: 1,
-  steps_per_environment: 3,
-  facilitator_prompts: [],
-  agent_order: "sequential_random",
-  treatment: {
-    action_correction: true,
-    variety_intervention: true,
-    correction_dimensions: ["adherence", "consistency"],
-    correction_threshold: 7,
-  },
-  evaluation_dimensions: ["adherence", "consistency"],
-};
 
 function mockEnvironmentResult(envId: number, agentNames: string[], stepsCount: number): EnvironmentResult {
   const agents = agentNames.map((name) => ({
@@ -78,52 +57,52 @@ describe("runner", () => {
   });
 
   describe("runExperiment — dry run", () => {
-    it("returns scenario config without running environments", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", dryRun: true });
+    it("returns scenario config without running environments", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", dryRun: true });
       expect(result).toHaveProperty("dryRun", true);
       expect(result).toHaveProperty("scenario");
     });
 
-    it("includes correct totalAgents and totalEnvironments", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", dryRun: true }) as DryRunResult;
+    it("includes correct totalAgents and totalEnvironments", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", dryRun: true }) as DryRunResult;
       // brainstorming-average: 5 agents/env * 40 envs = 200
       expect(result.totalAgents).toBe(200);
       expect(result.totalEnvironments).toBe(40);
       expect(result.seed).toBe(42); // default seed
     });
 
-    it("uses provided seed", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 123, dryRun: true }) as DryRunResult;
+    it("uses provided seed", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 123, dryRun: true }) as DryRunResult;
       expect(result.seed).toBe(123);
     });
   });
 
   describe("runExperiment — errors", () => {
-    it("throws for unknown scenario", () => {
-      expect(() => runExperiment({ scenario: "nonexistent-scenario" })).toThrow(
+    it("throws for unknown scenario", async () => {
+      await expect(runExperiment({ scenario: "nonexistent-scenario" })).rejects.toThrow(
         "Unknown scenario: nonexistent-scenario",
       );
     });
   });
 
   describe("runExperiment — full run", () => {
-    it("returns an ExperimentReport with metrics", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 });
+    it("returns an ExperimentReport with metrics", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 });
       expect(result).toHaveProperty("scenario", "brainstorming-average");
       expect(result).toHaveProperty("metrics");
       expect(result).toHaveProperty("timestamp");
     });
 
-    it("report has all evaluation dimensions from scenario", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report has all evaluation dimensions from scenario", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       const expectedDimensions = ["adherence", "consistency", "fluency", "convergence", "ideas_quantity"];
       for (const dim of expectedDimensions) {
         expect(result.metrics).toHaveProperty(dim);
       }
     });
 
-    it("report metrics have treatment and control groups", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report metrics have treatment and control groups", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       for (const metric of Object.values(result.metrics)) {
         expect(metric).toHaveProperty("treatment");
         expect(metric.treatment).toHaveProperty("mean");
@@ -134,8 +113,8 @@ describe("runner", () => {
       }
     });
 
-    it("report includes t-test results for each metric", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("report includes t-test results for each metric", async () => {
+      const result = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       for (const metric of Object.values(result.metrics)) {
         expect(metric).toHaveProperty("tTest");
         expect(metric.tTest).toHaveProperty("tStatistic");
@@ -145,34 +124,17 @@ describe("runner", () => {
       }
     });
 
-    it("treatment and control means differ (treatment effects applied)", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
-      // At least one dimension should show a non-trivial delta
-      const hasNonTrivialDelta = Object.values(result.metrics).some(
-        (m) => Math.abs(m.delta) > 0.1,
-      );
-      expect(hasNonTrivialDelta).toBe(true);
-    });
-
-    it("within-group standard deviation is non-zero", () => {
-      const result = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
-      for (const metric of Object.values(result.metrics)) {
-        expect(metric.treatment.sd).toBeGreaterThan(0.01);
-        expect(metric.control.sd).toBeGreaterThan(0.01);
-      }
-    });
-
-    it("is deterministic with the same seed", () => {
-      const result1 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
-      const result2 = runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+    it("is deterministic with the same seed", async () => {
+      const result1 = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
+      const result2 = await runExperiment({ scenario: "brainstorming-average", seed: 42 }) as ExperimentReport;
       // Compare metrics (timestamps will differ)
       expect(result1.metrics).toEqual(result2.metrics);
       expect(result1.agentsCount).toEqual(result2.agentsCount);
       expect(result1.environmentsCount).toEqual(result2.environmentsCount);
     });
 
-    it("with runs > 1 averages across multiple runs", () => {
-      const result = runExperiment({ scenario: "debate-controversial", seed: 42, runs: 2 });
+    it("with runs > 1 averages across multiple runs", async () => {
+      const result = await runExperiment({ scenario: "debate-controversial", seed: 42, runs: 2 });
       expect(result).toHaveProperty("metrics");
       if (!("metrics" in result)) return;
       const report = result;
@@ -195,7 +157,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "consistency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      const scores = scoreEnvironmentsTemplate(pairs, "treatment", dimensions);
 
       // 2 agents in 1 environment = 2 scores per dimension
       expect(scores.adherence).toHaveLength(2);
@@ -211,7 +173,7 @@ describe("runner", () => {
         },
       ];
       const dimensions = ["adherence", "fluency"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
+      const scores = scoreEnvironmentsTemplate(pairs, "treatment", dimensions);
 
       for (const dim of dimensions) {
         const dimScores = scores[dim];
@@ -221,99 +183,6 @@ describe("runner", () => {
           expect(score).toBeLessThanOrEqual(9);
         }
       }
-    });
-
-    it("treatment and control produce different scores", () => {
-      const pairs: EnvironmentPairResult[] = [
-        {
-          environmentId: 1,
-          treatment: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
-          control: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
-        },
-      ];
-      const dimensions = ["adherence", "consistency", "ideas_quantity"];
-      const tScores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
-      const cScores = scoreEnvironments(pairs, "control", dimensions, TEST_SCENARIO, 42);
-
-      // Treatment and control must differ for at least one dimension
-      const hasDifference = dimensions.some((dim) => {
-        const tMean = (tScores[dim] ?? []).reduce((s, v) => s + v, 0) / (tScores[dim]?.length ?? 1);
-        const cMean = (cScores[dim] ?? []).reduce((s, v) => s + v, 0) / (cScores[dim]?.length ?? 1);
-        return Math.abs(tMean - cMean) > 0.1;
-      });
-      expect(hasDifference).toBe(true);
-    });
-
-    it("within-group variance is non-zero", () => {
-      const pairs: EnvironmentPairResult[] = [
-        {
-          environmentId: 1,
-          treatment: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
-          control: mockEnvironmentResult(1, ["Alice", "Bob", "Charlie", "Dave", "Eve"], 3),
-        },
-      ];
-      const dimensions = ["adherence"];
-      const scores = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
-      const vals = scores.adherence ?? [];
-      const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
-      const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / (vals.length - 1);
-      expect(variance).toBeGreaterThan(0.01);
-    });
-
-    it("is deterministic with the same seed", () => {
-      const pairs: EnvironmentPairResult[] = [
-        {
-          environmentId: 1,
-          treatment: mockEnvironmentResult(1, ["Alice", "Bob"], 3),
-          control: mockEnvironmentResult(1, ["Alice", "Bob"], 3),
-        },
-      ];
-      const dimensions = ["adherence", "consistency"];
-      const scores1 = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
-      const scores2 = scoreEnvironments(pairs, "treatment", dimensions, TEST_SCENARIO, 42);
-      expect(scores1).toEqual(scores2);
-    });
-  });
-
-  describe("treatmentScale", () => {
-    it("returns 1.0 for AC+VI", () => {
-      expect(treatmentScale(TEST_SCENARIO)).toBe(1.0);
-    });
-
-    it("returns 0.5 for AC only", () => {
-      const acOnly = { ...TEST_SCENARIO, treatment: { ...TEST_SCENARIO.treatment, variety_intervention: false } };
-      expect(treatmentScale(acOnly)).toBe(0.5);
-    });
-
-    it("returns 0.7 for VI only", () => {
-      const viOnly = { ...TEST_SCENARIO, treatment: { ...TEST_SCENARIO.treatment, action_correction: false } };
-      expect(treatmentScale(viOnly)).toBe(0.7);
-    });
-
-    it("returns 0 when both disabled", () => {
-      const none = {
-        ...TEST_SCENARIO,
-        treatment: { ...TEST_SCENARIO.treatment, action_correction: false, variety_intervention: false },
-      };
-      expect(treatmentScale(none)).toBe(0);
-    });
-  });
-
-  describe("TREATMENT_EFFECTS", () => {
-    it("has effects for all standard dimensions", () => {
-      expect(TREATMENT_EFFECTS).toHaveProperty("adherence");
-      expect(TREATMENT_EFFECTS).toHaveProperty("consistency");
-      expect(TREATMENT_EFFECTS).toHaveProperty("fluency");
-      expect(TREATMENT_EFFECTS).toHaveProperty("convergence");
-      expect(TREATMENT_EFFECTS).toHaveProperty("ideas_quantity");
-    });
-
-    it("ideas_quantity is positive (treatment increases ideas)", () => {
-      expect(TREATMENT_EFFECTS.ideas_quantity).toBeGreaterThan(0);
-    });
-
-    it("consistency is negative (treatment trades consistency)", () => {
-      expect(TREATMENT_EFFECTS.consistency).toBeLessThan(0);
     });
   });
 

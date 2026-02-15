@@ -94,8 +94,44 @@ fetch_paginated() {
 }
 
 # --- Spans ---
+# Fetch spans from the dedicated spans dataset (Sentry v10+ sends spans as
+# standalone envelopes, not embedded in transaction events).  Falls back to
+# the legacy transaction-embedded approach if the spans dataset returns nothing.
 print_spans() {
   echo "=== SPANS ==="
+  echo ""
+
+  # --- Try the spans dataset first (paginated) ---
+  local span_fields="field=span_id&field=parent_span_id&field=span.op&field=span.description&field=timestamp&field=span.duration"
+  local spans
+  spans=$(fetch_paginated "$SENTRY_BASE/organizations/$SENTRY_ORG/events/?dataset=spans&${span_fields}&orderby=timestamp&per_page=100&project=$SENTRY_PROJECT_ID&query=trace%3A$TRACE_ID&statsPeriod=14d")
+
+  local span_count
+  span_count=$(echo "$spans" | jq 'length')
+
+  if [[ "$span_count" != "0" ]]; then
+    echo "  (${span_count} spans from spans dataset)"
+    echo ""
+    echo "$spans" | jq -r '
+      sort_by(.timestamp) | .[] |
+      (.timestamp | split("T") | .[1] | split("+")[0] | .[0:12]) as $ts |
+      (."span.duration" | . * 100 | round | . / 100 | tostring) as $dur |
+      "  \($ts) | \(."span.op" // "-") | \(."span.description" // "-") | \($dur)ms"
+    '
+    echo ""
+
+    # Print summary counts
+    echo "  --- Summary ---"
+    echo "$spans" | jq -r '
+      group_by(."span.op") | map({op: .[0]."span.op", count: length}) | sort_by(-.count) | .[] |
+      "  \(.count)\t\(.op)"
+    '
+    echo ""
+    return
+  fi
+
+  # --- Fallback: legacy transaction-embedded spans ---
+  echo "  (falling back to transaction-embedded spans)"
   echo ""
 
   local events

@@ -9,6 +9,8 @@ const runRequestSchema = z.object({
   seed: z.number().int().optional().default(42),
   runs: z.number().int().min(1).optional().default(1),
   dryRun: z.boolean().optional().default(false),
+  scale: z.number().min(0.01).max(1.0).optional().default(1.0),
+  mode: z.enum(["template", "llm"]).optional().default("template"),
 });
 
 export async function POST(request: Request) {
@@ -24,12 +26,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenario, seed, runs, dryRun } = parsed.data;
+    const { scenario, seed, runs, dryRun, scale, mode } = parsed.data;
 
-    logInfo("Experiment run requested via API", { scenario, seed, runs, dryRun });
+    logInfo("Experiment run requested via API", { scenario, seed, runs, dryRun, scale, mode });
     countMetric("api.evaluations.experiment.run", 1);
 
-    const result = runExperiment({ scenario, seed, runs, dryRun });
+    const result = await runExperiment({ scenario, seed, runs, dryRun, scale, mode });
     return jsonResponse(result, { status: 200 });
   });
 }

@@ -139,9 +139,6 @@ function welchSatterthwaite(
   return num / den;
 }
 
-/** Threshold below which variance is treated as zero (avoids fp noise). */
-const EPSILON = 1e-10;
-
 /** Welch's two-sample t-test (two-tailed). */
 export function welchTTest(
   groupA: number[],
@@ -156,9 +153,9 @@ export function welchTTest(
     const nB = groupB.length;
 
     const denom = Math.sqrt(vA / nA + vB / nB);
-    const tStat = denom < EPSILON ? 0 : (mA - mB) / denom;
+    const tStat = denom === 0 ? 0 : (mA - mB) / denom;
     const df =
-      denom < EPSILON ? nA + nB - 2 : welchSatterthwaite(vA, nA, vB, nB);
+      denom === 0 ? nA + nB - 2 : welchSatterthwaite(vA, nA, vB, nB);
     const pValue =
       tStat === 0 ? 1 : 2 * (1 - tDistributionCDF(Math.abs(tStat), df));
 
@@ -186,6 +183,6 @@ export function cohensD(groupA: number[], groupB: number[]): number {
   const vA = variance(groupA);
   const vB = variance(groupB);
   const pooledSd = Math.sqrt((vA + vB) / 2);
-  if (pooledSd < EPSILON) return 0;
+  if (pooledSd === 0) return 0;
   return (mA - mB) / pooledSd;
 }

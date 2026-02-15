@@ -1,4 +1,4 @@
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { withNewTrace, logInfo, countMetric } from "@/lib/telemetry";
 import { AgentFactory } from "./agent-factory";
 import { getScenario } from "./scenario-library";
 import { getProfile } from "./population-profiles";
@@ -8,12 +8,16 @@ import { welchTTest, cohensD, mean, standardDeviation } from "./statistical-test
 import { generateExperimentReport } from "./experiment-report";
 import type { MetricResult, ExperimentReport } from "./experiment-report";
 import type { ScenarioConfig } from "./types";
+import type { ExperimentMode } from "./environment";
+import { scoreTrajectory } from "./llm-scorer";
 
 interface RunnerOptions {
   scenario: string;
   seed?: number;
   runs?: number;
   dryRun?: boolean;
+  scale?: number;
+  mode?: ExperimentMode;
 }
 
 interface DryRunResult {
@@ -25,123 +29,112 @@ interface DryRunResult {
 }
 
 /**
- * Control group baseline scores per dimension (approximating TinyTroupe Table 1 control means).
- * These center the template scores so treatment effects stay within [0, 9].
- */
-const CONTROL_BASELINES: Record<string, number> = {
-  adherence: 6.5,
-  consistency: 6.8,
-  fluency: 7.0,
-  convergence: 6.5,
-  ideas_quantity: 4.0,
-};
-
-/**
- * Expected treatment effect directions from TinyTroupe Table 1.
- * These approximate the delta (T - C) when both AC and VI are enabled.
- */
-const TREATMENT_EFFECTS: Record<string, number> = {
-  adherence: -0.9,
-  consistency: -2.1,
-  fluency: -0.5,
-  convergence: -0.5,
-  ideas_quantity: 4.4,
-};
-
-/** Seeded xorshift32 PRNG (matches codebase pattern). */
-function createPrng(seed: number): () => number {
-  let state = seed | 0 || 1;
-  return () => {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    return (state >>> 0) / 0xffffffff;
-  };
-}
-
-/**
- * Compute treatment effect scale based on which mechanisms are enabled.
- * AC+VI = full effect, AC-only or VI-only = partial.
- */
-function treatmentScale(scenario: ScenarioConfig): number {
-  const { action_correction, variety_intervention } = scenario.treatment;
-  if (action_correction && variety_intervention) return 1.0;
-  if (action_correction) return 0.5;
-  if (variety_intervention) return 0.7;
-  return 0;
-}
-
-/**
  * Score all agents in all environments for a given group (treatment or control).
- * In template mode (no real LLM), uses deterministic seeded scores with:
- *  - Per-agent random variation (realistic within-group variance)
- *  - Treatment effect modifiers for the treatment group (T ≠ C)
+ * In template mode (no real LLM), uses deterministic placeholder scores based on trajectory length.
  */
-function scoreEnvironments(
+function scoreEnvironmentsTemplate(
   pairs: EnvironmentPairResult[],
   group: "treatment" | "control",
   dimensions: string[],
-  scenario: ScenarioConfig,
-  seed: number,
 ): Record<string, number[]> {
   const scores: Record<string, number[]> = {};
   for (const dim of dimensions) {
     scores[dim] = [];
   }
 
-  const scale = group === "treatment" ? treatmentScale(scenario) : 0;
-  const rng = createPrng(seed * 31 + (group === "treatment" ? 7 : 13));
+  for (const pair of pairs) {
+    const result = pair[group];
+    for (const agent of result.agents) {
+      const agentActions = result.trajectory.filter((a) => a.agentName === agent.name);
+      const baseScore = 5 + agentActions.length * 0.3;
 
-  const agentCount = pairs.reduce((sum, p) => sum + p[group].agents.length, 0);
-  for (let n = 0; n < agentCount; n++) {
-    for (const dim of dimensions) {
-      const baseline = CONTROL_BASELINES[dim] ?? 5.5;
-      const noise = (rng() - 0.5) * 3;
-      const effect = (TREATMENT_EFFECTS[dim] ?? 0) * scale;
-      const score = Math.min(9, Math.max(0, baseline + noise + effect));
-      scores[dim]?.push(score);
+      for (const dim of dimensions) {
+        const dimOffset = dimensions.indexOf(dim) * 0.2;
+        const score = Math.min(9, Math.max(0, baseScore + dimOffset));
+        scores[dim]?.push(score);
+      }
     }
   }
 
   return scores;
 }
 
-function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult {
-  return withSpan("experiment.run", "evaluation.experiment", () => {
+/**
+ * Score environments using LLM-backed trajectory scorer.
+ * Calls scoreTrajectory for each agent's actions in each environment pair.
+ */
+async function scoreEnvironmentsLlm(
+  pairs: EnvironmentPairResult[],
+  group: "treatment" | "control",
+  dimensions: string[],
+): Promise<Record<string, number[]>> {
+  const scores: Record<string, number[]> = {};
+  for (const dim of dimensions) {
+    scores[dim] = [];
+  }
+
+  for (const pair of pairs) {
+    const result = pair[group];
+    for (const agent of result.agents) {
+      const agentActions = result.trajectory.filter((a) => a.agentName === agent.name);
+      const trajectoryResult = await scoreTrajectory(agent, agentActions, dimensions);
+
+      for (const dim of dimensions) {
+        scores[dim]?.push(trajectoryResult.scores[dim] ?? 5);
+      }
+    }
+  }
+
+  return scores;
+}
+
+async function runExperiment(options: RunnerOptions): Promise<ExperimentReport | DryRunResult> {
+  return withNewTrace("experiment.run", "evaluation.experiment", async () => {
     const seed = options.seed ?? 42;
+    const scale = options.scale ?? 1.0;
+    const mode = options.mode ?? "template";
     const scenario = getScenario(options.scenario);
     if (!scenario) {
       throw new Error(`Unknown scenario: ${options.scenario}`);
     }
 
+    // Scale the scenario for reduced runs
+    const scaledScenario = scale < 1.0 ? {
+      ...scenario,
+      agents_per_environment: Math.max(2, Math.round(scenario.agents_per_environment * scale)),
+      total_environments: Math.max(1, Math.round(scenario.total_environments * scale)),
+    } : scenario;
+
     logInfo("Starting experiment", {
       scenario: options.scenario,
       seed,
+      scale,
+      mode,
       dryRun: options.dryRun ?? false,
     });
 
     if (options.dryRun) {
       return {
         dryRun: true as const,
-        scenario,
-        totalAgents: scenario.agents_per_environment * scenario.total_environments,
-        totalEnvironments: scenario.total_environments,
+        scenario: scaledScenario,
+        totalAgents: scaledScenario.agents_per_environment * scaledScenario.total_environments,
+        totalEnvironments: scaledScenario.total_environments,
         seed,
       };
     }
 
-    const profile = getProfile(scenario.population_profile);
+    const profile = getProfile(scaledScenario.population_profile);
     if (!profile) {
-      throw new Error(`Unknown population profile: ${scenario.population_profile}`);
+      throw new Error(`Unknown population profile: ${scaledScenario.population_profile}`);
     }
 
     const runs = options.runs ?? 1;
-    const totalAgents = scenario.agents_per_environment * scenario.total_environments;
+    const totalAgents = scaledScenario.agents_per_environment * scaledScenario.total_environments;
 
     // Accumulate scores across all runs
     const allTreatmentScores: Record<string, number[]> = {};
     const allControlScores: Record<string, number[]> = {};
-    for (const dim of scenario.evaluation_dimensions) {
+    for (const dim of scaledScenario.evaluation_dimensions) {
       allTreatmentScores[dim] = [];
       allControlScores[dim] = [];
     }
@@ -160,17 +153,18 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
         run: run + 1,
         totalRuns: runs,
         count: agents.length,
-        profile: scenario.population_profile,
+        profile: scaledScenario.population_profile,
       });
 
       // 2. Create and run environments (T/C pairs)
-      const envResult = createAndRunEnvironments(scenario, agents, runSeed);
+      const envResult = await createAndRunEnvironments(scaledScenario, agents, runSeed, mode);
 
       // 3. Score all environments
-      const tScores = scoreEnvironments(envResult.pairs, "treatment", scenario.evaluation_dimensions, scenario, runSeed);
-      const cScores = scoreEnvironments(envResult.pairs, "control", scenario.evaluation_dimensions, scenario, runSeed);
+      const scoreFn = mode === "llm" ? scoreEnvironmentsLlm : scoreEnvironmentsTemplate;
+      const tScores = await scoreFn(envResult.pairs, "treatment", scaledScenario.evaluation_dimensions);
+      const cScores = await scoreFn(envResult.pairs, "control", scaledScenario.evaluation_dimensions);
 
-      for (const dim of scenario.evaluation_dimensions) {
+      for (const dim of scaledScenario.evaluation_dimensions) {
         allTreatmentScores[dim]?.push(...(tScores[dim] ?? []));
         allControlScores[dim]?.push(...(cScores[dim] ?? []));
       }
@@ -178,7 +172,7 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
 
     // 4. Compute statistics per dimension across all runs
     const metrics: Record<string, MetricResult> = {};
-    for (const dim of scenario.evaluation_dimensions) {
+    for (const dim of scaledScenario.evaluation_dimensions) {
       const tScores = allTreatmentScores[dim] ?? [];
       const cScores = allControlScores[dim] ?? [];
       const tTest = welchTTest(tScores, cScores);
@@ -195,16 +189,16 @@ function runExperiment(options: RunnerOptions): ExperimentReport | DryRunResult 
 
     countMetric("experiment.completed", 1);
 
-    // 5. Generate report
+    // 5. Generate report (use original scenario.id for identification)
     return generateExperimentReport({
       scenario: scenario.id,
       seed,
       agentsCount: totalAgents,
-      environmentsCount: scenario.total_environments,
+      environmentsCount: scaledScenario.total_environments,
       metrics,
     });
   });
 }
 
-export { runExperiment, scoreEnvironments, TREATMENT_EFFECTS, CONTROL_BASELINES, treatmentScale };
+export { runExperiment, scoreEnvironmentsTemplate, scoreEnvironmentsLlm };
 export type { RunnerOptions, DryRunResult };
