@@ -71,6 +71,7 @@ describe("experiments schema", () => {
         sourceAgentIds: null,
         config: null,
         report: null,
+        progress: null,
         agentCount: 10,
         environmentCount: 2,
         createdAt: new Date(),

@@ -54,6 +54,7 @@ import {
   persistEnvironmentPair,
   completeExperiment,
   failExperiment,
+  updateProgress,
 } from "../persistence";
 import { createMockExperiment, resetExperimentFactoryCounter } from "@/tests/factories";
 import type { ScenarioConfig } from "../types";
@@ -233,6 +234,47 @@ describe("persistence", () => {
       expect(update.status).toBe("completed");
       expect(update.report).toBe(report);
       expect(update.completedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe("updateProgress", () => {
+    it("calls updateExperiment with progress field", async () => {
+      mockUpdateExperiment.mockResolvedValue(undefined);
+
+      await updateProgress("exp-1", {
+        phase: "running_environments",
+        environmentsProcessed: 2,
+        environmentsTotal: 5,
+      });
+
+      expect(mockUpdateExperiment).toHaveBeenCalledOnce();
+      const args = mockUpdateExperiment.mock.calls[0] as unknown[];
+      expect(args[0]).toBe("exp-1");
+      const update = args[1] as Record<string, unknown>;
+      expect(update.progress).toEqual({
+        phase: "running_environments",
+        environmentsProcessed: 2,
+        environmentsTotal: 5,
+      });
+    });
+
+    it("includes optional detail field when provided", async () => {
+      mockUpdateExperiment.mockResolvedValue(undefined);
+
+      await updateProgress("exp-1", {
+        phase: "scoring",
+        environmentsProcessed: 5,
+        environmentsTotal: 5,
+        detail: "Scoring agent 3/8",
+      });
+
+      const update = (mockUpdateExperiment.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(update.progress).toEqual({
+        phase: "scoring",
+        environmentsProcessed: 5,
+        environmentsTotal: 5,
+        detail: "Scoring agent 3/8",
+      });
     });
   });
 

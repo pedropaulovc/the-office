@@ -7,7 +7,7 @@ import {
 import { db } from "@/db/client";
 import { agents as agentsTable, channels, channelMembers, messages } from "@/db/schema";
 import type { Experiment } from "@/db/schema";
-import type { ScenarioConfig, GeneratedPersona } from "./types";
+import type { ScenarioConfig, GeneratedPersona, ExperimentProgress } from "./types";
 import type { EnvironmentPairResult } from "./environment-manager";
 import type { EnvironmentResult } from "./environment";
 import type { ExperimentReport } from "./experiment-report";
@@ -123,6 +123,16 @@ export async function persistEnvironmentPair(
     logInfo("Persisted environment pair", { experimentId, envIndex });
     countMetric("persistence.environment_persisted", 1);
   });
+}
+
+/**
+ * Updates the progress field on an experiment record.
+ */
+export async function updateProgress(
+  experimentId: string,
+  progress: ExperimentProgress,
+): Promise<void> {
+  await updateExperiment(experimentId, { progress: progress as unknown as Record<string, unknown> });
 }
 
 /**

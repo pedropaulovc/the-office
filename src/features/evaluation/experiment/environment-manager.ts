@@ -89,20 +89,23 @@ export async function createAndRunEnvironments(
       agentsPerEnvironment: scenario.agents_per_environment,
     });
 
-    const pairs: EnvironmentPairResult[] = [];
+    // All environment pairs are independent — run them concurrently.
+    // Treatment and control within each pair are also independent.
+    const pairs = await Promise.all(
+      agentGroups.map(async (groupAgents, index) => {
+        const envId = index + 1;
+        const treatmentEnv = new ExperimentEnvironment(scenario, groupAgents, envId, mode);
+        const controlEnv = new ExperimentEnvironment(controlScenario, groupAgents, envId, mode);
 
-    // In LLM mode, run sequentially to avoid rate limiting
-    for (const [index, groupAgents] of agentGroups.entries()) {
-      const envId = index + 1;
-      const treatmentEnv = new ExperimentEnvironment(scenario, groupAgents, envId, mode);
-      const controlEnv = new ExperimentEnvironment(controlScenario, groupAgents, envId, mode);
+        const envSeed = seed + envId;
+        const [treatmentResult, controlResult] = await Promise.all([
+          treatmentEnv.run(envSeed),
+          controlEnv.run(envSeed),
+        ]);
 
-      const envSeed = seed + envId;
-      const treatmentResult = await treatmentEnv.run(envSeed);
-      const controlResult = await controlEnv.run(envSeed);
-
-      pairs.push({ environmentId: envId, treatment: treatmentResult, control: controlResult });
-    }
+        return { environmentId: envId, treatment: treatmentResult, control: controlResult };
+      }),
+    );
 
     countMetric("experiment.environments_created", pairs.length * 2);
 

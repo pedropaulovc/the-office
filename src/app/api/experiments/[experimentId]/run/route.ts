@@ -1,9 +1,9 @@
 import { z } from "zod/v4";
 import { NextRequest, NextResponse } from "next/server";
 import { apiHandler, jsonResponse, parseRequestJson } from "@/lib/api-response";
-import { getExperiment, updateExperiment } from "@/db/queries/experiments";
+import { getExperiment } from "@/db/queries/experiments";
 import { runExperiment } from "@/features/evaluation/experiment/runner";
-import { logInfo, countMetric } from "@/lib/telemetry";
+import { logInfo, logError, countMetric } from "@/lib/telemetry";
 
 interface RouteContext {
   params: Promise<{ experimentId: string }>;
@@ -41,22 +41,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Mark as running
-    await updateExperiment(experimentId, { status: "running", startedAt: new Date() });
-
     logInfo("Starting experiment run", { experimentId });
     countMetric("experiment.run.started", 1);
 
-    const result = await runExperiment({
+    // Fire-and-forget — the runner handles all state transitions (running → completed/failed)
+    runExperiment({
       scenario: experiment.scenarioId,
       seed: experiment.seed,
       scale: experiment.scale,
-      mode: parsed.data.mode ?? (experiment.mode),
+      mode: parsed.data.mode ?? experiment.mode,
       persist: true,
+      experimentId,
       populationSource: experiment.populationSource,
       ...(experiment.sourceAgentIds && { sourceAgentIds: experiment.sourceAgentIds }),
+    }).catch((err) => {
+      logError("Experiment run failed in background", { experimentId, error: String(err) });
     });
 
-    return jsonResponse(result);
+    return jsonResponse({ experimentId, status: "running" }, { status: 202 });
   });
 }

@@ -11,6 +11,7 @@ interface ExperimentBody {
   sourceAgentIds: string[] | null;
   config: unknown;
   report: unknown;
+  progress: unknown;
   agentCount: number;
   environmentCount: number;
   createdAt: string;
@@ -28,15 +29,9 @@ interface ExperimentEnvironmentBody {
   trajectory: unknown;
 }
 
-interface RunResultBody {
-  scenario: string;
-  seed: number;
-  agentsCount: number;
-  environmentsCount: number;
-  metrics: Record<string, unknown>;
-  displayLabels: Record<string, string>;
-  timestamp: string;
-  experimentId?: string;
+interface RunAcceptedBody {
+  experimentId: string;
+  status: string;
 }
 
 interface ErrorBody {
@@ -54,31 +49,45 @@ test.describe("experiment run API", () => {
     return body.id;
   }
 
-  test("POST /api/experiments/[id]/run runs template experiment", async ({ request }) => {
+  /** Poll GET /api/experiments/[id] until status matches or timeout. */
+  async function pollUntil(
+    request: APIRequestContext,
+    experimentId: string,
+    targetStatus: string,
+    timeoutMs = 5000,
+  ): Promise<ExperimentBody> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const res = await request.get(`/api/experiments/${experimentId}`);
+      expect(res.status()).toBe(200);
+      const body = (await res.json()) as ExperimentBody;
+      if (body.status === targetStatus) return body;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(`Experiment ${experimentId} did not reach status "${targetStatus}" within ${timeoutMs}ms`);
+  }
+
+  test("POST /api/experiments/[id]/run returns 202 and completes async", async ({ request }) => {
     const experimentId = await createExperiment(request);
 
+    // Fire the run — should return 202 immediately
     const runRes = await request.post(`/api/experiments/${experimentId}/run`, {
       data: {},
     });
-    expect(runRes.status()).toBe(200);
+    expect(runRes.status()).toBe(202);
 
-    const result = (await runRes.json()) as RunResultBody;
-    expect(result.scenario).toBe("brainstorming-average");
-    expect(result.seed).toBe(42);
-    expect(result.metrics).toBeDefined();
-    expect(Object.keys(result.metrics).length).toBeGreaterThan(0);
-    expect(result.displayLabels).toBeDefined();
-    expect(result.timestamp).toBeDefined();
+    const accepted = (await runRes.json()) as RunAcceptedBody;
+    expect(accepted.experimentId).toBe(experimentId);
+    expect(accepted.status).toBe("running");
 
-    // Verify the original experiment was marked as running (the route updates it)
-    const getRes = await request.get(`/api/experiments/${experimentId}`);
-    expect(getRes.status()).toBe(200);
-    const experiment = (await getRes.json()) as ExperimentBody;
+    // Poll until completed
+    const experiment = await pollUntil(request, experimentId, "completed");
     expect(experiment.startedAt).not.toBeNull();
+    expect(experiment.completedAt).not.toBeNull();
+    expect(experiment.report).not.toBeNull();
 
-    // Verify environments were created (via the runner's persistence)
-    // experimentId is always present when persist=true (the default)
-    const envRes = await request.get(`/api/experiments/${result.experimentId}/environments`);
+    // Verify environments were created
+    const envRes = await request.get(`/api/experiments/${experimentId}/environments`);
     expect(envRes.status()).toBe(200);
     const envs = (await envRes.json()) as ExperimentEnvironmentBody[];
     expect(envs.length).toBeGreaterThan(0);
@@ -93,7 +102,10 @@ test.describe("experiment run API", () => {
     const firstRun = await request.post(`/api/experiments/${experimentId}/run`, {
       data: {},
     });
-    expect(firstRun.status()).toBe(200);
+    expect(firstRun.status()).toBe(202);
+
+    // Wait for it to finish so it's no longer "pending"
+    await pollUntil(request, experimentId, "completed");
 
     // Try to run again - experiment is no longer "pending"
     const secondRun = await request.post(`/api/experiments/${experimentId}/run`, { data: {} });
