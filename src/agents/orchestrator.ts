@@ -7,7 +7,6 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   getAgent,
-  updateAgent,
   listMemoryBlocks,
   getRecentMessages,
   createRunStep,
@@ -193,17 +192,12 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       model: agent.modelId,
       mcpServers: { "office-tools": mcpServer },
       maxTurns: agent.maxTurns,
-      maxBudgetUsd: agent.maxBudgetUsd,
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
       tools: [],
       env: buildSdkEnv(),
       stderr: createSdkStderrHandler(run.id, run.agentId),
     };
-    if (agent.sessionId) {
-      sdkOptions.resume = agent.sessionId;
-    }
-
     const sdkQuery = query({ prompt, options: sdkOptions });
 
     // 9. Iterate SDK messages — wrapped in sdk.query span
@@ -215,7 +209,6 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       stepNum: 0,
       currentStep: null as RunStep | null,
       result: null as SDKResultMessage | null,
-      sessId: null as string | null,
     };
 
     await Sentry.startSpanManual(
@@ -237,9 +230,6 @@ async function executeRunInner(run: Run): Promise<RunResult> {
           // Re-establish querySpan as active — the for-await over the SDK subprocess
           // loses Node.js async context, so child spans/logs would otherwise be orphaned.
           await Sentry.withActiveSpan(querySpan, async () => {
-            const extractedId = extractSessionId(msg);
-            if (extractedId) loopState.sessId = extractedId;
-
             if (msg.type === "system") {
               await handleSystemMsg(msg, run.id, run.agentId);
               return;
@@ -386,14 +376,9 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       },
     );
 
-    const { stepNum: stepNumber, result: resultMessage, sessId: sessionId } = loopState;
+    const { stepNum: stepNumber, result: resultMessage } = loopState;
 
-    // 10. Persist session ID
-    if (sessionId) {
-      await updateAgent(run.agentId, { sessionId });
-    }
-
-    // 11. Broadcast agent_done
+    // 10. Broadcast agent_done
     if (run.channelId) {
       connectionRegistry.broadcast(run.channelId, {
         type: "agent_done",
@@ -470,13 +455,6 @@ function formatTriggerPrompt(run: Run): string {
     return `A new message was posted (trigger: ${run.triggerMessageId}). Review the recent conversation and decide how to respond.`;
   }
   return "Review the recent messages in the channel and decide how to respond.";
-}
-
-function extractSessionId(msg: SDKMessage): string | null {
-  if ("session_id" in msg && typeof msg.session_id === "string") {
-    return msg.session_id;
-  }
-  return null;
 }
 
 async function handleSystemMsg(
@@ -626,8 +604,6 @@ function mapStopReason(result: SDKResultMessage | null): {
       return { status: "completed", stopReason: "end_turn" };
     case "error_max_turns":
       return { status: "failed", stopReason: "max_steps" };
-    case "error_max_budget_usd":
-      return { status: "failed", stopReason: "max_tokens_exceeded" };
     case "error_during_execution":
       return { status: "failed", stopReason: "error" };
     default:

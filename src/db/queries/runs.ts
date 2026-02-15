@@ -184,7 +184,7 @@ export function cancelRun(
 
     const updated = await updateRunStatus(id, {
       status: "cancelled",
-      stopReason: "cancelled",
+      stopReason: "error",
     });
     return { run: updated };
   });

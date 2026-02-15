@@ -10,9 +10,7 @@ const UpdateAgentSchema = z.object({
   systemPrompt: z.string().min(1).optional(),
   modelId: z.string().optional(),
   maxTurns: z.number().int().positive().optional(),
-  maxBudgetUsd: z.number().positive().optional(),
   isActive: z.boolean().optional(),
-  sessionId: z.string().nullable().optional(),
 });
 
 interface RouteContext { params: Promise<{ agentId: string }> }

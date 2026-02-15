@@ -8,8 +8,6 @@ interface AgentResponse {
   systemPrompt: string;
   modelId: string;
   maxTurns: number;
-  maxBudgetUsd: number;
-  sessionId: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

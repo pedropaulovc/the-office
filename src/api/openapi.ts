@@ -27,8 +27,6 @@ const AgentSchema = z
     systemPrompt: z.string(),
     modelId: z.string(),
     maxTurns: z.number().int(),
-    maxBudgetUsd: z.number(),
-    sessionId: z.string().nullable(),
     isActive: z.boolean(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
@@ -44,7 +42,6 @@ const CreateAgentBody = z
     systemPrompt: z.string().min(1),
     modelId: z.string().optional(),
     maxTurns: z.number().int().positive().optional(),
-    maxBudgetUsd: z.number().positive().optional(),
     isActive: z.boolean().optional(),
   })
   .meta({ id: "CreateAgentBody" });
@@ -57,9 +54,7 @@ const UpdateAgentBody = z
     systemPrompt: z.string().min(1).optional(),
     modelId: z.string().optional(),
     maxTurns: z.number().int().positive().optional(),
-    maxBudgetUsd: z.number().positive().optional(),
     isActive: z.boolean().optional(),
-    sessionId: z.string().nullable().optional(),
   })
   .meta({ id: "UpdateAgentBody" });
 
