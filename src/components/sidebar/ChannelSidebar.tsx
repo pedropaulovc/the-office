@@ -10,6 +10,7 @@ export default function ChannelSidebar() {
   const { channels, getDmsForUser, getAgent } = useData();
   const currentUser = getAgent(currentUserId);
   const dms = getDmsForUser(currentUserId);
+  const experimentChannels = channels.filter(ch => ch.experimentId !== null);
 
   return (
     <aside className="flex w-[240px] shrink-0 flex-col bg-slack-aubergine">
@@ -40,6 +41,16 @@ export default function ChannelSidebar() {
             <DmItem key={dm.id} dm={dm} />
           ))}
         </div>
+
+        {/* Experiment channels — only shown when experiment channels are loaded */}
+        {experimentChannels.length > 0 && (
+          <div className="pt-2">
+            <SectionHeader title="Experiments" />
+            {experimentChannels.map(ch => (
+              <ChannelItem key={ch.id} channel={ch} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* User footer */}

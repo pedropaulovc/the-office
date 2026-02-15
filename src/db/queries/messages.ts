@@ -31,7 +31,7 @@ export function listChannels(): Promise<Channel[]> {
 export function listChannelsWithMembers(): Promise<ChannelView[]> {
   return withSpan("listChannelsWithMembers", "db.query", async () => {
     const [allChannels, allMembers] = await Promise.all([
-      db.select().from(channels).orderBy(channels.name),
+      db.select().from(channels).where(isNull(channels.experimentId)).orderBy(channels.name),
       db.select().from(channelMembers),
     ]);
 
