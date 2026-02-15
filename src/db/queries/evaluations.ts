@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   evaluationRuns,
@@ -10,6 +10,10 @@ import {
 } from "@/db/schema";
 import type { EvaluationRunWithScores } from "@/features/evaluation/types";
 import { withSpan, logInfo } from "@/lib/telemetry";
+
+export type EvaluationRunWithDimensionScores = EvaluationRun & {
+  dimensionScores: Record<string, number>;
+};
 
 export function createEvaluationRun(
   data: NewEvaluationRun,
@@ -99,7 +103,7 @@ export function listEvaluationRuns(
     status?: string;
     isBaseline?: boolean;
   },
-): Promise<EvaluationRun[]> {
+): Promise<EvaluationRunWithDimensionScores[]> {
   return withSpan("listEvaluationRuns", "db.query", async () => {
     const conditions = [];
 
@@ -118,20 +122,51 @@ export function listEvaluationRuns(
       conditions.push(eq(evaluationRuns.isBaseline, filters.isBaseline));
     }
 
+    let runs: EvaluationRun[];
     if (conditions.length === 0) {
-      return db
+      runs = await db
         .select()
         .from(evaluationRuns)
         .orderBy(desc(evaluationRuns.createdAt));
+    } else {
+      const [first, ...rest] = conditions;
+      const where = rest.length === 0 ? first : and(first, ...rest);
+      runs = await db
+        .select()
+        .from(evaluationRuns)
+        .where(where)
+        .orderBy(desc(evaluationRuns.createdAt));
     }
 
-    const [first, ...rest] = conditions;
-    const where = rest.length === 0 ? first : and(first, ...rest);
-    return db
-      .select()
-      .from(evaluationRuns)
-      .where(where)
-      .orderBy(desc(evaluationRuns.createdAt));
+    if (runs.length === 0) return [];
+
+    // Fetch per-dimension averages for all runs in one query
+    const runIds = runs.map((r) => r.id);
+    const dimAverages = await db
+      .select({
+        evaluationRunId: evaluationScores.evaluationRunId,
+        dimension: evaluationScores.dimension,
+        avgScore: sql<number>`avg(${evaluationScores.score})`.as("avg_score"),
+      })
+      .from(evaluationScores)
+      .where(inArray(evaluationScores.evaluationRunId, runIds))
+      .groupBy(evaluationScores.evaluationRunId, evaluationScores.dimension);
+
+    // Build lookup: runId -> { dimension -> avgScore }
+    const scoreLookup = new Map<string, Record<string, number>>();
+    for (const row of dimAverages) {
+      let entry = scoreLookup.get(row.evaluationRunId);
+      if (!entry) {
+        entry = {};
+        scoreLookup.set(row.evaluationRunId, entry);
+      }
+      entry[row.dimension] = row.avgScore;
+    }
+
+    return runs.map((run) => ({
+      ...run,
+      dimensionScores: scoreLookup.get(run.id) ?? {},
+    }));
   });
 }
 

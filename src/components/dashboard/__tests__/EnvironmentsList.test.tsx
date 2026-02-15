@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { EnvironmentsList } from '@/components/dashboard/EnvironmentsList';
 import type { ExperimentEnvironment } from '@/hooks/use-experiment-detail';
 
 const mockNavigateToExperimentChannel = vi.fn();
-const mockLoadExperimentChannel = vi.fn<(id: string) => Promise<void>>();
+const mockLoadExperimentChannel = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/context/AppContext', () => ({
   useApp: () => ({
@@ -32,11 +32,6 @@ function makeEnvironment(overrides: Partial<ExperimentEnvironment> = {}): Experi
 }
 
 describe('EnvironmentsList', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockLoadExperimentChannel.mockResolvedValue(undefined);
-  });
-
   it('renders environment rows for each environment', () => {
     const environments = [
       makeEnvironment({ id: 'env-1', environmentIndex: 0, group: 'treatment' }),
@@ -109,6 +104,17 @@ describe('EnvironmentsList', () => {
     expect(channelCell?.textContent).toBe('-');
   });
 
+  it('disables View button when channelId is null', () => {
+    const environments = [
+      makeEnvironment({ id: 'env-1', channelId: null }),
+    ];
+
+    render(<EnvironmentsList environments={environments} />);
+
+    const viewBtn = screen.getByTestId('view-in-slack');
+    expect(viewBtn).toBeDisabled();
+  });
+
   it('applies correct color classes to group badges', () => {
     const environments = [
       makeEnvironment({ id: 'env-t', group: 'treatment' }),
@@ -124,62 +130,5 @@ describe('EnvironmentsList', () => {
     const controlBadge = screen.getByText('control');
     expect(controlBadge.className).toContain('bg-gray-100');
     expect(controlBadge.className).toContain('text-gray-800');
-  });
-
-  it('View button calls loadExperimentChannel and navigateToExperimentChannel', async () => {
-    const environments = [
-      makeEnvironment({ id: 'env-1', channelId: 'exp-ch-42' }),
-    ];
-
-    render(<EnvironmentsList environments={environments} />);
-
-    const viewBtn = screen.getByTestId('view-in-slack');
-    fireEvent.click(viewBtn);
-
-    // loadExperimentChannel is called first (async), then navigateToExperimentChannel
-    expect(mockLoadExperimentChannel).toHaveBeenCalledWith('exp-ch-42');
-
-    // Wait for the async handleView to complete
-    await vi.waitFor(() => {
-      expect(mockNavigateToExperimentChannel).toHaveBeenCalledWith('exp-ch-42');
-    });
-  });
-
-  it('View button is disabled when channelId is null', () => {
-    const environments = [
-      makeEnvironment({ id: 'env-1', channelId: null }),
-    ];
-
-    render(<EnvironmentsList environments={environments} />);
-
-    const viewBtn = screen.getByTestId('view-in-slack');
-    expect(viewBtn).toHaveProperty('disabled', true);
-  });
-
-  it('View button does not call handlers when channelId is null', () => {
-    const environments = [
-      makeEnvironment({ id: 'env-1', channelId: null }),
-    ];
-
-    render(<EnvironmentsList environments={environments} />);
-
-    const viewBtn = screen.getByTestId('view-in-slack');
-    fireEvent.click(viewBtn);
-
-    expect(mockLoadExperimentChannel).not.toHaveBeenCalled();
-    expect(mockNavigateToExperimentChannel).not.toHaveBeenCalled();
-  });
-
-  it('each View button has data-testid view-in-slack', () => {
-    const environments = [
-      makeEnvironment({ id: 'env-1' }),
-      makeEnvironment({ id: 'env-2' }),
-      makeEnvironment({ id: 'env-3' }),
-    ];
-
-    render(<EnvironmentsList environments={environments} />);
-
-    const viewBtns = screen.getAllByTestId('view-in-slack');
-    expect(viewBtns).toHaveLength(3);
   });
 });

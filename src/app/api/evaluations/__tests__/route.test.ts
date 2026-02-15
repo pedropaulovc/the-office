@@ -5,11 +5,19 @@ import { createMockEvaluationRun } from "@/tests/factories";
 const mockListEvaluationRuns = vi.fn<() => Promise<EvaluationRun[]>>();
 const mockCreateEvaluationRun = vi.fn<() => Promise<EvaluationRun>>();
 const mockGetAgent = vi.fn<(id: string) => Promise<Agent | undefined>>();
+const mockUpdateEvaluationRunStatus = vi.fn<() => Promise<undefined>>().mockResolvedValue(undefined);
+const mockRecordScore = vi.fn<() => Promise<undefined>>().mockResolvedValue(undefined);
 
 vi.mock("@/db/queries", () => ({
   listEvaluationRuns: (...args: unknown[]) => mockListEvaluationRuns(...(args as [])),
   createEvaluationRun: (...args: unknown[]) => mockCreateEvaluationRun(...(args as [])),
   getAgent: (...args: unknown[]) => mockGetAgent(...(args as [string])),
+  updateEvaluationRunStatus: (...args: unknown[]) => mockUpdateEvaluationRunStatus(...(args as [])),
+  recordScore: (...args: unknown[]) => mockRecordScore(...(args as [])),
+}));
+
+vi.mock("@/features/evaluation/harness/runner", () => ({
+  runEvaluation: vi.fn().mockResolvedValue({ agents: {} }),
 }));
 
 vi.mock("@/lib/telemetry", () => ({

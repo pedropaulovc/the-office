@@ -4,16 +4,32 @@ test.describe("experiment drill-down to Slack", () => {
   test.describe.configure({ mode: "serial" });
 
   test.beforeAll(async ({ request }) => {
-    const createRes = await request.post("/api/experiments", {
-      data: { scenarioId: "brainstorming-average", scale: 0.1 },
-    });
-    expect(createRes.status()).toBe(201);
-    const created = (await createRes.json()) as { id: string };
+    // Wait for any completed experiment (may be created by experiment-detail tests running in parallel).
+    // Only create our own experiment as a fallback if none exist after initial check.
+    let hasCompleted = false;
 
-    const runRes = await request.post(`/api/experiments/${created.id}/run`, {
-      data: {},
-    });
-    expect(runRes.status()).toBe(202);
+    for (let i = 0; i < 45; i++) {
+      const listRes = await request.get("/api/experiments");
+      const experiments = (await listRes.json()) as { id: string; status: string }[];
+      if (experiments.some((e) => e.status === "completed")) {
+        hasCompleted = true;
+        break;
+      }
+
+      // On the first iteration, create an experiment if nothing is in-flight
+      if (i === 0 && !experiments.some((e) => e.status === "running")) {
+        const createRes = await request.post("/api/experiments", {
+          data: { scenarioId: "brainstorming-average", scale: 0.1 },
+        });
+        if (createRes.status() === 201) {
+          const created = (await createRes.json()) as { id: string };
+          await request.post(`/api/experiments/${created.id}/run`, { data: {} });
+        }
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    expect(hasCompleted).toBe(true);
   });
 
   async function navigateToDetail(page: Page) {

@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import {
   listEvaluationRuns,
   createEvaluationRun,
+  updateEvaluationRunStatus,
+  recordScore,
   getAgent,
 } from "@/db/queries";
 import { jsonResponse, parseRequestJson, apiHandler } from "@/lib/api-response";
-import { logInfo, countMetric } from "@/lib/telemetry";
+import { logInfo, logError, countMetric } from "@/lib/telemetry";
 import { evaluationRunRequestSchema } from "@/features/evaluation/schemas";
+import { runEvaluation } from "@/features/evaluation/harness/runner";
+import type { EvaluationDimension } from "@/features/evaluation/types";
 
 export async function GET(request: Request) {
   return apiHandler("api.evaluations.list", "http.server", async () => {
@@ -82,6 +86,71 @@ export async function POST(request: Request) {
     });
     countMetric("api.evaluations.create", 1);
 
+    // Fire-and-forget: run the harness evaluation in the background
+    void executeHarnessForRun(run.id, run.agentId, run.dimensions, run.isBaseline);
+
     return jsonResponse(run, { status: 201 });
   });
+}
+
+async function executeHarnessForRun(
+  runId: string,
+  agentId: string,
+  dimensions: string[],
+  isBaseline: boolean,
+): Promise<void> {
+  try {
+    await updateEvaluationRunStatus(runId, { status: "running" });
+
+    const result = await runEvaluation({
+      agents: [agentId],
+      dimensions: dimensions as EvaluationDimension[],
+      threshold: 5.0,
+      mockJudge: false,
+      window: "30d",
+      updateBaseline: isBaseline,
+      regressionDelta: 1.0,
+    });
+
+    const agentResult = result.agents[agentId];
+    if (!agentResult) {
+      await updateEvaluationRunStatus(runId, { status: "failed" });
+      return;
+    }
+
+    // Record per-proposition scores
+    for (const [dim, dimResult] of Object.entries(agentResult.dimensions)) {
+      if (!("propositionScores" in dimResult)) continue;
+      for (const [propId, score] of Object.entries(dimResult.propositionScores)) {
+        await recordScore({
+          evaluationRunId: runId,
+          dimension: dim as "adherence" | "consistency" | "fluency" | "convergence" | "ideas_quantity",
+          propositionId: propId,
+          score,
+          reasoning: "",
+        });
+      }
+    }
+
+    await updateEvaluationRunStatus(runId, {
+      status: "completed",
+      overallScore: agentResult.overall,
+    });
+
+    logInfo("harness evaluation completed for run", {
+      runId,
+      agentId,
+      overallScore: agentResult.overall,
+      pass: agentResult.pass,
+    });
+  } catch (err) {
+    logError("harness evaluation failed for run", {
+      runId,
+      agentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await updateEvaluationRunStatus(runId, { status: "failed" }).catch(
+      /* best-effort status update */ Function.prototype as () => void,
+    );
+  }
 }

@@ -26,6 +26,9 @@ export default defineConfig({
         "**/*.d.ts",
         "**/*.test.{ts,tsx}",
         "**/index.ts",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.md",
       ],
       thresholds: {
         lines: 70,

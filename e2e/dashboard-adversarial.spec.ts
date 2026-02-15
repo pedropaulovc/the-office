@@ -156,23 +156,23 @@ test.describe("dashboard shell adversarial tests", () => {
     await expect(page.getByTestId("page-experiments")).toBeVisible();
     await expect(page.getByTestId("new-experiment-btn")).toBeVisible();
 
-    // Evals
+    // Evals — now shows "Agent Evaluations" heading with agent cards
     await page.getByTestId("dashboard-nav-evals").click();
     await expect(page.getByTestId("page-evals")).toBeVisible();
-    await expect(page.getByText("Evals coming soon")).toBeVisible();
+    await expect(page.getByText("Agent Evaluations")).toBeVisible();
     // Previous page should not be visible
     await expect(page.getByTestId("page-experiments")).toBeHidden();
 
-    // Config
+    // Config — now shows "Agent Configuration" heading with agent selector
     await page.getByTestId("dashboard-nav-config").click();
     await expect(page.getByTestId("page-config")).toBeVisible();
-    await expect(page.getByText("Config coming soon")).toBeVisible();
+    await expect(page.getByText("Agent Configuration")).toBeVisible();
     await expect(page.getByTestId("page-evals")).toBeHidden();
 
-    // Monitoring
+    // Monitoring — now shows "Monitoring" heading
     await page.getByTestId("dashboard-nav-monitoring").click();
     await expect(page.getByTestId("page-monitoring")).toBeVisible();
-    await expect(page.getByText("Monitoring coming soon")).toBeVisible();
+    await expect(page.getByText("Monitoring").first()).toBeVisible();
     await expect(page.getByTestId("page-config")).toBeHidden();
   });
 
