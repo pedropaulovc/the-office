@@ -1,16 +1,20 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { ActiveView, ThreadPanel } from '@/types';
+import type { ActiveView, ThreadPanel, TopLevelTab, DashboardPage } from '@/types';
 
 interface AppContextValue {
   currentUserId: string;
   activeView: ActiveView;
   threadPanel: ThreadPanel;
+  activeTab: TopLevelTab;
+  activeDashboardPage: DashboardPage;
   switchUser: (userId: string) => void;
   navigateTo: (view: ActiveView) => void;
   openThread: (parentMessageId: string) => void;
   closeThread: () => void;
+  switchTab: (tab: TopLevelTab) => void;
+  switchDashboardPage: (page: DashboardPage) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -19,6 +23,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUserId, setCurrentUserId] = useState('michael');
   const [activeView, setActiveView] = useState<ActiveView>({ kind: 'channel', id: 'general' });
   const [threadPanel, setThreadPanel] = useState<ThreadPanel>({ state: 'closed', parentMessageId: null });
+  const [activeTab, setActiveTab] = useState<TopLevelTab>('slack');
+  const [activeDashboardPage, setActiveDashboardPage] = useState<DashboardPage>('experiments');
 
   const switchUser = useCallback((userId: string) => {
     setCurrentUserId(userId);
@@ -39,15 +45,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setThreadPanel({ state: 'closed', parentMessageId: null });
   }, []);
 
+  const switchTab = useCallback((tab: TopLevelTab) => {
+    setActiveTab(tab);
+  }, []);
+
+  const switchDashboardPage = useCallback((page: DashboardPage) => {
+    setActiveDashboardPage(page);
+  }, []);
+
   return (
     <AppContext.Provider value={{
       currentUserId,
       activeView,
       threadPanel,
+      activeTab,
+      activeDashboardPage,
       switchUser,
       navigateTo,
       openThread,
       closeThread,
+      switchTab,
+      switchDashboardPage,
     }}>
       {children}
     </AppContext.Provider>

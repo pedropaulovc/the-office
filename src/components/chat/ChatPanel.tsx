@@ -10,7 +10,7 @@ export default function ChatPanel() {
   const { activeView } = useApp();
 
   return (
-    <div className="flex flex-1 flex-col min-w-0 bg-white h-screen">
+    <div className="flex flex-1 flex-col min-w-0 bg-white">
       <ChannelHeader />
       <MessageList key={`${activeView.kind}-${activeView.id}`} />
       <TypingIndicator />

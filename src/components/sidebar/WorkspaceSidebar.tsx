@@ -12,7 +12,7 @@ export default function WorkspaceSidebar() {
   const { agents } = useData();
 
   return (
-    <aside className="flex w-[68px] shrink-0 flex-col items-center bg-slack-workspace-bg py-3 gap-3 h-screen">
+    <aside className="flex w-[68px] shrink-0 flex-col items-center bg-slack-workspace-bg py-3 gap-3">
       {/* Workspace icon */}
       <button
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slack-aubergine-light text-slack-sidebar-text-active font-bold text-sm hover:rounded-md transition-all"
