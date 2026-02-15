@@ -52,23 +52,14 @@ vi.mock("@/lib/telemetry", () => ({
   countMetric: vi.fn(),
 }));
 
-interface MockToolDef {
-  name: string;
-  description: string;
-  handler: (args: Record<string, unknown>, extra: unknown) => Promise<ToolResult>;
-}
-
-interface ToolResult {
-  content: { type: string; text: string }[];
-}
-
+// Mock claude-agent-sdk for the registry's getToolServer backward-compat shim
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   tool: (
     name: string,
     description: string,
     _inputSchema: unknown,
-    handler: MockToolDef["handler"],
-  ): MockToolDef => ({
+    handler: (args: Record<string, unknown>) => Promise<unknown>,
+  ) => ({
     name,
     description,
     handler,
@@ -101,9 +92,9 @@ describe("send_message tool", () => {
 
   it("creates a message and broadcasts SSE event", async () => {
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "general") as unknown as MockToolDef;
+    const { handler } = createSendMessageTool("michael", "run-1", "general");
 
-    const result = await toolDef.handler({ channelId: "general", text: "Hello" }, undefined);
+    const result = await handler({ channelId: "general", text: "Hello" });
 
     expect(mockCreateMessage).toHaveBeenCalledWith({
       channelId: "general",
@@ -116,9 +107,9 @@ describe("send_message tool", () => {
 
   it("records tool_call and tool_return run messages", async () => {
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "general") as unknown as MockToolDef;
+    const { handler } = createSendMessageTool("michael", "run-1", "general");
 
-    await toolDef.handler({ channelId: "general", text: "Hello" }, undefined);
+    await handler({ channelId: "general", text: "Hello" });
 
     expect(mockCreateRunMessage).toHaveBeenCalledWith(
       expect.objectContaining({ runId: "run-1", messageType: "tool_call_message", toolName: "send_message" }),
@@ -132,9 +123,9 @@ describe("send_message tool", () => {
     mockGetChannel.mockResolvedValue({ id: "general", name: "general", kind: "public", topic: "", experimentId: null });
 
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "general", 0) as unknown as MockToolDef;
+    const { handler } = createSendMessageTool("michael", "run-1", "general", 0);
 
-    await toolDef.handler({ text: "Hello" }, undefined);
+    await handler({ text: "Hello" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).not.toHaveBeenCalled();
@@ -150,9 +141,9 @@ describe("send_message tool", () => {
     const mockExecutor = vi.fn();
 
     const { createSendMessageTool } = await import("../send-message");
-    const toolDef = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 0, mockExecutor) as unknown as MockToolDef;
+    const { handler } = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 0, mockExecutor);
 
-    await toolDef.handler({ text: "Hey Dwight" }, undefined);
+    await handler({ text: "Hey Dwight" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).toHaveBeenCalledWith(
@@ -176,9 +167,9 @@ describe("send_message tool", () => {
 
     const { createSendMessageTool } = await import("../send-message");
     // chainDepth=2, so next would be 3 which equals MAX_CHAIN_DEPTH(3)
-    const toolDef = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 2) as unknown as MockToolDef;
+    const { handler } = createSendMessageTool("michael", "run-1", "dm-michael-dwight", 2);
 
-    await toolDef.handler({ text: "Again" }, undefined);
+    await handler({ text: "Again" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).not.toHaveBeenCalled();
@@ -201,8 +192,8 @@ describe("send_message tool", () => {
     const { createSendMessageTool } = await import("../send-message");
     const exec = vi.fn();
 
-    const tool0 = createSendMessageTool("agentA", "run-0", "dm-ab", 0, exec) as unknown as MockToolDef;
-    await tool0.handler({ text: "d0" }, undefined);
+    const tool0 = createSendMessageTool("agentA", "run-0", "dm-ab", 0, exec);
+    await tool0.handler({ text: "d0" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).toHaveBeenCalledWith(
@@ -217,8 +208,8 @@ describe("send_message tool", () => {
       text: "d1", parentMessageId: null, createdAt: new Date(),
     });
 
-    const tool1 = createSendMessageTool("agentB", "run-1", "dm-ab", 1, exec) as unknown as MockToolDef;
-    await tool1.handler({ text: "d1" }, undefined);
+    const tool1 = createSendMessageTool("agentB", "run-1", "dm-ab", 1, exec);
+    await tool1.handler({ text: "d1" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).toHaveBeenCalledWith(
@@ -233,8 +224,8 @@ describe("send_message tool", () => {
       text: "d2", parentMessageId: null, createdAt: new Date(),
     });
 
-    const tool2 = createSendMessageTool("agentA", "run-2", "dm-ab", 2, exec) as unknown as MockToolDef;
-    await tool2.handler({ text: "d2" }, undefined);
+    const tool2 = createSendMessageTool("agentA", "run-2", "dm-ab", 2, exec);
+    await tool2.handler({ text: "d2" });
     await flushMicrotasks();
 
     expect(mockEnqueueRun).not.toHaveBeenCalled();
@@ -257,9 +248,9 @@ describe("react_to_message tool", () => {
 
   it("creates a reaction and broadcasts SSE event to the message's channel", async () => {
     const { createReactToMessageTool } = await import("../react-to-message");
-    const toolDef = createReactToMessageTool("michael", "run-1") as unknown as MockToolDef;
+    const { handler } = createReactToMessageTool("michael", "run-1");
 
-    const result = await toolDef.handler({ messageId: "msg-1", emoji: "thumbsup" }, undefined);
+    const result = await handler({ messageId: "msg-1", emoji: "thumbsup" });
 
     expect(mockCreateReaction).toHaveBeenCalledWith({
       messageId: "msg-1",
@@ -283,9 +274,9 @@ describe("do_nothing tool", () => {
 
   it("returns action none without side effects", async () => {
     const { createDoNothingTool } = await import("../do-nothing");
-    const toolDef = createDoNothingTool("run-1") as unknown as MockToolDef;
+    const { handler } = createDoNothingTool("run-1");
 
-    const result = await toolDef.handler({}, undefined);
+    const result = await handler();
 
     expect(result).toEqual({ content: [{ type: "text", text: JSON.stringify({ action: "none" }) }] });
     expect(mockCreateMessage).not.toHaveBeenCalled();
@@ -293,9 +284,9 @@ describe("do_nothing tool", () => {
 
   it("records tool_call and tool_return run messages", async () => {
     const { createDoNothingTool } = await import("../do-nothing");
-    const toolDef = createDoNothingTool("run-1") as unknown as MockToolDef;
+    const { handler } = createDoNothingTool("run-1");
 
-    await toolDef.handler({}, undefined);
+    await handler();
 
     expect(mockCreateRunMessage).toHaveBeenCalledTimes(2);
   });
@@ -313,9 +304,9 @@ describe("update_memory tool", () => {
 
   it("upserts a memory block scoped to agent", async () => {
     const { createUpdateMemoryTool } = await import("../update-memory");
-    const toolDef = createUpdateMemoryTool("michael", "run-1") as unknown as MockToolDef;
+    const { handler } = createUpdateMemoryTool("michael", "run-1");
 
-    const result = await toolDef.handler({ label: "notes", content: "test content" }, undefined);
+    const result = await handler({ label: "notes", content: "test content" });
 
     expect(mockUpsertMemoryBlock).toHaveBeenCalledWith({
       agentId: "michael",
@@ -337,9 +328,9 @@ describe("search_memory tool", () => {
 
   it("searches passages scoped to agent", async () => {
     const { createSearchMemoryTool } = await import("../search-memory");
-    const toolDef = createSearchMemoryTool("michael", "run-1") as unknown as MockToolDef;
+    const { handler } = createSearchMemoryTool("michael", "run-1");
 
-    const result = await toolDef.handler({ query: "passage" }, undefined);
+    const result = await handler({ query: "passage" });
 
     expect(mockListArchivalPassages).toHaveBeenCalledWith("michael", "passage");
     const firstContent = result.content.at(0);
@@ -362,9 +353,9 @@ describe("store_memory tool", () => {
 
   it("creates an archival passage scoped to agent", async () => {
     const { createStoreMemoryTool } = await import("../store-memory");
-    const toolDef = createStoreMemoryTool("michael", "run-1") as unknown as MockToolDef;
+    const { handler } = createStoreMemoryTool("michael", "run-1");
 
-    const result = await toolDef.handler({ content: "new info", tags: ["important"] }, undefined);
+    const result = await handler({ content: "new info", tags: ["important"] });
 
     expect(mockCreateArchivalPassage).toHaveBeenCalledWith({
       agentId: "michael",
@@ -376,9 +367,9 @@ describe("store_memory tool", () => {
 
   it("handles missing tags", async () => {
     const { createStoreMemoryTool } = await import("../store-memory");
-    const toolDef = createStoreMemoryTool("michael", "run-1") as unknown as MockToolDef;
+    const { handler } = createStoreMemoryTool("michael", "run-1");
 
-    await toolDef.handler({ content: "no tags", tags: undefined }, undefined);
+    await handler({ content: "no tags" });
 
     expect(mockCreateArchivalPassage).toHaveBeenCalledWith({
       agentId: "michael",
@@ -389,12 +380,38 @@ describe("store_memory tool", () => {
 });
 
 describe("registry", () => {
-  it("getToolServer returns MCP server with all 6 tools", async () => {
+  it("getToolkit returns definitions and handlers for all 6 tools", async () => {
+    const { getToolkit } = await import("../registry");
+    const toolkit = getToolkit("michael", "run-1", "general");
+
+    expect(toolkit.definitions).toHaveLength(6);
+    expect(toolkit.handlers.size).toBe(6);
+
+    const names = toolkit.definitions.map((d) => d.name);
+    expect(names).toContain("send_message");
+    expect(names).toContain("react_to_message");
+    expect(names).toContain("do_nothing");
+    expect(names).toContain("update_memory");
+    expect(names).toContain("search_memory");
+    expect(names).toContain("store_memory");
+  });
+
+  it("getToolkit definitions have valid input_schema", async () => {
+    const { getToolkit } = await import("../registry");
+    const toolkit = getToolkit("michael", "run-1", "general");
+
+    for (const def of toolkit.definitions) {
+      expect(def.input_schema).toBeDefined();
+      expect(def.input_schema.type).toBe("object");
+    }
+  });
+
+  it("getToolServer wraps toolkit into SDK MCP server", async () => {
     const { getToolServer } = await import("../registry");
     const server = getToolServer("michael", "run-1", "general");
 
     // With our mock, createSdkMcpServer returns its options
-    const opts = server as unknown as { name: string; tools: MockToolDef[] };
+    const opts = server as unknown as { name: string; tools: { name: string }[] };
     expect(opts.name).toBe("office-tools");
     expect(opts.tools).toHaveLength(6);
 
