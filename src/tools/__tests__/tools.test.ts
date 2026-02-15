@@ -86,6 +86,7 @@ describe("send_message tool", () => {
       channelId: "general",
       userId: "michael",
       text: "Hello",
+      thinking: null,
     });
     expect(mockBroadcast).toHaveBeenCalledWith("general", expect.objectContaining({ type: "message_created" }));
     expect(result).toEqual({ content: [{ type: "text", text: JSON.stringify({ messageId: "new-msg-1" }) }] });

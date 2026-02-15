@@ -215,6 +215,7 @@ export function getChannelMessages(channelId: string): Promise<Message[]> {
         channelId: m.channelId,
         userId: m.userId,
         text: m.text,
+        thinking: m.thinking,
         timestamp: m.createdAt.toISOString(),
         reactions: reactionsMap.get(m.id) ?? [],
         threadReplyCount: reply?.count ?? 0,
