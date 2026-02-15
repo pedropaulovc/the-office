@@ -38,9 +38,9 @@ describe('ExperimentLaunchDialog', () => {
     const options = select.querySelectorAll('option');
     expect(options).toHaveLength(4);
     expect(options[0]?.textContent).toBe('Brainstorming (Average)');
-    expect(options[1]?.textContent).toBe('Brainstorming (Creative)');
-    expect(options[2]?.textContent).toBe('Debate (Controversial)');
-    expect(options[3]?.textContent).toBe('Debate (Neutral)');
+    expect(options[1]?.textContent).toBe('Brainstorming (Difficult Full)');
+    expect(options[2]?.textContent).toBe('Brainstorming (Difficult Variety)');
+    expect(options[3]?.textContent).toBe('Debate (Controversial)');
   });
 
   it('scale slider defaults to 0.1', () => {

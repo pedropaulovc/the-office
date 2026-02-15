@@ -56,14 +56,25 @@ describe("telemetry helpers", () => {
     expect(receivedSpan).toBe(fakeSpan);
   });
 
-  it("logInfo calls Sentry.logger.info with message and attributes", async () => {
+  it("logInfo calls Sentry.logger.info with message and stringified attributes", async () => {
     const { logInfo } = await import("../telemetry");
     logInfo("test message", { key: "value" });
 
     expect(mockLoggerInfo).toHaveBeenCalledWith("test message", { key: "value" });
   });
 
-  it("logWarn calls Sentry.logger.warn", async () => {
+  it("logInfo stringifies numeric and boolean attributes", async () => {
+    const { logInfo } = await import("../telemetry");
+    logInfo("test message", { count: 42, active: true, name: "test" });
+
+    expect(mockLoggerInfo).toHaveBeenCalledWith("test message", {
+      count: "42",
+      active: "true",
+      name: "test",
+    });
+  });
+
+  it("logWarn calls Sentry.logger.warn with stringified attributes", async () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(vi.fn());
     const { logWarn } = await import("../telemetry");
     logWarn("warning message");
@@ -73,12 +84,12 @@ describe("telemetry helpers", () => {
     spy.mockRestore();
   });
 
-  it("logError calls Sentry.logger.error", async () => {
+  it("logError calls Sentry.logger.error with stringified attributes", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(vi.fn());
     const { logError } = await import("../telemetry");
     logError("error message", { code: 500 });
 
-    expect(mockLoggerError).toHaveBeenCalledWith("error message", { code: 500 });
+    expect(mockLoggerError).toHaveBeenCalledWith("error message", { code: "500" });
     expect(spy).toHaveBeenCalledWith("[error] error message", { code: 500 });
     spy.mockRestore();
   });
@@ -111,7 +122,7 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       "test.name.1 | short value",
-      expect.objectContaining({ agentId: "michael", chunk: 1, totalChunks: 1 }),
+      expect.objectContaining({ agentId: "michael", chunk: "1", totalChunks: "1" }),
     );
   });
 
@@ -127,21 +138,21 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("sdk.input.system_prompt.michael.1 | "),
-      expect.objectContaining({ runId: "r1", chunk: 1, totalChunks: 3 }),
+      expect.objectContaining({ runId: "r1", chunk: "1", totalChunks: "3" }),
     );
 
     // Chunk 2
     expect(mockLoggerInfo).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining("sdk.input.system_prompt.michael.2 | "),
-      expect.objectContaining({ runId: "r1", chunk: 2, totalChunks: 3 }),
+      expect.objectContaining({ runId: "r1", chunk: "2", totalChunks: "3" }),
     );
 
     // Chunk 3
     expect(mockLoggerInfo).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining("sdk.input.system_prompt.michael.3 | "),
-      expect.objectContaining({ runId: "r1", chunk: 3, totalChunks: 3 }),
+      expect.objectContaining({ runId: "r1", chunk: "3", totalChunks: "3" }),
     );
 
     // Each chunk's message body is <=5000 chars of the value
@@ -158,7 +169,7 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       `test.exact.1 | ${exact}`,
-      expect.objectContaining({ chunk: 1, totalChunks: 1 }),
+      expect.objectContaining({ chunk: "1", totalChunks: "1" }),
     );
   });
 
@@ -171,7 +182,7 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       "judge.request.1",
-      expect.objectContaining({ model: "haiku", prompt: "short", chunk: 1, totalChunks: 1 }),
+      expect.objectContaining({ model: "haiku", prompt: "short", chunk: "1", totalChunks: "1" }),
     );
   });
 
@@ -189,7 +200,7 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenNthCalledWith(
       1,
       "judge.request.1",
-      expect.objectContaining({ model: "haiku", chunk: 1, totalChunks: 2 }),
+      expect.objectContaining({ model: "haiku", chunk: "1", totalChunks: "2" }),
     );
     const chunk1Attrs = mockLoggerInfo.mock.calls[0]?.[1] as Record<string, unknown>;
     expect((chunk1Attrs.systemPrompt as string).length).toBe(5000);
@@ -198,7 +209,7 @@ describe("telemetry helpers", () => {
     expect(mockLoggerInfo).toHaveBeenNthCalledWith(
       2,
       "judge.request.2",
-      expect.objectContaining({ model: "haiku", chunk: 2, totalChunks: 2 }),
+      expect.objectContaining({ model: "haiku", chunk: "2", totalChunks: "2" }),
     );
     const chunk2Attrs = mockLoggerInfo.mock.calls[1]?.[1] as Record<string, unknown>;
     expect((chunk2Attrs.systemPrompt as string).length).toBe(5000);
