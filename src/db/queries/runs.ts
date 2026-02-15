@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   runs,
@@ -244,6 +244,7 @@ export function getAgentSendMessages(
         and(
           eq(runs.agentId, agentId),
           eq(runMessages.toolName, "send_message"),
+          isNotNull(runMessages.toolInput),
           gte(runMessages.createdAt, windowStart),
           lte(runMessages.createdAt, windowEnd),
         ),
@@ -284,6 +285,7 @@ export function getChannelSendMessages(
         and(
           eq(runs.channelId, channelId),
           eq(runMessages.toolName, "send_message"),
+          isNotNull(runMessages.toolInput),
           gte(runMessages.createdAt, windowStart),
           lte(runMessages.createdAt, windowEnd),
         ),

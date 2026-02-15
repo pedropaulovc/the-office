@@ -100,7 +100,7 @@ async function demoResolver() {
 // ── S-2.5: MCP Tools Demo ──
 
 async function demoTools() {
-  const { getToolServer } = await import("../src/tools/registry");
+  const { getToolkit } = await import("../src/tools/registry");
   const { createMessage, listChannelMembers } = await import("../src/db/queries/messages");
   const { listArchivalPassages, upsertMemoryBlock } = await import("../src/db/queries/memory");
 
@@ -108,10 +108,9 @@ async function demoTools() {
 
   // Show registry creates all 6 tools
   section("1. Tool registry");
-  const server = getToolServer("michael", "demo-run-id", "general");
-  console.log(`  Server created: ${typeof server === "object" ? "✓" : "✗"}`);
-  console.log(`  Tools registered: send_message, react_to_message, do_nothing,`);
-  console.log(`                    update_memory, search_memory, store_memory`);
+  const toolkit = getToolkit("michael", "demo-run-id", "general");
+  console.log(`  Toolkit created: ${typeof toolkit === "object" ? "✓" : "✗"}`);
+  console.log(`  Tools (${toolkit.definitions.length}): ${toolkit.definitions.map(d => d.name).join(", ")}`);
 
   // Demo: send_message creates a real DB row
   section("2. send_message — creates DB message");
