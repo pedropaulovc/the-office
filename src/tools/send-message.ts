@@ -1,5 +1,5 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
+import { z, toJSONSchema } from "zod";
+import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import { createMessage, createRunMessage, getChannel, getRecentMessages, listChannelMembers } from "@/db/queries";
 import { connectionRegistry } from "@/messages/sse-registry";
 import { enqueueRun, type RunExecutor } from "@/agents/mailbox";
@@ -10,12 +10,18 @@ import {
   formatFeedbackForAgent,
 } from "@/features/evaluation/gates/correction-pipeline";
 import type { CorrectionPipelineConfig } from "@/features/evaluation/gates/types";
+import type { ToolResult } from "./registry";
 
 export interface SendMessageToolOptions {
   gateConfig?: CorrectionPipelineConfig;
   agentName?: string;
   persona?: string;
 }
+
+const inputSchema = z.object({
+  channelId: z.string().min(1).optional().describe("The channel to send the message to (defaults to current channel)"),
+  text: z.string().min(1).describe("The message text"),
+});
 
 export function createSendMessageTool(
   agentId: string,
@@ -25,82 +31,83 @@ export function createSendMessageTool(
   executor?: RunExecutor,
   toolOptions?: SendMessageToolOptions,
 ) {
-  return tool(
-    "send_message",
-    "Send a message to a channel. Use this to participate in conversations.",
-    {
-      channelId: z.string().min(1).optional().describe("The channel to send the message to (defaults to current channel)"),
-      text: z.string().min(1).describe("The message text"),
-    },
-    async (args) => {
-      return withSpan("tool.send_message", "agent.tool", async () => {
-        const targetChannelId = args.channelId ?? channelId;
-        if (!targetChannelId) {
-          return { content: [{ type: "text" as const, text: JSON.stringify({ error: "No channel specified" }) }] };
-        }
+  const definition: Tool = {
+    name: "send_message",
+    description: "Send a message to a channel. Use this to participate in conversations.",
+    input_schema: toJSONSchema(inputSchema) as Tool["input_schema"],
+  };
 
-        await createRunMessage({
-          runId,
-          stepId: null,
-          messageType: "tool_call_message",
-          toolName: "send_message",
-          toolInput: args,
-          content: JSON.stringify(args),
-        });
+  const handler = async (rawInput: unknown): Promise<ToolResult> => {
+    return withSpan("tool.send_message", "agent.tool", async () => {
+      const args = inputSchema.parse(rawInput);
+      const targetChannelId = args.channelId ?? channelId;
+      if (!targetChannelId) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "No channel specified" }) }] };
+      }
 
-        // --- Quality Gate (S-7.0b) ---
-        const gateResult = await runQualityGate(
-          agentId,
-          runId,
-          targetChannelId,
-          args.text,
-          toolOptions,
-        );
+      await createRunMessage({
+        runId,
+        stepId: null,
+        messageType: "tool_call_message",
+        toolName: "send_message",
+        toolInput: args,
+        content: JSON.stringify(args),
+      });
 
-        if (gateResult.type === "feedback") {
-          // Return feedback to agent for regeneration retry
-          await createRunMessage({
-            runId,
-            stepId: null,
-            messageType: "tool_return_message",
-            toolName: "send_message",
-            content: gateResult.feedbackText,
-          });
-          return { content: [{ type: "text" as const, text: gateResult.feedbackText }] };
-        }
+      // --- Quality Gate (S-7.0b) ---
+      const gateResult = await runQualityGate(
+        agentId,
+        runId,
+        targetChannelId,
+        args.text,
+        toolOptions,
+      );
 
-        // Use the (possibly corrected) text
-        const finalText = gateResult.text;
-
-        const message = await createMessage({
-          channelId: targetChannelId,
-          userId: agentId,
-          text: finalText,
-        });
-
-        connectionRegistry.broadcast(targetChannelId, {
-          type: "message_created",
-          channelId: targetChannelId,
-          data: message,
-        });
-
-        // Agent-to-agent DM chain: enqueue a follow-up run for the other participant
-        void triggerDmChain(agentId, targetChannelId, message.id, chainDepth, executor);
-
-        const result = JSON.stringify({ messageId: message.id });
-
+      if (gateResult.type === "feedback") {
+        // Return feedback to agent for regeneration retry
         await createRunMessage({
           runId,
           stepId: null,
           messageType: "tool_return_message",
           toolName: "send_message",
-          content: result,
+          content: gateResult.feedbackText,
         });
+        return { content: [{ type: "text" as const, text: gateResult.feedbackText }] };
+      }
 
-        return { content: [{ type: "text" as const, text: result }] };
+      // Use the (possibly corrected) text
+      const finalText = gateResult.text;
+
+      const message = await createMessage({
+        channelId: targetChannelId,
+        userId: agentId,
+        text: finalText,
       });
-    },
-  );
+
+      connectionRegistry.broadcast(targetChannelId, {
+        type: "message_created",
+        channelId: targetChannelId,
+        data: message,
+      });
+
+      // Agent-to-agent DM chain: enqueue a follow-up run for the other participant
+      void triggerDmChain(agentId, targetChannelId, message.id, chainDepth, executor);
+
+      const result = JSON.stringify({ messageId: message.id });
+
+      await createRunMessage({
+        runId,
+        stepId: null,
+        messageType: "tool_return_message",
+        toolName: "send_message",
+        content: result,
+      });
+
+      return { content: [{ type: "text" as const, text: result }] };
+    });
+  };
+
+  return { definition, handler };
 }
 
 // ---------------------------------------------------------------------------
