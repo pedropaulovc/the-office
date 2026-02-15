@@ -18,8 +18,6 @@ describe("agents schema", () => {
     expect(columnNames).toContain("system_prompt");
     expect(columnNames).toContain("model_id");
     expect(columnNames).toContain("max_turns");
-    expect(columnNames).toContain("max_budget_usd");
-    expect(columnNames).toContain("session_id");
     expect(columnNames).toContain("is_active");
     expect(columnNames).toContain("created_at");
     expect(columnNames).toContain("updated_at");
@@ -48,10 +46,8 @@ describe("agents schema", () => {
       title: "Tester",
       avatarColor: "#000",
       systemPrompt: "test",
-      modelId: "claude-sonnet-4-5-20250929",
-      maxTurns: 5,
-      maxBudgetUsd: 0.1,
-      sessionId: null,
+      modelId: "claude-haiku-4-5-20251001",
+      maxTurns: 50,
       isActive: true,
       experimentId: null,
       persona: null,

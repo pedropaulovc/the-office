@@ -11,7 +11,6 @@ const CreateAgentSchema = z.object({
   systemPrompt: z.string().min(1),
   modelId: z.string().optional(),
   maxTurns: z.number().int().positive().optional(),
-  maxBudgetUsd: z.number().positive().optional(),
   isActive: z.boolean().optional(),
 });
 

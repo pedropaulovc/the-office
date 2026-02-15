@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 
 export const agents = pgTable("agents", {
   id: text("id").primaryKey(),
@@ -8,8 +8,6 @@ export const agents = pgTable("agents", {
   systemPrompt: text("system_prompt").notNull(),
   modelId: text("model_id").notNull().default("claude-haiku-4-5-20251001"),
   maxTurns: integer("max_turns").notNull().default(50),
-  maxBudgetUsd: real("max_budget_usd").notNull().default(1),
-  sessionId: text("session_id"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   experimentId: uuid("experiment_id"),

@@ -8,7 +8,6 @@ import { logInfo, logWarn, logError, countMetric, distributionMetric } from "@/l
 // --- Mocks ---
 
 const mockGetAgent = vi.fn<(id: string) => Promise<Agent | undefined>>();
-const mockUpdateAgent = vi.fn<(id: string, data: unknown) => Promise<Agent | undefined>>();
 const mockListMemoryBlocks = vi.fn<(agentId: string) => Promise<unknown[]>>();
 const mockGetRecentMessages = vi.fn<(channelId: string) => Promise<unknown[]>>();
 const mockCreateRunStep = vi.fn<(data: unknown) => Promise<unknown>>();
@@ -17,7 +16,6 @@ const mockCreateRunMessage = vi.fn<(data: unknown) => Promise<unknown>>();
 
 vi.mock("@/db/queries", () => ({
   getAgent: (id: string) => mockGetAgent(id),
-  updateAgent: (id: string, data: unknown) => mockUpdateAgent(id, data),
   listMemoryBlocks: (agentId: string) => mockListMemoryBlocks(agentId),
   getRecentMessages: (channelId: string) => mockGetRecentMessages(channelId),
   createRunStep: (data: unknown) => mockCreateRunStep(data),
@@ -265,7 +263,7 @@ function makeAuthStatusMessage(isAuthenticating: boolean, error?: string) {
 // --- Tests ---
 
 describe("orchestrator", () => {
-  const AGENT = createMockAgent({ id: "michael", sessionId: null });
+  const AGENT = createMockAgent({ id: "michael" });
   const RUN = createMockRun({ agentId: "michael", channelId: "general" });
 
   beforeEach(() => {
@@ -297,7 +295,6 @@ describe("orchestrator", () => {
     );
     mockUpdateRunStep.mockResolvedValue(undefined);
     mockCreateRunMessage.mockResolvedValue(undefined);
-    mockUpdateAgent.mockResolvedValue(undefined);
   });
 
   it("happy path: loads agent + memory + messages, builds prompt, calls SDK", async () => {
@@ -338,32 +335,6 @@ describe("orchestrator", () => {
         persona: AGENT.systemPrompt,
       }) as unknown,
     }));
-  });
-
-  it("passes resume: sessionId when agent has existing session", async () => {
-    const agentWithSession = createMockAgent({
-      id: "michael",
-      sessionId: "prev-session",
-    });
-    mockGetAgent.mockResolvedValue(agentWithSession);
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    const callArgs = mockQuery.mock.calls[0] as [{ options: { resume?: string } }];
-    expect(callArgs[0].options.resume).toBe("prev-session");
-  });
-
-  it("persists new session ID after invocation", async () => {
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hi"), makeSuccessResult()];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(mockUpdateAgent).toHaveBeenCalledWith("michael", {
-      sessionId: SESSION_ID,
-    });
   });
 
   it("broadcasts agent_typing before / agent_done after", async () => {
