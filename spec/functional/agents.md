@@ -11,12 +11,12 @@ agents
   title           text NOT NULL
   avatar_color    text NOT NULL
   system_prompt   text NOT NULL     -- full personality prompt, customizable per agent
-  model_id        text NOT NULL DEFAULT 'claude-sonnet-4-5-20250929'
-  max_turns       integer NOT NULL DEFAULT 5
-  max_budget_usd  real NOT NULL DEFAULT 0.10
-  session_id      text              -- Claude Agent SDK session for resume
+  model_id        text NOT NULL DEFAULT 'claude-haiku-4-5-20251001'
+  max_turns       integer NOT NULL DEFAULT 50
   is_active       boolean NOT NULL DEFAULT true
   created_at      timestamptz NOT NULL DEFAULT now()
+  experiment_id   uuid
+  persona         jsonb
   updated_at      timestamptz NOT NULL DEFAULT now()
 ```
 
@@ -62,10 +62,8 @@ Each agent is seeded with 3 core memory blocks (see [memory.md](memory.md)):
 
 | Field | Purpose | Default |
 |-------|---------|---------|
-| `model_id` | Which Claude model to invoke | `claude-sonnet-4-5-20250929` |
-| `max_turns` | Max LLM call cycles per invocation | 5 |
-| `max_budget_usd` | Cost cap per invocation | $0.10 |
-| `session_id` | Claude SDK session for conversation continuity | null (set after first invocation) |
+| `model_id` | Which Claude model to invoke | `claude-haiku-4-5-20251001` |
+| `max_turns` | Max LLM call cycles per invocation | 50 |
 
 ## Related
 

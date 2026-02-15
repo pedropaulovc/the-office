@@ -37,7 +37,7 @@ created → running → completed
                   → cancelled
 ```
 
-Stop reasons: `end_turn`, `error`, `max_steps`, `max_tokens_exceeded`, `cancelled`, `no_tool_call`, `invalid_tool_call`
+Stop reasons: `end_turn`, `error`, `max_steps`, `no_tool_call`
 
 ## Orchestrator
 
@@ -49,22 +49,55 @@ The core invocation logic. Called by the mailbox when a run is claimed.
 2. Load core memory blocks
 3. Fetch last 20 messages from the associated channel
 4. Build system prompt via prompt builder
-5. Create in-process MCP server via `createSdkMcpServer()` with all agent tools
+5. Get tool definitions + handler map from registry
 6. Broadcast `agent_typing` SSE event
-7. Call Claude Agent SDK `query()` with: prompt, systemPrompt, mcpServers, resume, maxTurns, maxBudgetUsd
-8. Record each step and message in `run_steps` / `run_messages` for observability
-9. On result, persist agent's session ID for next interaction
-10. Update run status to `completed` (or `failed` on error) with stop reason and token usage
-11. Broadcast `agent_done` SSE event
+7. Run agentic loop (see below)
+8. Record each turn in `run_steps` / `run_messages` for observability
+9. Update run status to `completed` (or `failed` on error) with stop reason and token usage
+10. Broadcast `agent_done` SSE event
 
-**The orchestrator does NOT create chat messages directly.** Agents use the `send_message` MCP tool to speak. This gives agents full control — including the option to say nothing via `do_nothing`.
+### Agentic Loop
+
+```pseudocode
+messages = [{ role: "user", content: triggerPrompt }]
+turns = 0
+totalUsage = { input: 0, output: 0 }
+
+while turns < agent.maxTurns:
+  turns++
+
+  response = anthropic.messages.create({
+    model: agent.modelId,
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages,
+    tools: toolDefinitions,
+  })
+
+  // Log full request/response to Sentry
+  // Record assistant turn as run_step + run_messages
+  // Accumulate token usage from response.usage
+
+  if response.stop_reason == "end_turn":
+    break
+
+  if response.stop_reason == "tool_use":
+    for each tool_use block in response.content:
+      handler = toolHandlers.get(block.name)
+      result = await handler(block.input)
+      // Record tool_call + tool_return in run_messages
+
+    messages.push({ role: "assistant", content: response.content })
+    messages.push({ role: "user", content: toolResults })
+```
+
+**The orchestrator does NOT create chat messages directly.** Agents use the `send_message` tool to speak. This gives agents full control — including the option to say nothing via `do_nothing`.
 
 ### Safety Constraints
 
 | Constraint | Value | Purpose |
 |-----------|-------|---------|
-| `maxTurns` | 5 (default, per agent) | Limit LLM call cycles per invocation |
-| `maxBudgetUsd` | $0.10 (default, per agent) | Cost cap per invocation |
+| `maxTurns` | 50 (default, per agent) | Limit LLM call cycles per invocation |
 | Error isolation | Agent failures do not crash the system | Run status set to `failed`, processing continues |
 
 ## Agent Resolver
@@ -161,7 +194,7 @@ Run (parent span)
 
 - **Agents**: [agents.md](agents.md) — agent config loaded by orchestrator
 - **Memory**: [memory.md](memory.md) — blocks injected by prompt builder
-- **Tools**: [tools.md](tools.md) — MCP tools created by orchestrator
+- **Tools**: [tools.md](tools.md) — tools created by orchestrator
 - **User–Agent Comms**: [user-agent-comms.md](user-agent-comms.md) — POST endpoint triggers resolver + mailbox
 - **Agent–Agent Comms**: [agent-agent-comms.md](agent-agent-comms.md) — chain depth and group ordering behavior
 - **Implementation**: `spec/plan/milestone-1-database-foundation.md` (S-1.6), `spec/plan/milestone-2-observability-agent-core.md` (S-2.0 through S-2.4)

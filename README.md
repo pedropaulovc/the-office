@@ -4,7 +4,7 @@ A replica of *The Office* with AI agents as characters, communicating in a Slack
 
 ## What Is This?
 
-A hackathon project that brings Dunder Mifflin to life. Characters chat in channels, send DMs, react to messages, hold meetings, and develop relationships over time — all powered by Claude via the Claude Agent SDK.
+A hackathon project that brings Dunder Mifflin to life. Characters chat in channels, send DMs, react to messages, hold meetings, and develop relationships over time — all powered by Claude via the Anthropic SDK.
 
 **Key ideas:**
 - Each character has **core memory** (personality, relationships, mood) that evolves as they interact
@@ -26,18 +26,18 @@ Next.js Frontend (Slack-like UI)
         │
    ┌────┴────┐
    ▼         ▼
-Claude    Neon PostgreSQL
-Agent SDK    + pgvector
+Anthropic  Neon PostgreSQL
+  SDK         + pgvector
    │
    ▼
-MCP Tools (chat, memory, agent-to-agent)
+Tools (chat, memory, agent-to-agent)
 ```
 
 ## Tech Stack
 
 | Layer | Tech |
 |-------|------|
-| AI | Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) |
+| AI | Anthropic SDK (`@anthropic-ai/sdk`) |
 | Language | TypeScript |
 | Database | Neon PostgreSQL + pgvector |
 | ORM | Drizzle |
@@ -88,6 +88,6 @@ npm run dev
 
 ## Design Philosophy
 
-Inspired by [Letta](https://github.com/letta-ai/letta)'s architecture patterns (stateful agents, dual memory, tool registry, skills) — but built entirely from scratch on the Claude Agent SDK. No Letta dependency, no Slack dependency.
+Inspired by [Letta](https://github.com/letta-ai/letta)'s architecture patterns (stateful agents, dual memory, tool registry, skills) — but built entirely from scratch on the Anthropic SDK. No Letta dependency, no Slack dependency.
 
 See [`spec/functional/`](spec/functional/README.md) for the full capability spec (one file per feature area).

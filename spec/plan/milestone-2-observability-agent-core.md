@@ -8,7 +8,7 @@ graph TD
     S21 --> S22[S-2.2 Agent Mailbox]
     S22 --> S23[S-2.3 Orchestrator]
     S23 --> S24[S-2.4 Agent resolver]
-    S24 --> S25[S-2.5 MCP Tools]
+    S24 --> S25[S-2.5 Tool Registry & Tools]
 ```
 
 ---
@@ -126,7 +126,7 @@ Enqueue 3 runs for the same agent in rapid succession. Show they process sequent
 
 ## [S-2.3] Agent Orchestrator
 
-As a developer, I want an orchestrator that invokes an agent via Claude Agent SDK given a run.
+As a developer, I want an orchestrator that invokes an agent via the Anthropic SDK given a run.
 
 ### Files to create
 | File | Purpose |
@@ -139,34 +139,49 @@ The heart of the system. Called by the mailbox when a run is claimed:
 2. Load core memory blocks
 3. **Fetch last 20 messages from the channel/DM** the run is associated with
 4. Build system prompt via prompt builder (persona + memory + conversation context)
-5. Create in-process MCP server with `createSdkMcpServer()` — tools are a stub/empty for now (S-2.5 adds real tools)
+5. Get tool definitions + handler map from `getToolkit()` — tools are a stub/empty for now (S-2.5 adds real tools)
 6. Broadcast `agent_typing` SSE event
-7. Call `query()` from Claude Agent SDK with prompt, systemPrompt, mcpServers, resume, maxTurns, maxBudgetUsd
-8. Record each step and message in `run_steps` / `run_messages` tables for observability
-9. On result, update agent's session ID for next interaction
-10. Update run status to `completed` (or `failed` on error) with stop reason and token usage
-11. Broadcast `agent_done` SSE event
-12. **Emit Sentry trace span** wrapping the entire invocation
+7. Run agentic loop: call `messages.create()` in a while-loop, dispatching tool_use blocks to handlers
+8. Record each turn and message in `run_steps` / `run_messages` tables for observability
+9. Update run status to `completed` (or `failed` on error) with stop reason and token usage
+10. Broadcast `agent_done` SSE event
+11. **Emit Sentry trace span** wrapping the entire invocation
 
 ```typescript
-// Key pattern from spec:
-for await (const msg of query({
-  prompt: formatTriggerMessage(triggerMessage),
-  options: {
-    systemPrompt: buildSystemPrompt(agent, blocks, recentMessages),
-    mcpServers: { 'office-tools': tools },
-    resume: agent.sessionId,
-    maxTurns: agent.maxTurns,
-    maxBudgetUsd: agent.maxBudgetUsd,
-  },
-})) {
-  if (msg.type === 'result') {
-    await updateAgentSession(agentId, msg.sessionId);
+// Key pattern — in-process agentic loop:
+const anthropic = new Anthropic();
+const { definitions, handlers } = getToolkit(agentId, runId);
+const messages = [{ role: "user", content: formatTriggerMessage(triggerMessage) }];
+let turns = 0;
+const totalUsage = { input: 0, output: 0 };
+
+while (turns < agent.maxTurns) {
+  turns++;
+  const response = await anthropic.messages.create({
+    model: agent.modelId,
+    max_tokens: 4096,
+    system: buildSystemPrompt(agent, blocks, recentMessages),
+    messages,
+    tools: definitions,
+  });
+
+  // Log full request/response to Sentry
+  // Record assistant turn as run_step + run_messages
+  // Accumulate token usage from response.usage
+  totalUsage.input += response.usage.input_tokens;
+  totalUsage.output += response.usage.output_tokens;
+
+  if (response.stop_reason === "end_turn") break;
+
+  if (response.stop_reason === "tool_use") {
+    // Dispatch each tool_use block to its handler
+    // Record tool_call + tool_return in run_messages
+    // Push assistant + tool_result messages for next iteration
   }
 }
 ```
 
-**Important**: The orchestrator does NOT create chat messages directly. Agents use the `send_message` MCP tool to speak. This gives agents full control including the option to say nothing. For this story, use a stub tool set — real tools come in S-2.5.
+**Important**: The orchestrator does NOT create chat messages directly. Agents use the `send_message` tool to speak. This gives agents full control including the option to say nothing. For this story, use a stub tool set — real tools come in S-2.5.
 
 ### Files to create (supporting)
 | File | Purpose |
@@ -175,29 +190,27 @@ for await (const msg of query({
 | `src/db/queries/memory.ts` | `getBlocks()`, `updateBlock()`, `storePassage()`, `searchPassages()` |
 
 ### Acceptance Criteria
-- [ ] [AC-2.3.1] `executeRun()` loads agent + memory + last 20 messages, builds prompt, calls Claude SDK `query()`
-- [ ] [AC-2.3.2] MCP tools created via `createSdkMcpServer()` (stub tools for now)
-- [ ] [AC-2.3.3] Session ID persisted after each invocation for conversation continuity
+- [ ] [AC-2.3.1] `executeRun()` loads agent + memory + last 20 messages, builds prompt, calls `messages.create()` in a loop
+- [ ] [AC-2.3.2] Tool definitions + handlers from `getToolkit()` (stub tools for now)
 - [ ] [AC-2.3.4] SSE typing indicators broadcast before/after (no-op until SSE wired)
 - [ ] [AC-2.3.5] Errors logged but do not crash — agent failures are isolated. Run status set to `failed`
 - [ ] [AC-2.3.6] Each step and message recorded in `run_steps` / `run_messages` tables
 - [ ] [AC-2.3.7] Run status updated with stop reason and token usage on completion
 - [ ] [AC-2.3.8] Sentry trace span wraps each invocation with child spans for steps
-- [ ] [AC-2.3.9] Unit tests for orchestrator flow (mocking Claude SDK)
-- [ ] [AC-2.3.10] All SDK message types emit Sentry structured logs (logInfo/logWarn/logError) with relevant attributes
-- [ ] [AC-2.3.11] Assistant turns wrapped in child spans (`sdk.turn.{N}`, op: `ai.agent.turn`) with tool call details
+- [ ] [AC-2.3.9] Unit tests for orchestrator flow (mocking Anthropic SDK `messages.create()`)
+- [ ] [AC-2.3.10] All turns emit Sentry structured logs (logInfo/logWarn/logError) with relevant attributes
+- [ ] [AC-2.3.11] Assistant turns wrapped in child spans (`agent.turn.{N}`, op: `ai.agent.turn`) with tool call details
 - [ ] [AC-2.3.12] Tool calls from assistant messages recorded as `tool_call_message` in `run_messages` with `toolName`/`toolInput`
 - [ ] [AC-2.3.13] User messages (tool returns) recorded as `user_message` / `tool_return_message` in `run_messages`
-- [ ] [AC-2.3.14] Result message emits metrics: `sdk.duration_ms`, `sdk.duration_api_ms`, `sdk.num_turns`, `sdk.cost_usd`
-- [ ] [AC-2.3.15] Compaction events emit `logWarn` + counter metric
-- [ ] [AC-2.3.16] Unit tests for new telemetry (message recording, log emission, span creation)
+- [ ] [AC-2.3.14] Result metrics computed from accumulated `response.usage` per turn: `agent.duration_ms`, `agent.num_turns`, `agent.input_tokens`, `agent.output_tokens`
+- [ ] [AC-2.3.15] Unit tests for new telemetry (message recording, log emission, span creation)
 
 ### Demo
 Run a script that triggers an agent (e.g. Michael in #general). In Sentry, show:
-1. Rich trace with nested spans: `executeRun` → `sdk.query` → `sdk.turn.1`, `sdk.turn.2`, etc.
-2. Structured logs for every SDK message: init (with model/tools), assistant turns, tool calls, user messages, result summary
-3. Turn boundaries clearly visible — each assistant message starts a new span with step number
-4. Metrics: token usage, cost, duration, number of turns, compaction count
+1. Rich trace with nested spans: `executeRun` → `agent.turn.1`, `agent.turn.2`, etc.
+2. Structured logs for each turn: model/tools, assistant response, tool calls, tool results
+3. Turn boundaries clearly visible — each `messages.create()` call starts a new span with step number
+4. Metrics: token usage, duration, number of turns
 5. `run_messages` table populated with full conversation transcript (system, user, assistant, tool_call, tool_return)
 
 ---
@@ -233,14 +246,14 @@ Call `resolveTargetAgents()` with:
 
 ---
 
-## [S-2.5] MCP Tool Registry & Tools
+## [S-2.5] Tool Registry & Tools
 
-As a developer, I want all 6 agent tools implemented as MCP tools so agents can interact with the world.
+As a developer, I want all 6 agent tools implemented so agents can interact with the world.
 
 ### Files to create
 | File | Purpose |
 |------|---------|
-| `src/tools/registry.ts` | `getTools(agentId)` — returns tool array for an agent |
+| `src/tools/registry.ts` | `getToolkit(agentId, runId, ...)` — returns tool definitions + handler map for an agent |
 | `src/tools/send-message.ts` | Post message to any channel (public, private, or DM) |
 | `src/tools/react-to-message.ts` | Add emoji reaction |
 | `src/tools/do-nothing.ts` | Explicitly choose silence |
@@ -259,7 +272,7 @@ store_memory(content: string, tags?: string[]) → { passageId }
 ```
 
 Each tool:
-- Uses `zod` for input validation
+- Uses `zod` for input validation (also used to generate JSON Schema for `tools` parameter in `messages.create()` via `zod-to-json-schema`)
 - Receives `agentId` via closure (the calling agent's identity)
 - Calls query functions from `src/db/queries/`
 - Broadcasts SSE events for UI-visible actions (messages, reactions)
@@ -273,8 +286,8 @@ Each tool:
 - [ ] [AC-2.5.4] `do_nothing` returns immediately without side effects
 - [ ] [AC-2.5.5] `update_memory` only allows the agent to modify its own blocks
 - [ ] [AC-2.5.6] `search_memory` uses keyword matching (ILIKE) on the agent's own passages
-- [ ] [AC-2.5.7] Registry returns all tools scoped to a specific agentId
-- [ ] [AC-2.5.8] Orchestrator updated to use real tools instead of stubs
+- [ ] [AC-2.5.7] `getToolkit()` returns definitions (for `messages.create()`) + handlers (for dispatching `tool_use` blocks) scoped to a specific agentId
+- [ ] [AC-2.5.8] Orchestrator updated to use real toolkit instead of stubs
 - [ ] [AC-2.5.9] Tool executions recorded in `run_messages` as `tool_call_message` / `tool_return_message`
 - [ ] [AC-2.5.10] Sentry spans for tool executions
 - [ ] [AC-2.5.11] Unit tests for each tool handler

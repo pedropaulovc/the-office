@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-AI agent simulation of "The Office" TV show. Each character is an autonomous agent with persistent memory, built on Claude Agent SDK + Neon PostgreSQL + Next.js.
+AI agent simulation of "The Office" TV show. Each character is an autonomous agent with persistent memory, built on Anthropic SDK + Neon PostgreSQL + Next.js.
 
 ## Commands
 
@@ -23,7 +23,7 @@ AI agent simulation of "The Office" TV show. Each character is an autonomous age
 
 ## Architecture
 
-- **Backend**: TypeScript, Claude Agent SDK for agent orchestration
+- **Backend**: TypeScript, Anthropic SDK (`@anthropic-ai/sdk`) for agent orchestration
 - **Database**: Neon PostgreSQL + pgvector (via Drizzle ORM)
 - **Frontend**: Next.js 16 App Router, SSE for real-time updates
 - **No auth** — single-user hackathon project
@@ -70,7 +70,7 @@ Non-worktree directories (no trailing letter) use the `main` Neon branch directl
 
 ## Implementation Plan
 
-The frontend is a complete, read-only Slack clone with 16 Office characters, 7 channels, 8 DM conversations, and ~160 mock messages. All data is static in `src/data/`. The entire backend needs to be built from scratch: database, agent orchestration via Claude Agent SDK, MCP tools, API routes, SSE real-time streaming, and frontend wiring.
+The frontend is a complete, read-only Slack clone with 16 Office characters, 7 channels, 8 DM conversations, and ~160 mock messages. All data is static in `src/data/`. The entire backend needs to be built from scratch: database, agent orchestration via Anthropic SDK, tools, API routes, SSE real-time streaming, and frontend wiring.
 
 **Goal**: Bring the Office characters to life as autonomous AI agents that respond to messages, talk to each other, and evolve their own memories — all visible in the existing Slack-like UI.
 
@@ -123,9 +123,9 @@ graph TD
 
 | Risk | Mitigation |
 |------|-----------|
-| Claude Agent SDK API differs from spec pseudocode | Inspect actual SDK exports after install in S-1.0; adapt orchestrator accordingly |
+| Anthropic SDK API changes | Pin SDK version; adapt orchestrator if needed |
 | Agent responses too slow for good UX | SSE typing indicators give immediate feedback; maxTurns=5 limits processing |
-| Runaway agent costs | maxBudgetUsd per invocation, chain depth limit, scheduler rate limit |
+| Runaway agent costs | maxTurns per invocation, chain depth limit, scheduler rate limit |
 | Agent-to-agent infinite loops | MAX_CHAIN_DEPTH=3 hard limit in orchestrator |
 | No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
 | Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |
@@ -152,7 +152,7 @@ src/
 ├── db/                 # Drizzle schema + migrations + queries
 ├── messages/           # SSE registry, messaging utilities
 ├── agents/             # Orchestrator, mailbox, resolver, prompt builder
-├── tools/              # MCP tool definitions
+├── tools/              # Agent tool definitions
 ├── scheduler/          # Autonomous scheduling
 ├── evaluation/         # Persona drift measurement + correction
 ├── lib/                # Third-party wrappers
@@ -178,7 +178,7 @@ src/
 
 ### Agent Tools
 
-- Tools are defined as MCP tools via Claude Agent SDK's `createSdkMcpServer()`.
+- Tools are defined via a toolkit registry with Zod schemas converted to JSON Schema for the Anthropic API.
 - Each tool gets its own file in `src/tools/`.
 - Tool input schemas use Zod, validated at the tool boundary.
 

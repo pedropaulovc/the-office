@@ -56,7 +56,7 @@ Post in #general. Watch 2-3 agents respond one after another with natural delays
 
 ## [S-4.2] Skills System
 
-As a developer, I want filesystem-based skills that provide character behavior knowledge, with Claude Agent SDK handling skill loading and injection.
+As a developer, I want filesystem-based skills that provide character behavior knowledge, loaded and injected into agent prompts.
 
 ### Files to create
 | File | Purpose |
@@ -72,7 +72,7 @@ As a developer, I want filesystem-based skills that provide character behavior k
 
 ### Acceptance Criteria
 - [ ] [AC-4.2.1] Each skill file has YAML frontmatter (`name`, `description`) + markdown body
-- [ ] [AC-4.2.2] Skills are loaded and injected into prompts by the Claude Agent SDK
+- [ ] [AC-4.2.2] Skills are loaded and injected into prompts by the prompt builder
 - [ ] [AC-4.2.3] Skills API: `GET /api/skills` (list with name + description), `GET /api/skills/[name]` (full content)
 - [ ] [AC-4.2.4] Unit tests for skills API filesystem reading
 - [ ] [AC-4.2.5] Sentry span for skill listing and fetch

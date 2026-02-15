@@ -2,7 +2,7 @@
 
 ## Context
 
-The frontend is a complete, read-only Slack clone with 16 Office characters, 7 channels, 8 DM conversations, and ~160 mock messages. All data is static in `src/data/`. The entire backend needs to be built from scratch: database, agent orchestration via Claude Agent SDK, MCP tools, API routes, SSE real-time streaming, and frontend wiring.
+The frontend is a complete, read-only Slack clone with 16 Office characters, 7 channels, 8 DM conversations, and ~160 mock messages. All data is static in `src/data/`. The entire backend needs to be built from scratch: database, agent orchestration via Anthropic SDK, tools, API routes, SSE real-time streaming, and frontend wiring.
 
 **Goal**: Bring the Office characters to life as autonomous AI agents that respond to messages, talk to each other, and evolve their own memories — all visible in the existing Slack-like UI.
 
@@ -68,9 +68,9 @@ After all milestones:
 
 | Risk | Mitigation |
 |------|-----------|
-| Claude Agent SDK API differs from spec pseudocode | Inspect actual SDK exports after install in S-1.0; adapt orchestrator accordingly |
+| Anthropic SDK API changes | Pin SDK version; adapt orchestrator if needed |
 | Agent responses too slow for good UX | SSE typing indicators give immediate feedback; maxTurns=5 limits processing |
-| Runaway agent costs | maxBudgetUsd per invocation, chain depth limit, scheduler rate limit |
+| Runaway agent costs | maxTurns per invocation, chain depth limit, scheduler rate limit |
 | Agent-to-agent infinite loops | MAX_CHAIN_DEPTH=3 hard limit in orchestrator |
 | No observability into agent behavior | Sentry telemetry from S-2.0 + runs table provide full visibility |
 | Concurrent agent processing causes race conditions | Mailbox queue ensures one run at a time per agent |

@@ -99,10 +99,8 @@ List all agents.
     "title": "Regional Manager",
     "avatarColor": "#4A90D9",
     "systemPrompt": "You are Michael Scott...",
-    "modelId": "claude-sonnet-4-5-20250929",
-    "maxTurns": 5,
-    "maxBudgetUsd": 0.10,
-    "sessionId": null,
+    "modelId": "claude-haiku-4-5-20251001",
+    "maxTurns": 50,
     "isActive": true,
     "createdAt": "2025-01-01T00:00:00Z",
     "updatedAt": "2025-01-01T00:00:00Z"
@@ -134,7 +132,7 @@ Create a new agent.
 }
 ```
 
-Optional fields with defaults: `modelId`, `maxTurns`, `maxBudgetUsd`, `isActive`.
+Optional fields with defaults: `modelId`, `maxTurns`, `isActive`.
 
 **Response 201:** Created agent object.
 
@@ -150,9 +148,8 @@ Update agent fields. Only include fields to change.
 {
   "displayName": "Michael G. Scott",
   "systemPrompt": "Updated prompt...",
-  "modelId": "claude-sonnet-4-5-20250929",
-  "maxTurns": 3,
-  "maxBudgetUsd": 0.05,
+  "modelId": "claude-haiku-4-5-20251001",
+  "maxTurns": 30,
   "isActive": false
 }
 ```
