@@ -144,7 +144,12 @@ async function runExperiment(options: RunnerOptions): Promise<(ExperimentReport 
         });
         experimentId = record.id;
       } else {
-        await updateExperiment(experimentId, { status: "running", startedAt: new Date() });
+        await updateExperiment(experimentId, {
+          status: "running",
+          startedAt: new Date(),
+          agentCount: scaledScenario.agents_per_environment * scaledScenario.total_environments,
+          environmentCount: scaledScenario.total_environments,
+        });
       }
       await updateProgress(experimentId, {
         phase: "setup",

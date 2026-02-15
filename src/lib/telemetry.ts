@@ -3,15 +3,16 @@ import * as Sentry from "@sentry/nextjs";
 const MAX_ATTR_LENGTH = 8196;
 const LOG_CHUNK_SIZE = 5000;
 
-function truncateAttributes(
+function stringifyAttributes(
   attrs?: Record<string, string | number | boolean>,
-): Record<string, string | number | boolean> | undefined {
+): Record<string, string> | undefined {
   if (!attrs) return attrs;
-  const out: Record<string, string | number | boolean> = {};
+  const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(attrs)) {
-    out[k] = typeof v === "string" && v.length > MAX_ATTR_LENGTH
-      ? v.slice(0, MAX_ATTR_LENGTH) + "…[truncated]"
-      : v;
+    const s = String(v);
+    out[k] = s.length > MAX_ATTR_LENGTH
+      ? s.slice(0, MAX_ATTR_LENGTH) + "…[truncated]"
+      : s;
   }
   return out;
 }
@@ -39,7 +40,7 @@ export function logInfo(
   message: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
-  Sentry.logger.info(message, truncateAttributes(attributes));
+  Sentry.logger.info(message, stringifyAttributes(attributes));
 }
 
 /**
@@ -49,7 +50,7 @@ export function logWarn(
   message: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
-  Sentry.logger.warn(message, truncateAttributes(attributes));
+  Sentry.logger.warn(message, stringifyAttributes(attributes));
   console.warn(`[warn] ${message}`, attributes ?? "");
 }
 
@@ -60,7 +61,7 @@ export function logError(
   message: string,
   attributes?: Record<string, string | number | boolean>,
 ): void {
-  Sentry.logger.error(message, truncateAttributes(attributes));
+  Sentry.logger.error(message, stringifyAttributes(attributes));
   console.error(`[error] ${message}`, attributes ?? "");
 }
 

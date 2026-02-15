@@ -9,6 +9,7 @@ import { getAnthropicClient, JUDGE_MODEL } from "@/lib/anthropic";
 import {
   withSpan,
   logInfo,
+  logChunkedAttrs,
   countMetric,
   distributionMetric,
 } from "@/lib/telemetry";
@@ -217,10 +218,15 @@ export async function scoreTrajectory(
 
       const prompt = buildEvaluationPrompt(persona, actions, dimensions);
 
-      logInfo("llm-scorer.scoring", {
+      const scorerSystemPrompt =
+        "You are an expert evaluator assessing agent behavior quality. Score each dimension independently on a 0-9 scale.";
+
+      logChunkedAttrs("llm-scorer.prompt", {
         persona: persona.name,
         actionCount: actions.length,
         dimensions: dimensions.join(","),
+        systemPrompt: scorerSystemPrompt,
+        userPrompt: prompt,
       });
 
       const start = Date.now();
@@ -228,8 +234,7 @@ export async function scoreTrajectory(
         model: JUDGE_MODEL,
         max_tokens: 1024,
         temperature: 0,
-        system:
-          "You are an expert evaluator assessing agent behavior quality. Score each dimension independently on a 0-9 scale.",
+        system: scorerSystemPrompt,
         messages: [{ role: "user", content: prompt }],
         output_config: {
           format: {
@@ -255,10 +260,13 @@ export async function scoreTrajectory(
         details[d] = entry;
       }
 
-      logInfo("llm-scorer.complete", {
+      logChunkedAttrs("llm-scorer.result", {
         persona: persona.name,
         dimensionCount: dimensions.length,
         durationMs,
+        inputTokens,
+        outputTokens,
+        judgeOutput: text,
       });
       countMetric("evaluation.experiment.trajectory_scored", 1);
       distributionMetric(

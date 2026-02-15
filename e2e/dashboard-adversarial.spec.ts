@@ -154,7 +154,7 @@ test.describe("dashboard shell adversarial tests", () => {
 
     // Experiments (default)
     await expect(page.getByTestId("page-experiments")).toBeVisible();
-    await expect(page.getByText("Experiments coming soon")).toBeVisible();
+    await expect(page.getByTestId("new-experiment-btn")).toBeVisible();
 
     // Evals
     await page.getByTestId("dashboard-nav-evals").click();

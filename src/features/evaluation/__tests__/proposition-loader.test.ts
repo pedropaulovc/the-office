@@ -279,7 +279,7 @@ describe("proposition-loader", () => {
       expect(mockLoggerInfo).toHaveBeenCalledWith(
         "proposition file loaded",
         expect.objectContaining({
-          propositionCount: 4,
+          propositionCount: "4",
           dimension: "adherence",
         }),
       );
