@@ -33,6 +33,7 @@ export const experiments = pgTable(
     sourceAgentIds: text("source_agent_ids").array(),
     config: jsonb("config"),
     report: jsonb("report"),
+    progress: jsonb("progress"),
     agentCount: integer("agent_count").notNull().default(0),
     environmentCount: integer("environment_count").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

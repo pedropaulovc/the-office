@@ -72,6 +72,17 @@ export interface PopulationProfile {
   };
 }
 
+// Experiment progress tracking
+
+export type ExperimentPhase = 'setup' | 'generating_agents' | 'running_environments' | 'scoring' | 'completing';
+
+export interface ExperimentProgress {
+  phase: ExperimentPhase;
+  environmentsProcessed: number;
+  environmentsTotal: number;
+  detail?: string;
+}
+
 export interface FactoryOptions {
   seed?: number;
   templateOnly?: boolean;

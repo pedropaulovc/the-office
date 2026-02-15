@@ -18,6 +18,7 @@ export function createMockExperiment(
     sourceAgentIds: null,
     config: null,
     report: null,
+    progress: null,
     agentCount: 10,
     environmentCount: 2,
     createdAt: new Date("2025-01-01"),
