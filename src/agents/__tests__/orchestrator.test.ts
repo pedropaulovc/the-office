@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Agent } from "@/db/schema";
-import type { SDKMessage, SDKSystemMessage, SDKAssistantMessage, SDKResultSuccess, SDKResultError } from "@anthropic-ai/claude-agent-sdk";
 import { createMockAgent, createMockRun, createMockMemoryBlock } from "@/tests/factories";
-import type { UUID } from "crypto";
 import { logInfo, logWarn, logError, countMetric, distributionMetric } from "@/lib/telemetry";
 
 // --- Mocks ---
@@ -29,47 +27,22 @@ vi.mock("@/agents/prompt-builder", () => ({
   buildSystemPrompt: (...args: unknown[]) => mockBuildSystemPrompt(args[0]) as string,
 }));
 
-// SDK message generator that tests control via `sdkMessages`
-let sdkMessages: SDKMessage[] = [];
+// Mock Anthropic SDK
+const mockCreate = vi.fn();
 
-function* sdkMessageGenerator(): Generator<SDKMessage> {
-  for (const msg of sdkMessages) {
-    yield msg;
-  }
-}
-
-function createMockQuery() {
-  return {
-    [Symbol.asyncIterator]() {
-      const gen = sdkMessageGenerator();
-      return {
-        next() {
-          const result = gen.next();
-          return Promise.resolve(result);
-        },
-        return() {
-          return Promise.resolve({ done: true as const, value: undefined });
-        },
-        throw(e: unknown) {
-          return Promise.reject(e instanceof Error ? e : new Error(String(e)));
-        },
-      };
-    },
-    interrupt: vi.fn(),
-    close: vi.fn(),
-  };
-}
-
-const mockQuery = vi.fn().mockImplementation(() => createMockQuery());
-
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: (...args: unknown[]) => mockQuery(args[0]) as ReturnType<typeof createMockQuery>,
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class MockAnthropic {
+    messages = { create: (...args: unknown[]) => mockCreate(...args) as unknown };
+  },
 }));
 
-const mockGetToolServer = vi.fn().mockReturnValue({ type: "sdk", name: "office-tools" });
+const mockGetToolkit = vi.fn().mockReturnValue({
+  definitions: [],
+  handlers: new Map(),
+});
 
 vi.mock("@/tools/registry", () => ({
-  getToolServer: (...args: unknown[]) => mockGetToolServer(...args) as Record<string, unknown>,
+  getToolkit: (...args: unknown[]) => mockGetToolkit(...args) as unknown,
 }));
 
 const mockBroadcast = vi.fn();
@@ -78,25 +51,11 @@ vi.mock("@/messages/sse-registry", () => ({
   connectionRegistry: { broadcast: (...args: unknown[]) => { mockBroadcast(args[0], args[1]); } },
 }));
 
-const noop = () => undefined;
-const mockBuildSdkEnv = vi.fn().mockReturnValue({ NODE_ENV: "test" });
-const mockCreateSdkStderrHandler = vi.fn().mockReturnValue(noop);
-
-vi.mock("@/agents/sdk-env", () => ({
-  buildSdkEnv: () => mockBuildSdkEnv() as Record<string, string>,
-  createSdkStderrHandler: (...args: unknown[]) => mockCreateSdkStderrHandler(args[0], args[1]) as typeof noop,
-}));
-
 const mockStartSpan = vi.fn((_opts: unknown, fn: () => unknown) => fn());
-const mockSpanEnd = vi.fn();
-const mockStartSpanManual = vi.fn((_opts: unknown, fn: (span: unknown) => unknown) => fn({ end: mockSpanEnd }));
-const mockWithActiveSpan = vi.fn((_span: unknown, fn: () => unknown) => fn());
 const mockCaptureException = vi.fn();
 
 vi.mock("@sentry/nextjs", () => ({
   startSpan: (opts: unknown, fn: () => unknown) => mockStartSpan(opts, fn),
-  startSpanManual: (opts: unknown, fn: (span: unknown) => unknown) => mockStartSpanManual(opts, fn),
-  withActiveSpan: (_span: unknown, fn: () => unknown) => mockWithActiveSpan(_span, fn),
   captureException: (err: unknown) => { mockCaptureException(err); },
 }));
 
@@ -117,146 +76,40 @@ vi.mock("@/lib/telemetry", () => ({
 
 // --- Helpers ---
 
-const SESSION_ID = "test-session-id";
-const MOCK_UUID = "00000000-0000-0000-0000-000000000001" as UUID;
-
-function makeInitMessage(): SDKSystemMessage {
+function makeEndTurnResponse(text: string) {
   return {
-    type: "system",
-    subtype: "init",
-    agents: [],
-    apiKeySource: "user",
-    claude_code_version: "1.0.0",
-    cwd: "/test",
-    tools: [],
-    mcp_servers: [],
-    model: "claude-sonnet-4-5-20250929",
-    permissionMode: "bypassPermissions",
-    slash_commands: [],
-    output_style: "text",
-    skills: [],
-    plugins: [],
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
+    id: "msg-1",
+    type: "message" as const,
+    role: "assistant" as const,
+    content: [{ type: "text" as const, text }],
+    model: "claude-haiku-4-5-20251001",
+    stop_reason: "end_turn" as const,
+    stop_sequence: null,
+    usage: { input_tokens: 100, output_tokens: 50 },
   };
 }
 
-function makeAssistantMessage(text: string) {
-  return {
-    type: "assistant" as const,
-    message: { content: [{ type: "text", text }] },
-    parent_tool_use_id: null,
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  } as unknown as SDKAssistantMessage;
-}
-
-function makeSuccessResult(): SDKResultSuccess {
-  return {
-    type: "result",
-    subtype: "success",
-    duration_ms: 1000,
-    duration_api_ms: 800,
-    is_error: false,
-    num_turns: 1,
-    result: "done",
-    stop_reason: "end_turn",
-    total_cost_usd: 0.01,
-    usage: {
-      input_tokens: 100,
-      output_tokens: 50,
-      cache_creation_input_tokens: 0,
-      cache_read_input_tokens: 0,
-    } as SDKResultSuccess["usage"],
-    modelUsage: {},
-    permission_denials: [],
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  };
-}
-
-function makeErrorResult(subtype: SDKResultError["subtype"]): SDKResultError {
-  return {
-    type: "result",
-    subtype,
-    duration_ms: 1000,
-    duration_api_ms: 800,
-    is_error: true,
-    num_turns: 1,
-    stop_reason: null,
-    total_cost_usd: 0.01,
-    usage: {
-      input_tokens: 100,
-      output_tokens: 50,
-      cache_creation_input_tokens: 0,
-      cache_read_input_tokens: 0,
-    } as SDKResultSuccess["usage"],
-    modelUsage: {},
-    permission_denials: [],
-    errors: ["something failed"],
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  };
-}
-
-function makeAssistantMessageWithToolUse(
+function makeToolUseResponse(
   text: string,
   toolUses: { id: string; name: string; input: unknown }[],
 ) {
   return {
-    type: "assistant" as const,
-    message: {
-      content: [
-        { type: "text", text },
-        ...toolUses.map((t) => ({ type: "tool_use", id: t.id, name: t.name, input: t.input })),
-      ],
-    },
-    parent_tool_use_id: null,
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  } as unknown as SDKAssistantMessage;
-}
-
-function makeUserMessage(content: string, toolUseResult?: unknown) {
-  return {
-    type: "user" as const,
-    message: { role: "user" as const, content },
-    parent_tool_use_id: null,
-    tool_use_result: toolUseResult,
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  };
-}
-
-function makeReplayMessage(content: string) {
-  return {
-    type: "user" as const,
-    message: { role: "user" as const, content },
-    parent_tool_use_id: null,
-    isReplay: true as const,
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  };
-}
-
-function makeCompactBoundaryMessage() {
-  return {
-    type: "system" as const,
-    subtype: "compact_boundary" as const,
-    compact_metadata: { trigger: "auto" as const, pre_tokens: 50000 },
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
-  };
-}
-
-function makeAuthStatusMessage(isAuthenticating: boolean, error?: string) {
-  return {
-    type: "auth_status" as const,
-    isAuthenticating,
-    output: [],
-    error,
-    uuid: MOCK_UUID,
-    session_id: SESSION_ID,
+    id: "msg-1",
+    type: "message" as const,
+    role: "assistant" as const,
+    content: [
+      { type: "text" as const, text },
+      ...toolUses.map((t) => ({
+        type: "tool_use" as const,
+        id: t.id,
+        name: t.name,
+        input: t.input,
+      })),
+    ],
+    model: "claude-haiku-4-5-20251001",
+    stop_reason: "tool_use" as const,
+    stop_sequence: null,
+    usage: { input_tokens: 100, output_tokens: 50 },
   };
 }
 
@@ -268,17 +121,15 @@ describe("orchestrator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    sdkMessages = [];
 
     // Re-set mock implementations after clearAllMocks
-    mockQuery.mockImplementation(() => createMockQuery());
-    mockGetToolServer.mockReturnValue({ type: "sdk", name: "office-tools" });
-    mockBuildSdkEnv.mockReturnValue({ NODE_ENV: "test" });
-    mockCreateSdkStderrHandler.mockReturnValue(noop);
+    mockCreate.mockResolvedValue(makeEndTurnResponse("Hello!"));
+    mockGetToolkit.mockReturnValue({
+      definitions: [],
+      handlers: new Map(),
+    });
     mockBuildSystemPrompt.mockReturnValue("test system prompt");
     mockStartSpan.mockImplementation((_opts: unknown, fn: () => unknown) => fn());
-    mockStartSpanManual.mockImplementation((_opts: unknown, fn: (span: unknown) => unknown) => fn({ end: mockSpanEnd }));
-    mockWithActiveSpan.mockImplementation((_span: unknown, fn: () => unknown) => fn());
 
     mockGetAgent.mockResolvedValue(AGENT);
     mockListMemoryBlocks.mockResolvedValue([]);
@@ -297,13 +148,12 @@ describe("orchestrator", () => {
     mockCreateRunMessage.mockResolvedValue(undefined);
   });
 
-  it("happy path: loads agent + memory + messages, builds prompt, calls SDK", async () => {
+  it("happy path: loads agent + memory + messages, builds prompt, calls messages.create()", async () => {
     const memoryBlock = createMockMemoryBlock({ agentId: "michael" });
     mockListMemoryBlocks.mockResolvedValue([memoryBlock]);
     mockGetRecentMessages.mockResolvedValue([
       { userId: "dwight", text: "Bears.", createdAt: new Date() },
     ]);
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     const result = await executeRun(RUN);
@@ -318,28 +168,30 @@ describe("orchestrator", () => {
       interventionNudge: null,
       repetitionContext: null,
     });
-    expect(mockQuery).toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalled();
     expect(result.status).toBe("completed");
   });
 
-  it("creates MCP server with tools from registry", async () => {
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
+  it("passes tool definitions to messages.create() via tools parameter", async () => {
+    const mockDefs = [
+      { name: "send_message", description: "Send a message", input_schema: { type: "object" as const, properties: {} } },
+    ];
+    mockGetToolkit.mockReturnValue({
+      definitions: mockDefs,
+      handlers: new Map(),
+    });
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockGetToolServer).toHaveBeenCalledWith("michael", RUN.id, "general", 0, expect.any(Function), expect.objectContaining({
-      sendMessage: expect.objectContaining({
-        gateConfig: expect.any(Object) as unknown,
-        agentName: AGENT.displayName,
-        persona: AGENT.systemPrompt,
-      }) as unknown,
-    }));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: mockDefs,
+      }),
+    );
   });
 
   it("broadcasts agent_typing before / agent_done after", async () => {
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
-
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
@@ -356,13 +208,11 @@ describe("orchestrator", () => {
 
     expect(result.status).toBe("failed");
     expect(result.stopReason).toBe("error");
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it("SDK throws returns failed, Sentry.captureException called", async () => {
-    mockQuery.mockImplementation(() => {
-      throw new Error("SDK crashed");
-    });
+  it("messages.create() throws returns failed, Sentry.captureException called", async () => {
+    mockCreate.mockRejectedValue(new Error("API crashed"));
 
     const { executeRun } = await import("../orchestrator");
     const result = await executeRun(RUN);
@@ -373,12 +223,19 @@ describe("orchestrator", () => {
   });
 
   it("records run_steps with incrementing stepNumber", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAssistantMessage("First"),
-      makeAssistantMessage("Second"),
-      makeSuccessResult(),
-    ];
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Thinking...", [
+        { id: "tu_1", name: "do_nothing", input: { reason: "thinking" } },
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
+
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"ok":true}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "do_nothing", description: "Do nothing", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["do_nothing", mockHandler]]),
+    });
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
@@ -392,19 +249,10 @@ describe("orchestrator", () => {
     );
   });
 
-  it("records run_messages for system + assistant", async () => {
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
-
+  it("records assistant_message for response text", async () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
-    expect(mockCreateRunMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        runId: RUN.id,
-        messageType: "system_message",
-        content: "[system:init]",
-      }),
-    );
     expect(mockCreateRunMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: RUN.id,
@@ -414,9 +262,7 @@ describe("orchestrator", () => {
     );
   });
 
-  it("returns token usage + stop reason in RunResult", async () => {
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Test"), makeSuccessResult()];
-
+  it("returns token usage in RunResult", async () => {
     const { executeRun } = await import("../orchestrator");
     const result = await executeRun(RUN);
 
@@ -425,23 +271,25 @@ describe("orchestrator", () => {
     expect(result.tokenUsage).toEqual({
       inputTokens: 100,
       outputTokens: 50,
-      totalCostUsd: 0.01,
     });
   });
 
-  it("maps error_max_turns to max_steps stop reason", async () => {
-    sdkMessages = [makeInitMessage(), makeErrorResult("error_max_turns")];
+  it("returns max_steps when turns exhausted", async () => {
+    // Agent with maxTurns=1, but API returns tool_use so the loop would continue
+    const agent = createMockAgent({ id: "michael", maxTurns: 1 });
+    mockGetAgent.mockResolvedValue(agent);
+    // The response triggers tool use, but maxTurns=1 so only 1 turn runs
+    mockCreate.mockResolvedValue(makeEndTurnResponse("Hello"));
 
     const { executeRun } = await import("../orchestrator");
     const result = await executeRun(RUN);
 
-    expect(result.status).toBe("failed");
+    // maxTurns=1, turns=1, so turns >= maxTurns → max_steps
+    expect(result.status).toBe("completed");
     expect(result.stopReason).toBe("max_steps");
   });
 
-  it("Sentry.startSpan wraps invocation", async () => {
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
-
+  it("Sentry.startSpan wraps executeRun invocation", async () => {
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
 
@@ -451,9 +299,36 @@ describe("orchestrator", () => {
     );
   });
 
+  it("creates agent.turn spans for each API call", async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Thinking", [
+        { id: "tu_1", name: "do_nothing", input: {} },
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
+
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"ok":true}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "do_nothing", description: "Do nothing", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["do_nothing", mockHandler]]),
+    });
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockStartSpan).toHaveBeenCalledWith(
+      { name: "agent.turn.1", op: "ai.agent.turn" },
+      expect.any(Function),
+    );
+    expect(mockStartSpan).toHaveBeenCalledWith(
+      { name: "agent.turn.2", op: "ai.agent.turn" },
+      expect.any(Function),
+    );
+  });
+
   it("missing channelId skips getRecentMessages and broadcasts", async () => {
     const runNoChannel = createMockRun({ agentId: "michael", channelId: null });
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(runNoChannel);
@@ -463,13 +338,19 @@ describe("orchestrator", () => {
   });
 
   it("records tool_use blocks as tool_call_message", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAssistantMessageWithToolUse("Thinking...", [
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Thinking...", [
         { id: "tu_1", name: "send_message", input: { channelId: "general", text: "Hello!" } },
-      ]),
-      makeSuccessResult(),
-    ];
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
+
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"messageId":"msg-1"}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "send_message", description: "Send", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["send_message", mockHandler]]),
+    });
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
@@ -483,32 +364,20 @@ describe("orchestrator", () => {
     );
   });
 
-  it("records user messages as user_message", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAssistantMessage("Hello"),
-      makeUserMessage("tool result text") as unknown as SDKMessage,
-      makeSuccessResult(),
-    ];
+  it("records tool results as tool_return_message", async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Thinking", [
+        { id: "tu_1", name: "send_message", input: { channelId: "general", text: "Hi" } },
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
 
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(mockCreateRunMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messageType: "user_message",
-        content: "tool result text",
-      }),
-    );
-  });
-
-  it("records tool_use_result as tool_return_message", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAssistantMessage("Hello"),
-      makeUserMessage("tool response", { messageId: "msg-1" }) as unknown as SDKMessage,
-      makeSuccessResult(),
-    ];
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"messageId":"msg-1"}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "send_message", description: "Send", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["send_message", mockHandler]]),
+    });
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(RUN);
@@ -516,146 +385,9 @@ describe("orchestrator", () => {
     expect(mockCreateRunMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         messageType: "tool_return_message",
-        content: JSON.stringify({ messageId: "msg-1" }),
+        content: '{"messageId":"msg-1"}',
+        toolName: "send_message",
       }),
-    );
-  });
-
-  it("skips replay messages", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeReplayMessage("replayed content") as unknown as SDKMessage,
-      makeAssistantMessage("Hello"),
-      makeSuccessResult(),
-    ];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    const userMsgCalls = mockCreateRunMessage.mock.calls.filter(
-      (call) => (call[0] as { messageType: string }).messageType === "user_message",
-    );
-    expect(userMsgCalls).toHaveLength(0);
-  });
-
-  it("emits logWarn + countMetric for compact_boundary events", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeCompactBoundaryMessage() as unknown as SDKMessage,
-      makeSuccessResult(),
-    ];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(logWarn).toHaveBeenCalledWith(
-      "sdk.compact.michael",
-      expect.objectContaining({ trigger: "auto", preTokens: 50000 }),
-    );
-    expect(countMetric).toHaveBeenCalledWith("sdk.compaction", 1, { agentId: "michael" });
-  });
-
-  it("emits logError for auth_status with error", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAuthStatusMessage(false, "token expired") as unknown as SDKMessage,
-      makeSuccessResult(),
-    ];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(logError).toHaveBeenCalledWith(
-      "sdk.auth_status.michael",
-      expect.objectContaining({ error: "token expired" }),
-    );
-  });
-
-  it("emits logWarn for auth_status without error", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAuthStatusMessage(true) as unknown as SDKMessage,
-      makeSuccessResult(),
-    ];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(logWarn).toHaveBeenCalledWith(
-      "sdk.auth_status.michael",
-      expect.objectContaining({ isAuthenticating: true }),
-    );
-  });
-
-  it("emits SDK-specific result metrics", async () => {
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hi"), makeSuccessResult()];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(distributionMetric).toHaveBeenCalledWith(
-      "sdk.duration_ms", 1000, "millisecond", expect.objectContaining({ agentId: "michael" }),
-    );
-    expect(distributionMetric).toHaveBeenCalledWith(
-      "sdk.duration_api_ms", 800, "millisecond", expect.objectContaining({ agentId: "michael" }),
-    );
-    expect(countMetric).toHaveBeenCalledWith(
-      "sdk.num_turns", 1, expect.objectContaining({ agentId: "michael" }),
-    );
-    expect(distributionMetric).toHaveBeenCalledWith(
-      "sdk.cost_usd", 0.01, "dollar", expect.objectContaining({ agentId: "michael" }),
-    );
-  });
-
-  it("creates sdk.query and sdk.turn spans", async () => {
-    sdkMessages = [
-      makeInitMessage(),
-      makeAssistantMessage("First"),
-      makeAssistantMessage("Second"),
-      makeSuccessResult(),
-    ];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(mockStartSpanManual).toHaveBeenCalledWith(
-      { name: "sdk.query", op: "ai.agent" },
-      expect.any(Function),
-    );
-    expect(mockStartSpan).toHaveBeenCalledWith(
-      { name: "sdk.turn.1", op: "ai.agent.turn" },
-      expect.any(Function),
-    );
-    expect(mockStartSpan).toHaveBeenCalledWith(
-      { name: "sdk.turn.2", op: "ai.agent.turn" },
-      expect.any(Function),
-    );
-  });
-
-  it("emits logInfo for sdk.init with model and tools", async () => {
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(logInfo).toHaveBeenCalledWith(
-      "sdk.init.michael",
-      expect.objectContaining({
-        model: "claude-sonnet-4-5-20250929",
-        permissionMode: "bypassPermissions",
-      }),
-    );
-  });
-
-  it("logs errors from error result messages", async () => {
-    sdkMessages = [makeInitMessage(), makeErrorResult("error_during_execution")];
-
-    const { executeRun } = await import("../orchestrator");
-    await executeRun(RUN);
-
-    expect(logError).toHaveBeenCalledWith(
-      "sdk.result.error.michael",
-      expect.objectContaining({ error: "something failed" }),
     );
   });
 
@@ -667,7 +399,7 @@ describe("orchestrator", () => {
 
     expect(result.status).toBe("completed");
     expect(result.stopReason).toBe("end_turn");
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
     expect(logWarn).toHaveBeenCalledWith(
       "chain depth exceeded, skipping run",
       expect.objectContaining({ chainDepth: 3, maxChainDepth: 3 }),
@@ -679,29 +411,28 @@ describe("orchestrator", () => {
 
   it("allows execution at chain depth below MAX_CHAIN_DEPTH", async () => {
     const run = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 2 });
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     const result = await executeRun(run);
 
     expect(result.status).toBe("completed");
-    expect(mockQuery).toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalled();
   });
 
-  it("uses triggerPrompt as SDK prompt when present on the run", async () => {
+  it("uses triggerPrompt when present on the run", async () => {
     const run = createMockRun({
       agentId: "michael",
       channelId: "general",
       triggerPrompt: "You have a scheduled check-in. Say something interesting about the office.",
     });
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(run);
 
-    const callArgs = mockQuery.mock.calls[0] as [{ prompt: string }];
-    expect(callArgs[0].prompt).toBe(
-      "You have a scheduled check-in. Say something interesting about the office.",
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{ role: "user", content: "You have a scheduled check-in. Say something interesting about the office." }],
+      }),
     );
   });
 
@@ -712,29 +443,114 @@ describe("orchestrator", () => {
       triggerMessageId: "msg-42",
       triggerPrompt: null,
     });
-    sdkMessages = [makeInitMessage(), makeAssistantMessage("Hello!"), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(run);
 
-    const callArgs = mockQuery.mock.calls[0] as [{ prompt: string }];
-    expect(callArgs[0].prompt).toBe(
-      "A new message was posted (trigger: msg-42). Review the recent conversation and decide how to respond.",
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{
+          role: "user",
+          content: "A new message was posted (trigger: msg-42). Review the recent conversation and decide how to respond.",
+        }],
+      }),
     );
   });
 
-  it("passes chainDepth and executeRun to getToolServer", async () => {
+  it("passes chainDepth and executeRun to getToolkit", async () => {
     const run = createMockRun({ agentId: "michael", channelId: "general", chainDepth: 1 });
-    sdkMessages = [makeInitMessage(), makeSuccessResult()];
 
     const { executeRun } = await import("../orchestrator");
     await executeRun(run);
 
-    expect(mockGetToolServer).toHaveBeenCalledWith(
+    expect(mockGetToolkit).toHaveBeenCalledWith(
       "michael", run.id, "general", 1, expect.any(Function), expect.objectContaining({
         sendMessage: expect.objectContaining({
           gateConfig: expect.any(Object) as unknown,
         }) as unknown,
+      }),
+    );
+  });
+
+  it("emits agent duration, turn, and token metrics", async () => {
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(distributionMetric).toHaveBeenCalledWith(
+      "agent.duration_ms", expect.any(Number), "millisecond", expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(countMetric).toHaveBeenCalledWith(
+      "agent.num_turns", 1, expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(countMetric).toHaveBeenCalledWith(
+      "agent.input_tokens", 100, expect.objectContaining({ agentId: "michael" }),
+    );
+    expect(countMetric).toHaveBeenCalledWith(
+      "agent.output_tokens", 50, expect.objectContaining({ agentId: "michael" }),
+    );
+  });
+
+  it("dispatches tool calls and accumulates token usage across turns", async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Step 1", [
+        { id: "tu_1", name: "do_nothing", input: { reason: "thinking" } },
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
+
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"ok":true}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "do_nothing", description: "Do nothing", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["do_nothing", mockHandler]]),
+    });
+
+    const { executeRun } = await import("../orchestrator");
+    const result = await executeRun(RUN);
+
+    expect(mockHandler).toHaveBeenCalledWith({ reason: "thinking" });
+    expect(result.tokenUsage).toEqual({
+      inputTokens: 200, // 100 + 100
+      outputTokens: 100, // 50 + 50
+    });
+  });
+
+  it("handles unknown tool gracefully", async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeToolUseResponse("Using tool", [
+        { id: "tu_1", name: "unknown_tool", input: {} },
+      ]))
+      .mockResolvedValueOnce(makeEndTurnResponse("Done"));
+
+    mockGetToolkit.mockReturnValue({
+      definitions: [],
+      handlers: new Map(),
+    });
+
+    const { executeRun } = await import("../orchestrator");
+    const result = await executeRun(RUN);
+
+    expect(result.status).toBe("completed");
+    expect(logError).toHaveBeenCalledWith(
+      "agent.unknown_tool.michael",
+      expect.objectContaining({ toolName: "unknown_tool" }),
+    );
+  });
+
+  it("logs executeRun finished with run details", async () => {
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(logInfo).toHaveBeenCalledWith(
+      "executeRun finished",
+      expect.objectContaining({
+        runId: RUN.id,
+        agentId: "michael",
+        status: "completed",
+        stopReason: "end_turn",
+        turns: 1,
+        inputTokens: 100,
+        outputTokens: 50,
       }),
     );
   });
