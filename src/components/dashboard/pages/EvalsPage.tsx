@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Play, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
+import { Play, BookmarkPlus, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useData } from '@/context/useData';
 import { useEvaluations } from '@/hooks/use-evaluations';
 import type { EvalRun, EvalDimension } from '@/hooks/use-evaluations';
@@ -88,15 +88,15 @@ function getLatestScoresPerDimension(
 
   // Runs are already sorted by createdAt desc from the API
   const latest = completedRuns[0];
-  if (latest?.overallScore == null) return {};
+  if (!latest) return {};
 
-  // The API returns overallScore but not per-dimension scores at the list level.
-  // Use overallScore as a proxy for all dimensions that were evaluated.
+  // Use real per-dimension scores from the API
+  const dimScores = latest.dimensionScores ?? {};
   const scores: Partial<Record<EvalDimension, number>> = {};
-  const overallScore = latest.overallScore;
-  for (const dim of latest.dimensions) {
-    if (ALL_DIMENSIONS.includes(dim as EvalDimension)) {
-      scores[dim as EvalDimension] = overallScore;
+  for (const dim of ALL_DIMENSIONS) {
+    const dimScore = dimScores[dim];
+    if (dimScore != null) {
+      scores[dim] = dimScore;
     }
   }
   return scores;
@@ -225,10 +225,10 @@ function AgentCard({ agent, agentRuns, onRunEval, onCaptureBaseline }: AgentCard
             }}
             disabled={isRunning}
             data-testid="capture-baseline-btn"
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-slack-channel-active px-2.5 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            <Bookmark className="h-3 w-3" />
-            Baseline
+            <BookmarkPlus className="h-3 w-3" />
+            Set Baseline
           </button>
         </div>
       </div>
@@ -293,7 +293,15 @@ export function EvalsPage() {
     <div className="flex flex-1 flex-col overflow-hidden" data-testid="page-evals">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900">Agent Evaluations</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900">Agent Evaluations</h1>
+          <div className="group relative">
+            <Info className="h-4 w-4 text-gray-400 cursor-help" />
+            <div className="pointer-events-none absolute left-0 top-full z-10 mt-1 w-72 rounded-md bg-gray-900 px-3 py-2 text-xs text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              Evaluates each agent{"'"}s recent chat messages (last 30 days) against persona propositions using an LLM judge. Scores reflect how well the agent{"'"}s output matches its character — system prompts and personality configs are not evaluated directly.
+            </div>
+          </div>
+        </div>
         <span className="text-sm text-gray-500">
           {coreAgents.length} agents
         </span>

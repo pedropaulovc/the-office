@@ -15,6 +15,7 @@ function makeEvalRun(overrides: Partial<EvalRun> = {}): EvalRun {
     overallScore: 7.5,
     isBaseline: false,
     tokenUsage: null,
+    dimensionScores: {},
     createdAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),
     ...overrides,

@@ -20,6 +20,7 @@ export interface EvalRun {
   overallScore: number | null;
   isBaseline: boolean;
   tokenUsage: unknown;
+  dimensionScores: Record<string, number>;
   createdAt: string;
   completedAt: string | null;
 }
