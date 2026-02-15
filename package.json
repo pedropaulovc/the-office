@@ -25,7 +25,6 @@
     "experiment:table1": "npx tsx src/features/evaluation/experiment/reproduce-table1.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.39",
     "@anthropic-ai/sdk": "^0.74.0",
     "@neondatabase/serverless": "^1.0.2",
     "@scalar/nextjs-api-reference": "^0.9.18",
