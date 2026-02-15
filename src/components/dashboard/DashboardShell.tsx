@@ -3,6 +3,7 @@
 import { useApp } from '@/context/AppContext';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { ExperimentsPage } from '@/components/dashboard/pages/ExperimentsPage';
+import { ExperimentDetailPage } from '@/components/dashboard/pages/ExperimentDetailPage';
 import { EvalsPage } from '@/components/dashboard/pages/EvalsPage';
 import { ConfigPage } from '@/components/dashboard/pages/ConfigPage';
 import { MonitoringPage } from '@/components/dashboard/pages/MonitoringPage';
@@ -11,6 +12,7 @@ import type { ComponentType } from 'react';
 
 const pageComponents: Record<DashboardPage, ComponentType> = {
   experiments: ExperimentsPage,
+  'experiment-detail': ExperimentDetailPage,
   evals: EvalsPage,
   config: ConfigPage,
   monitoring: MonitoringPage,

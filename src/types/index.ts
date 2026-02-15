@@ -1,5 +1,5 @@
 export type TopLevelTab = 'slack' | 'dashboard';
-export type DashboardPage = 'experiments' | 'evals' | 'config' | 'monitoring';
+export type DashboardPage = 'experiments' | 'experiment-detail' | 'evals' | 'config' | 'monitoring';
 
 export type Presence = 'active' | 'away' | 'offline';
 export type ChannelKind = 'public' | 'private' | 'dm';
