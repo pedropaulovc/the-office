@@ -1,10 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import {
-  query,
-  type SDKMessage,
-  type SDKResultMessage,
-  type SDKAssistantMessage,
-} from "@anthropic-ai/claude-agent-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   getAgent,
   listMemoryBlocks,
@@ -13,10 +8,9 @@ import {
   updateRunStep,
   createRunMessage,
 } from "@/db/queries";
-import type { Run, RunStep } from "@/db/schema";
+import type { Run } from "@/db/schema";
 import { buildSystemPrompt } from "@/agents/prompt-builder";
-import { buildSdkEnv, createSdkStderrHandler } from "@/agents/sdk-env";
-import { getToolServer } from "@/tools/registry";
+import { getToolkit, type ToolResult } from "@/tools/registry";
 import { connectionRegistry } from "@/messages/sse-registry";
 import type { RunResult } from "@/agents/mailbox";
 import { MAX_CHAIN_DEPTH } from "@/agents/constants";
@@ -30,7 +24,7 @@ import {
 } from "@/lib/telemetry";
 
 /**
- * Executes a single agent run: loads context, calls Claude Agent SDK, records steps/messages.
+ * Executes a single agent run: loads context, calls Anthropic API in agentic loop, records steps/messages.
  */
 export async function executeRun(run: Run): Promise<RunResult> {
   return Sentry.startSpan(
@@ -165,14 +159,17 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       repetitionContext,
     });
 
-    // 5. Create MCP server with tools (pass pipeline config for quality gate)
-    const mcpServer = getToolServer(run.agentId, run.id, run.channelId, run.chainDepth, executeRun, {
+    // 5. Get toolkit (tool definitions + handlers)
+    const toolOptions = {
       sendMessage: {
         gateConfig: evalConfig.pipeline,
         agentName: agent.displayName,
         persona: agent.systemPrompt,
       },
-    });
+    };
+    const { definitions, handlers } = getToolkit(
+      run.agentId, run.id, run.channelId, run.chainDepth, executeRun, toolOptions,
+    );
 
     // 6. Broadcast agent_typing
     if (run.channelId) {
@@ -186,199 +183,153 @@ async function executeRunInner(run: Run): Promise<RunResult> {
     // 7. Build trigger prompt
     const prompt = formatTriggerPrompt(run);
 
-    // 8. Call SDK
-    const sdkOptions: Parameters<typeof query>[0]["options"] = {
-      systemPrompt,
-      model: agent.modelId,
-      mcpServers: { "office-tools": mcpServer },
-      maxTurns: agent.maxTurns,
-      permissionMode: "bypassPermissions",
-      allowDangerouslySkipPermissions: true,
-      tools: [],
-      env: buildSdkEnv(),
-      stderr: createSdkStderrHandler(run.id, run.agentId),
-    };
-    const sdkQuery = query({ prompt, options: sdkOptions });
+    // 8. Agentic loop — replaces Claude Agent SDK subprocess
+    const anthropic = new Anthropic();
+    const messages: Anthropic.MessageParam[] = [{ role: "user" as const, content: prompt }];
+    let turns = 0;
+    const totalUsage = { input: 0, output: 0 };
+    let stopReason: "end_turn" | "max_steps" | "no_tool_call" | "error" = "end_turn";
 
-    // 9. Iterate SDK messages — wrapped in sdk.query span
-    // Use startSpanManual so we get a span reference to re-establish async context
-    // inside the for-await loop (the SDK subprocess breaks Node.js async context).
-    // State object avoids TypeScript narrowing issues — TS can't track
-    // mutations inside withActiveSpan/startSpan callbacks on let variables.
-    const loopState = {
-      stepNum: 0,
-      currentStep: null as RunStep | null,
-      result: null as SDKResultMessage | null,
-    };
+    logChunked(`agent.input.system_prompt.${run.agentId}`, systemPrompt, {
+      runId: run.id,
+      agentId: run.agentId,
+      length: systemPrompt.length,
+    });
+    logChunked(`agent.input.trigger.${run.agentId}`, prompt, {
+      runId: run.id,
+      agentId: run.agentId,
+    });
 
-    await Sentry.startSpanManual(
-      { name: "sdk.query", op: "ai.agent" },
-      async (querySpan) => {
+    while (turns < agent.maxTurns) {
+      turns++;
 
-        // Log inputs inside sdk.query span so they're linked to it
-        logChunked(`sdk.input.system_prompt.${run.agentId}`, systemPrompt, {
+      const response = await Sentry.startSpan(
+        { name: `agent.turn.${turns}`, op: "ai.agent.turn" },
+        () => anthropic.messages.create({
+          model: agent.modelId,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages,
+          tools: definitions,
+        }),
+      );
+
+      totalUsage.input += response.usage.input_tokens;
+      totalUsage.output += response.usage.output_tokens;
+
+      // Record assistant turn
+      const step = await createRunStep({
+        runId: run.id,
+        stepNumber: turns,
+        modelId: agent.modelId,
+      });
+
+      // Extract text content from response
+      const textContent = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n") || "[no text content]";
+
+      await createRunMessage({
+        runId: run.id,
+        stepId: step.id,
+        messageType: "assistant_message",
+        content: textContent,
+      });
+
+      logChunked(`agent.response.${run.agentId}`, textContent, {
+        runId: run.id,
+        turn: turns,
+      });
+
+      // Record tool_use blocks
+      const toolUseBlocks = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+      );
+
+      for (const block of toolUseBlocks) {
+        await createRunMessage({
           runId: run.id,
-          agentId: run.agentId,
-          length: systemPrompt.length,
+          stepId: step.id,
+          messageType: "tool_call_message",
+          content: `[tool_use: ${block.name}]`,
+          toolName: block.name,
+          toolInput: block.input as Record<string, unknown>,
         });
-        logChunked(`sdk.input.trigger.${run.agentId}`, prompt, {
+        logChunked(`agent.tool_call.${run.agentId}`, `${block.name} ${JSON.stringify(block.input)}`, {
           runId: run.id,
-          agentId: run.agentId,
+          toolName: block.name,
+          toolUseId: block.id,
+          turn: turns,
         });
+      }
 
-        for await (const msg of sdkQuery) {
-          // Re-establish querySpan as active — the for-await over the SDK subprocess
-          // loses Node.js async context, so child spans/logs would otherwise be orphaned.
-          await Sentry.withActiveSpan(querySpan, async () => {
-            if (msg.type === "system") {
-              await handleSystemMsg(msg, run.id, run.agentId);
-              return;
-            }
+      // Check stop reason
+      if (response.stop_reason === "end_turn") {
+        await updateRunStep(step.id, { status: "completed" });
+        stopReason = "end_turn";
+        break;
+      }
 
-            if (msg.type === "assistant") {
-              if (loopState.currentStep) {
-                await updateRunStep(loopState.currentStep.id, { status: "completed" });
-              }
-              loopState.stepNum++;
-              const step = loopState.stepNum;
-              loopState.currentStep = await Sentry.startSpan(
-                { name: `sdk.turn.${step}`, op: "ai.agent.turn" },
-                async () => {
-                  const newStep = await createRunStep({
-                    runId: run.id,
-                    stepNumber: step,
-                    modelId: agent.modelId,
-                  });
+      if (response.stop_reason === "tool_use") {
+        // Dispatch tool calls
+        const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
-                  const content = extractAssistantContent(msg);
-                  const thinking = extractThinkingContent(msg);
-                  await createRunMessage({
-                    runId: run.id,
-                    stepId: newStep.id,
-                    messageType: "assistant_message",
-                    content,
-                  });
+        for (const block of toolUseBlocks) {
+          const handler = handlers.get(block.name);
+          let result: ToolResult;
 
-                  if (thinking) {
-                    logChunked(`sdk.thinking.${run.agentId}`, thinking, {
-                      runId: run.id,
-                      step,
-                    });
-                  }
-                  logChunked(`sdk.response.${run.agentId}`, content, {
-                    runId: run.id,
-                    step,
-                  });
+          if (!handler) {
+            result = { content: [{ type: "text", text: JSON.stringify({ error: `Unknown tool: ${block.name}` }) }] };
+            logError(`agent.unknown_tool.${run.agentId}`, { runId: run.id, toolName: block.name });
+          } else {
+            result = await Sentry.startSpan(
+              { name: `tool.${block.name}`, op: "agent.tool" },
+              () => handler(block.input),
+            );
+          }
 
-                  for (const toolUse of extractToolUseBlocks(msg)) {
-                    const inputStr = JSON.stringify(toolUse.input);
-                    await createRunMessage({
-                      runId: run.id,
-                      stepId: newStep.id,
-                      messageType: "tool_call_message",
-                      content: `[tool_use: ${toolUse.name}]`,
-                      toolName: toolUse.name,
-                      toolInput: toolUse.input as Record<string, unknown>,
-                    });
-                    logChunked(`sdk.tool_call.${run.agentId}`, `${toolUse.name} ${inputStr}`, {
-                      runId: run.id,
-                      toolName: toolUse.name,
-                      toolUseId: toolUse.id,
-                      step,
-                    });
-                  }
+          const resultText = result.content[0]?.text ?? "";
 
-                  return newStep;
-                },
-              );
-              return;
-            }
+          await createRunMessage({
+            runId: run.id,
+            stepId: step.id,
+            messageType: "tool_return_message",
+            content: resultText,
+            toolName: block.name,
+          });
+          logChunked(`agent.tool_return.${run.agentId}`, resultText, {
+            runId: run.id,
+            toolName: block.name,
+            turn: turns,
+          });
 
-            if (msg.type === "user") {
-              if ("isReplay" in msg) return;
-              const userContent = extractUserContent(msg);
-              await createRunMessage({
-                runId: run.id,
-                stepId: loopState.currentStep?.id ?? null,
-                messageType: "user_message",
-                content: userContent,
-              });
-              logChunked(`sdk.user_message.${run.agentId}`, userContent, {
-                runId: run.id,
-              });
-              if (msg.tool_use_result != null) {
-                const toolResult =
-                  typeof msg.tool_use_result === "string"
-                    ? msg.tool_use_result
-                    : JSON.stringify(msg.tool_use_result);
-                await createRunMessage({
-                  runId: run.id,
-                  stepId: loopState.currentStep?.id ?? null,
-                  messageType: "tool_return_message",
-                  content: toolResult,
-                });
-                logChunked(`sdk.tool_return.${run.agentId}`, toolResult, {
-                  runId: run.id,
-                });
-              }
-              return;
-            }
-
-            if (msg.type === "tool_progress") {
-              logInfo(`sdk.tool_progress.${run.agentId}`, {
-                runId: run.id,
-                toolName: msg.tool_name,
-                toolUseId: msg.tool_use_id,
-                elapsedSeconds: msg.elapsed_time_seconds,
-              });
-              return;
-            }
-
-            if (msg.type === "tool_use_summary") {
-              logInfo(`sdk.tool_use_summary.${run.agentId}`, {
-                runId: run.id,
-                summary: msg.summary,
-              });
-              return;
-            }
-
-            if (msg.type === "auth_status") {
-              if (msg.error) {
-                logError(`sdk.auth_status.${run.agentId}`, {
-                  runId: run.id,
-                  isAuthenticating: msg.isAuthenticating,
-                  error: msg.error,
-                });
-              } else {
-                logWarn(`sdk.auth_status.${run.agentId}`, {
-                  runId: run.id,
-                  isAuthenticating: msg.isAuthenticating,
-                });
-              }
-              return;
-            }
-
-            if (msg.type === "result") {
-              loopState.result = msg;
-              return;
-            }
-
-            // stream_event and unknown types: skip silently
+          toolResults.push({
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: resultText,
           });
         }
 
-        // Close final step inside the span
-        if (loopState.currentStep) {
-          await updateRunStep(loopState.currentStep.id, { status: "completed" });
-        }
+        // Push conversation turns
+        messages.push({ role: "assistant" as const, content: response.content });
+        messages.push({ role: "user" as const, content: toolResults });
+        await updateRunStep(step.id, { status: "completed" });
+        continue;
+      }
 
-        querySpan.end();
-      },
-    );
+      // Unexpected stop reason
+      await updateRunStep(step.id, { status: "completed" });
+      stopReason = "no_tool_call";
+      break;
+    }
 
-    const { stepNum: stepNumber, result: resultMessage } = loopState;
+    // Check if we hit max turns
+    if (turns >= agent.maxTurns) {
+      stopReason = "max_steps";
+    }
 
-    // 10. Broadcast agent_done
+    // 9. Broadcast agent_done
     if (run.channelId) {
       connectionRegistry.broadcast(run.channelId, {
         type: "agent_done",
@@ -387,52 +338,31 @@ async function executeRunInner(run: Run): Promise<RunResult> {
       });
     }
 
-    // 12. Build result
-    const { status, stopReason } = mapStopReason(resultMessage);
-    const tokenUsage = resultMessage
-      ? buildTokenUsage(resultMessage)
-      : undefined;
+    // 10. Build result
+    const durationMs = Date.now() - startTime;
+    const tokenUsage = {
+      inputTokens: totalUsage.input,
+      outputTokens: totalUsage.output,
+    };
 
-    countMetric("orchestrator.run", 1, { agentId: run.agentId, status });
-    distributionMetric(
-      "orchestrator.duration_ms",
-      Date.now() - startTime,
-      "millisecond",
-      { agentId: run.agentId },
-    );
-
-    // SDK-specific result metrics
-    if (resultMessage) {
-      distributionMetric("sdk.duration_ms", resultMessage.duration_ms, "millisecond", { agentId: run.agentId });
-      distributionMetric("sdk.duration_api_ms", resultMessage.duration_api_ms, "millisecond", { agentId: run.agentId });
-      countMetric("sdk.num_turns", resultMessage.num_turns, { agentId: run.agentId });
-      distributionMetric("sdk.cost_usd", resultMessage.total_cost_usd, "dollar", { agentId: run.agentId });
-
-      if ("errors" in resultMessage && Array.isArray(resultMessage.errors)) {
-        for (const err of resultMessage.errors) {
-          logError(`sdk.result.error.${run.agentId}`, { runId: run.id, error: err });
-        }
-      }
-      if (resultMessage.permission_denials.length > 0) {
-        logWarn(`sdk.result.permission_denials.${run.agentId}`, {
-          runId: run.id,
-          count: resultMessage.permission_denials.length,
-        });
-      }
-    }
+    countMetric("orchestrator.run", 1, { agentId: run.agentId, status: "completed" });
+    distributionMetric("agent.duration_ms", durationMs, "millisecond", { agentId: run.agentId });
+    countMetric("agent.num_turns", turns, { agentId: run.agentId });
+    countMetric("agent.input_tokens", totalUsage.input, { agentId: run.agentId });
+    countMetric("agent.output_tokens", totalUsage.output, { agentId: run.agentId });
 
     logInfo("executeRun finished", {
       runId: run.id,
       agentId: run.agentId,
-      status,
+      status: "completed",
       stopReason,
-      steps: stepNumber,
-      durationMs: Date.now() - startTime,
-      numTurns: resultMessage?.num_turns ?? 0,
-      costUsd: resultMessage?.total_cost_usd ?? 0,
+      turns,
+      durationMs,
+      inputTokens: totalUsage.input,
+      outputTokens: totalUsage.output,
     });
 
-    return { status, stopReason, tokenUsage };
+    return { status: "completed", stopReason, tokenUsage };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logError("executeRun failed", {
@@ -455,158 +385,4 @@ function formatTriggerPrompt(run: Run): string {
     return `A new message was posted (trigger: ${run.triggerMessageId}). Review the recent conversation and decide how to respond.`;
   }
   return "Review the recent messages in the channel and decide how to respond.";
-}
-
-async function handleSystemMsg(
-  msg: SDKMessage & { type: "system" },
-  runId: string,
-  agentId: string,
-): Promise<void> {
-  if (msg.subtype === "init") {
-    await createRunMessage({
-      runId,
-      stepId: null,
-      messageType: "system_message",
-      content: "[system:init]",
-    });
-    logInfo(`sdk.init.${agentId}`, {
-      runId,
-      model: msg.model,
-      permissionMode: msg.permissionMode,
-      toolCount: msg.tools.length,
-    });
-    return;
-  }
-
-  if (msg.subtype === "compact_boundary") {
-    logWarn(`sdk.compact.${agentId}`, {
-      runId,
-      trigger: msg.compact_metadata.trigger,
-      preTokens: msg.compact_metadata.pre_tokens,
-    });
-    countMetric("sdk.compaction", 1, { agentId });
-    return;
-  }
-
-  if (msg.subtype === "status") {
-    logInfo(`sdk.status.${agentId}`, { runId });
-    return;
-  }
-
-  if (msg.subtype === "hook_started") {
-    logInfo(`sdk.hook.started.${agentId}`, { runId, hookName: msg.hook_name, hookEvent: msg.hook_event });
-    return;
-  }
-
-  if (msg.subtype === "hook_progress") {
-    logInfo(`sdk.hook.progress.${agentId}`, { runId, hookName: msg.hook_name });
-    return;
-  }
-
-  if (msg.subtype === "hook_response") {
-    logInfo(`sdk.hook.response.${agentId}`, { runId, hookName: msg.hook_name, outcome: msg.outcome });
-    return;
-  }
-
-  if (msg.subtype === "task_notification") {
-    logInfo(`sdk.task_notification.${agentId}`, {
-      runId,
-      taskId: msg.task_id,
-      status: msg.status,
-      summary: msg.summary,
-    });
-    return;
-  }
-
-  // Unknown or new subtype — log generically to avoid runtime errors
-  const subtype = (msg as { subtype?: string }).subtype ?? "unknown";
-  logInfo(`sdk.system_message.${agentId}`, {
-    runId,
-    subtype,
-    ...(subtype === "files_persisted" && "files" in msg && "failed" in msg
-      ? { fileCount: (msg as { files: unknown[] }).files.length, failedCount: (msg as { failed: unknown[] }).failed.length }
-      : {}),
-  });
-}
-
-interface ToolUseBlock {
-  id: string;
-  name: string;
-  input: unknown;
-}
-
-function extractToolUseBlocks(msg: SDKAssistantMessage): ToolUseBlock[] {
-  const message = msg.message as unknown as { content: unknown };
-  const content = message.content;
-  if (!Array.isArray(content)) return [];
-  const blocks: ToolUseBlock[] = [];
-  for (const block of content as { type: string; id?: string; name?: string; input?: unknown }[]) {
-    if (block.type === "tool_use" && block.id && block.name) {
-      blocks.push({ id: block.id, name: block.name, input: block.input });
-    }
-  }
-  return blocks;
-}
-
-function extractUserContent(msg: { message: unknown }): string {
-  const message = msg.message as { content: unknown };
-  const content = message.content;
-  if (typeof content === "string") return content;
-  return JSON.stringify(content);
-}
-
-function extractAssistantContent(msg: SDKAssistantMessage): string {
-  // BetaMessage.content type may not resolve cleanly — cast via unknown
-  const message = msg.message as unknown as { content: unknown };
-  const content = message.content;
-  if (!Array.isArray(content)) return String(content);
-  const parts: string[] = [];
-  for (const block of content as { type: string; text?: string }[]) {
-    if (block.type === "text" && block.text) {
-      parts.push(block.text);
-    }
-  }
-  return parts.join("\n") || "[no text content]";
-}
-
-function extractThinkingContent(msg: SDKAssistantMessage): string | null {
-  const message = msg.message as unknown as { content: unknown };
-  const content = message.content;
-  if (!Array.isArray(content)) return null;
-  const parts: string[] = [];
-  for (const block of content as { type: string; thinking?: string }[]) {
-    if (block.type === "thinking" && block.thinking) {
-      parts.push(block.thinking);
-    }
-  }
-  return parts.length > 0 ? parts.join("\n") : null;
-}
-
-function buildTokenUsage(result: SDKResultMessage): Record<string, unknown> {
-  const usage = result.usage as Record<string, unknown>;
-  return {
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
-    totalCostUsd: result.total_cost_usd,
-  };
-}
-
-function mapStopReason(result: SDKResultMessage | null): {
-  status: NonNullable<RunResult["status"]>;
-  stopReason: NonNullable<RunResult["stopReason"]>;
-} {
-  if (!result) {
-    return { status: "failed", stopReason: "error" };
-  }
-
-  switch (result.subtype) {
-    case "success":
-      return { status: "completed", stopReason: "end_turn" };
-    case "error_max_turns":
-      return { status: "failed", stopReason: "max_steps" };
-    case "error_during_execution":
-      return { status: "failed", stopReason: "error" };
-    default:
-      return { status: "failed", stopReason: "error" };
-  }
 }

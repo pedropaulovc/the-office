@@ -52,20 +52,6 @@ vi.mock("@/lib/telemetry", () => ({
   countMetric: vi.fn(),
 }));
 
-// Mock claude-agent-sdk for the registry's getToolServer backward-compat shim
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  tool: (
-    name: string,
-    description: string,
-    _inputSchema: unknown,
-    handler: (args: Record<string, unknown>) => Promise<unknown>,
-  ) => ({
-    name,
-    description,
-    handler,
-  }),
-  createSdkMcpServer: (opts: unknown) => opts,
-}));
 
 // --- Helpers ---
 
@@ -406,23 +392,6 @@ describe("registry", () => {
     }
   });
 
-  it("getToolServer wraps toolkit into SDK MCP server", async () => {
-    const { getToolServer } = await import("../registry");
-    const server = getToolServer("michael", "run-1", "general");
-
-    // With our mock, createSdkMcpServer returns its options
-    const opts = server as unknown as { name: string; tools: { name: string }[] };
-    expect(opts.name).toBe("office-tools");
-    expect(opts.tools).toHaveLength(6);
-
-    const toolNames = opts.tools.map((t) => t.name);
-    expect(toolNames).toContain("send_message");
-    expect(toolNames).toContain("react_to_message");
-    expect(toolNames).toContain("do_nothing");
-    expect(toolNames).toContain("update_memory");
-    expect(toolNames).toContain("search_memory");
-    expect(toolNames).toContain("store_memory");
-  });
 });
 
 }); // MCP tools
