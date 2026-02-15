@@ -24,6 +24,15 @@ export function withSpan<T>(name: string, op: string, fn: (span: Sentry.Span) =>
 }
 
 /**
+ * Starts a brand-new trace (independent trace ID) and runs fn inside it.
+ * Use this when a logical operation should be its own trace rather than a
+ * child span of the current one (e.g. each experiment in a batch).
+ */
+export function withNewTrace<T>(name: string, op: string, fn: (span: Sentry.Span) => T): T {
+  return Sentry.startNewTrace(() => Sentry.startSpan({ name, op }, fn));
+}
+
+/**
  * Emits a structured info log to Sentry.
  */
 export function logInfo(

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@sentry/nextjs", () => ({
   startSpan: vi.fn((_opts: unknown, cb: (span: unknown) => unknown) => cb({})),
+  startNewTrace: vi.fn((cb: () => unknown) => cb()),
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   metrics: { count: vi.fn(), distribution: vi.fn() },
 }));

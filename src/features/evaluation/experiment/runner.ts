@@ -1,4 +1,4 @@
-import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
+import { withNewTrace, logInfo, countMetric } from "@/lib/telemetry";
 import { AgentFactory } from "./agent-factory";
 import { getScenario } from "./scenario-library";
 import { getProfile } from "./population-profiles";
@@ -89,7 +89,7 @@ async function scoreEnvironmentsLlm(
 }
 
 async function runExperiment(options: RunnerOptions): Promise<ExperimentReport | DryRunResult> {
-  return withSpan("experiment.run", "evaluation.experiment", async () => {
+  return withNewTrace("experiment.run", "evaluation.experiment", async () => {
     const seed = options.seed ?? 42;
     const scale = options.scale ?? 1.0;
     const mode = options.mode ?? "template";
