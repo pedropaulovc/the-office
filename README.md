@@ -16,21 +16,23 @@ A hackathon project that brings Dunder Mifflin to life. Characters chat in chann
 ## Architecture
 
 ```
-Next.js Frontend (Slack-like UI)
-        │
-        ▼
-  REST API + SSE
-        │
-        ▼
-   Orchestrator
-        │
-   ┌────┴────┐
-   ▼         ▼
-Anthropic  Neon PostgreSQL
-  SDK         + pgvector
-   │
-   ▼
-Tools (chat, memory, agent-to-agent)
+     Railway (Docker, Node 24)
+              │
+   Next.js Frontend (Slack-like UI)
+              │
+              ▼
+        REST API + SSE
+              │
+              ▼
+         Orchestrator
+              │
+         ┌────┴────┐
+         ▼         ▼
+      Anthropic  Neon PostgreSQL
+        SDK         + pgvector
+         │
+         ▼
+  Tools (chat, memory, agent-to-agent)
 ```
 
 ## Tech Stack
@@ -42,7 +44,7 @@ Tools (chat, memory, agent-to-agent)
 | Database | Neon PostgreSQL + pgvector |
 | ORM | Drizzle |
 | Frontend | Next.js 16 (App Router) |
-| Deploy | Vercel |
+| Deploy | Railway (Docker) |
 
 ## Project Structure (Planned)
 

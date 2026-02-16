@@ -480,16 +480,16 @@
       <!-- ═══ BACKGROUND ═══ -->
       <rect width="1300" height="920" fill="#ffffff" rx="8"/>
 
-      <!-- ═══ ZONE: Vercel (wraps Presentation + Application) ═══ -->
+      <!-- ═══ ZONE: Railway (wraps Presentation + Application) ═══ -->
       <rect x="70" y="88" width="620" height="620" rx="12" fill="none" stroke="#C2410C" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.35"/>
       <rect x="82" y="80" width="68" height="18" fill="#fff" rx="3"/>
-      <text x="86" y="93" font-size="10" font-weight="600" fill="#C2410C" letter-spacing="0.5">VERCEL</text>
+      <text x="86" y="93" font-size="10" font-weight="600" fill="#C2410C" letter-spacing="0.5">RAILWAY</text>
 
       <!-- ═══ ZONE: Presentation Tier ═══ -->
       <rect x="110" y="130" width="550" height="130" rx="8" fill="#E8F1FB" fill-opacity="0.5" stroke="#0078D4" stroke-width="1" stroke-dasharray="6,3" opacity="0.6"/>
       <text x="126" y="150" font-size="10" font-weight="600" fill="#0078D4" letter-spacing="0.8" text-transform="uppercase">PRESENTATION</text>
 
-      <!-- ═══ ZONE: Application Tier (Vercel) ═══ -->
+      <!-- ═══ ZONE: Application Tier (Railway) ═══ -->
       <rect x="110" y="300" width="550" height="260" rx="8" fill="#F3E8FF" fill-opacity="0.35" stroke="#6B21A8" stroke-width="1" stroke-dasharray="6,3" opacity="0.6"/>
       <text x="126" y="320" font-size="10" font-weight="600" fill="#6B21A8" letter-spacing="0.8">APPLICATION LAYER</text>
 
@@ -563,7 +563,7 @@
         <text x="65" y="60" text-anchor="middle" font-size="9" fill="#8792a2">Broadcast events</text>
       </g>
 
-      <!-- ─── MCP Servers (Remote, on Vercel) ─── -->
+      <!-- ─── MCP Servers (Remote, on Railway) ─── -->
       <g transform="translate(140, 460)">
         <rect width="130" height="72" rx="8" fill="#fff" stroke="#6B21A8" stroke-width="1.5" filter="url(#shadow)"/>
         <svg x="53" y="8" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B21A8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -750,7 +750,7 @@
       <rect x="1060" y="486" width="80" height="16" rx="3" fill="#FFF7ED"/>
       <text x="1100" y="497" text-anchor="middle" font-size="8" font-weight="600" fill="#C2410C">Claude SDK</text>
 
-      <!-- SDK Executor → MCP Servers (remote tool calls back to Vercel) -->
+      <!-- SDK Executor → MCP Servers (remote tool calls back to Railway) -->
       <line x1="758" y1="530" x2="272" y2="496" stroke="#6B21A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
       <rect x="460" y="518" width="88" height="14" rx="3" fill="#F3E8FF"/>
       <text x="504" y="528" text-anchor="middle" font-size="7" font-weight="600" fill="#6B21A8">remote MCP</text>
@@ -771,7 +771,7 @@
       <rect x="348" y="811" width="48" height="14" rx="3" fill="#E8F5E9"/>
       <text x="372" y="821" text-anchor="middle" font-size="7" font-weight="600" fill="#15803D">queries</text>
 
-      <!-- Vercel → Sentry (traces) -->
+      <!-- Railway → Sentry (traces) -->
       <line x1="660" y1="201" x2="1098" y2="230" stroke="#B91C1C" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)" opacity="0.5"/>
       <!-- AAS → Sentry (traces) -->
       <line x1="1012" y1="342" x2="1098" y2="270" stroke="#B91C1C" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)" opacity="0.5"/>
@@ -798,7 +798,7 @@
         <text x="458" y="4" font-size="9" fill="#8792a2">Presentation</text>
 
         <rect x="548" y="-6" width="12" height="12" rx="2" fill="#F3E8FF" stroke="#6B21A8" stroke-width="1"/>
-        <text x="566" y="4" font-size="9" fill="#8792a2">API / Vercel</text>
+        <text x="566" y="4" font-size="9" fill="#8792a2">API / Railway</text>
 
         <rect x="640" y="-6" width="12" height="12" rx="2" fill="#E0F7FA" stroke="#0E7490" stroke-width="1"/>
         <text x="658" y="4" font-size="9" fill="#8792a2">AAS (Railway)</text>
@@ -867,7 +867,7 @@
       </div>
       <div class="flow-step-content">
         <h4 style="color:var(--green)">SDK Executor (Railway)</h4>
-        <p>AAS's SDK Executor runs the Claude Agent SDK with the agent's persona, memory, and context. It streams results back as SSE events (assistant_text, tool_use, tool_result, turn_complete). MCP tools are called remotely back to Vercel.</p>
+        <p>AAS's SDK Executor runs the Claude Agent SDK with the agent's persona, memory, and context. It streams results back as SSE events (assistant_text, tool_use, tool_result, turn_complete). MCP tools are called remotely back to Railway.</p>
         <span class="flow-detail">Claude Agent SDK</span>
         <span class="flow-detail">Hono SSE streaming</span>
         <span class="flow-detail">Remote MCP tools</span>
@@ -934,10 +934,10 @@
       <div class="detail-list">
         <div class="detail-item"><h5>1. Instance Lookup</h5><p>Resolve named agent instance (e.g. <code>dev/B/michael</code>) from in-memory registry. Provision on first use.</p></div>
         <div class="detail-item"><h5>2. Queue &amp; Dequeue</h5><p>Per-instance FIFO queue (max 25). Guarantees serial execution &mdash; no race conditions.</p></div>
-        <div class="detail-item"><h5>3. Build Prompt</h5><p>Vercel assembles modular sections: persona + core memory + tool instructions + recent messages</p></div>
-        <div class="detail-item"><h5>4. Remote MCP</h5><p>6 tools served from Vercel as remote MCP servers. AAS calls back to Vercel during execution.</p></div>
+        <div class="detail-item"><h5>3. Build Prompt</h5><p>Railway assembles modular sections: persona + core memory + tool instructions + recent messages</p></div>
+        <div class="detail-item"><h5>4. Remote MCP</h5><p>6 tools served from Railway as remote MCP servers. AAS calls back to Railway during execution.</p></div>
         <div class="detail-item"><h5>5. SDK Execution</h5><p>Async generator streams Claude Agent SDK responses. SSE events: assistant_text, tool_use, tool_result, done.</p></div>
-        <div class="detail-item"><h5>6. Persist &amp; Broadcast</h5><p>Vercel receives SSE stream, saves run steps/messages/tokens, broadcasts to UI clients.</p></div>
+        <div class="detail-item"><h5>6. Persist &amp; Broadcast</h5><p>Railway receives SSE stream, saves run steps/messages/tokens, broadcasts to UI clients.</p></div>
       </div>
     </div>
     <div class="agent-section">
@@ -987,7 +987,8 @@
         <div class="schema-field"><span class="name">title</span><span class="type">text</span></div>
         <div class="schema-field"><span class="name">systemPrompt</span><span class="type">text</span></div>
         <div class="schema-field"><span class="name">modelId</span><span class="type">text</span></div>
-        <div class="schema-field"><span class="name">maxTurns</span><span class="type">int</span></div>
+        <div class="schema-field"><span class="name">maxTurns / maxBudgetUsd</span><span class="type">int / numeric</span></div>
+        <div class="schema-field"><span class="name">sessionId</span><span class="type">text</span></div>
         <div class="schema-field"><span class="name">isActive</span><span class="type">boolean</span></div>
       </div>
     </div>
@@ -1085,7 +1086,7 @@
   </div>
   <div class="infra-layout">
     <div class="infra-card">
-      <h3><span style="color:var(--orange)">&#9650;</span> Vercel</h3>
+      <h3><span style="color:var(--orange)">&#9650;</span> Railway</h3>
       <ul>
         <li><div class="bullet" style="background:var(--orange)"></div><strong>Hosting</strong> &mdash; Edge-optimized serverless: REST API, SSE Registry, remote MCP servers, Scheduler</li>
         <li><div class="bullet" style="background:var(--orange)"></div><strong>Remote MCP</strong> &mdash; 6 agent tools served as MCP endpoints, called remotely by AAS on Railway</li>
@@ -1114,8 +1115,8 @@
       <ul>
         <li><div class="bullet" style="background:var(--cyan)"></div><strong>Long-lived Container</strong> &mdash; Persistent Hono HTTP server managing named agent instances with in-memory state</li>
         <li><div class="bullet" style="background:var(--cyan)"></div><strong>Instance Registry</strong> &mdash; Named instances (e.g. <code>dev/B/michael</code>) with CRUD lifecycle and per-instance FIFO queues</li>
-        <li><div class="bullet" style="background:var(--cyan)"></div><strong>SSE Streaming</strong> &mdash; Real-time SDK execution events streamed back to Vercel (assistant_text, tool_use, done)</li>
-        <li><div class="bullet" style="background:var(--cyan)"></div><strong>Distributed Tracing</strong> &mdash; Sentry trace propagation across Vercel &#8596; AAS boundary</li>
+        <li><div class="bullet" style="background:var(--cyan)"></div><strong>SSE Streaming</strong> &mdash; Real-time SDK execution events streamed back to Railway (assistant_text, tool_use, done)</li>
+        <li><div class="bullet" style="background:var(--cyan)"></div><strong>Distributed Tracing</strong> &mdash; Sentry trace propagation across Railway &#8596; AAS boundary</li>
       </ul>
     </div>
     <div class="infra-card">
