@@ -7,6 +7,7 @@ Sentry.init({
   tracePropagationTargets: [
     /^https:\/\/.*\.vercel\.app\/api/,
     /^https:\/\/.*\.railway\.app\/api/,
+    /^https:\/\/the-office\.vza\.net\/api/,
   ],
   enableLogs: true,
   environment: process.env.NODE_ENV,
