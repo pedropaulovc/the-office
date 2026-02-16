@@ -13,6 +13,8 @@ const lato = Lato({
   variable: '--font-lato',
 });
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Dunder Mifflin Slack',
   description: 'The Office Slack Clone',
