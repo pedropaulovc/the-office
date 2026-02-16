@@ -33,6 +33,7 @@ export interface Message {
   channelId: string;
   userId: string;
   text: string;
+  thinking?: string | null;
   timestamp: string;
   reactions: Reaction[];
   threadReplyCount: number;

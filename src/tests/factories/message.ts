@@ -10,6 +10,7 @@ export function createMockMessage(overrides?: Partial<DbMessage>): DbMessage {
     parentMessageId: null,
     userId: `user-${counter}`,
     text: `Test message ${counter}`,
+    thinking: null,
     createdAt: new Date("2025-01-01"),
     ...overrides,
   };

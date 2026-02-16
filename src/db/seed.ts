@@ -71,6 +71,7 @@ interface MessageDef {
   channelId: string;
   userId: string;
   text: string;
+  thinking?: string;
   createdAt: Date;
   reactions: { emoji: string; userIds: string[] }[];
   parentMockId?: string;
@@ -80,8 +81,8 @@ const messageDefs: MessageDef[] = [
   // ============ #general ============
   { mockId: "gen-1", channelId: "general", userId: "michael", text: "Good morning everyone! It is a beautiful day at Dunder Mifflin, and I just want to say... I love this company.", createdAt: t(2, 9, 0), reactions: [{ emoji: "❤️", userIds: ["pam", "kevin"] }] },
   { mockId: "gen-2", channelId: "general", userId: "stanley", text: "It's Monday, Michael.", createdAt: t(2, 9, 2), reactions: [] },
-  { mockId: "gen-3", channelId: "general", userId: "michael", text: "And what better day to celebrate the gift of employment! Everyone, conference room in 5 minutes. I have a big announcement.", createdAt: t(2, 9, 3), reactions: [{ emoji: "😬", userIds: ["jim", "pam", "oscar"] }] },
-  { mockId: "gen-4", channelId: "general", userId: "dwight", text: "I'll prepare the conference room. Everyone should be seated by rank.", createdAt: t(2, 9, 4), reactions: [] },
+  { mockId: "gen-3", channelId: "general", userId: "michael", text: "And what better day to celebrate the gift of employment! Everyone, conference room in 5 minutes. I have a big announcement.", thinking: "I need to assert my authority as boss while keeping everyone excited. A conference room meeting is the perfect way to make myself the center of attention. I should make it sound important even though I haven't actually decided what the announcement is yet.", createdAt: t(2, 9, 3), reactions: [{ emoji: "😬", userIds: ["jim", "pam", "oscar"] }] },
+  { mockId: "gen-4", channelId: "general", userId: "dwight", text: "I'll prepare the conference room. Everyone should be seated by rank.", thinking: "Michael has called a meeting. As Assistant to the Regional Manager, it is my duty to prepare the conference room and establish proper seating hierarchy. The Schrute family ranking system based on beet yield per acre is the only fair and logical approach. I must act immediately to demonstrate my loyalty and competence.", createdAt: t(2, 9, 4), reactions: [] },
   { mockId: "gen-5", channelId: "general", userId: "jim", text: "What rank system are we using today, Dwight?", createdAt: t(2, 9, 5), reactions: [{ emoji: "😂", userIds: ["pam", "kevin", "oscar"] }] },
   { mockId: "gen-6", channelId: "general", userId: "dwight", text: "Schrute family hierarchy. Obviously. It's based on beet yield per acre.", createdAt: t(2, 9, 6), reactions: [{ emoji: "🥬", userIds: ["creed"] }] },
   { mockId: "gen-7", channelId: "general", userId: "pam", text: "Reminder: the kitchen fridge will be cleaned out on Friday. Please label your food. Kevin, this means you.", createdAt: t(2, 10, 30), reactions: [{ emoji: "👍", userIds: ["oscar", "angela"] }] },
@@ -543,6 +544,7 @@ async function seed() {
     channelId: m.channelId,
     userId: m.userId,
     text: m.text,
+    thinking: m.thinking ?? null,
     createdAt: m.createdAt,
   }));
 

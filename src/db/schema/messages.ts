@@ -51,6 +51,7 @@ export const messages = pgTable(
     parentMessageId: uuid("parent_message_id"),
     userId: text("user_id").notNull(),
     text: text("text").notNull(),
+    thinking: text("thinking"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

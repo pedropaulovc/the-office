@@ -11,6 +11,11 @@ export interface ToolResult {
   content: { type: "text"; text: string }[];
 }
 
+/** Mutable ref for passing accumulated thinking text from orchestrator to tools. */
+export interface ThinkingRef {
+  current: string | null;
+}
+
 export interface ToolServerOptions {
   sendMessage?: SendMessageToolOptions;
 }
@@ -30,9 +35,10 @@ export function getToolkit(
   chainDepth = 0,
   executor?: RunExecutor,
   toolOptions?: ToolServerOptions,
+  thinkingRef?: ThinkingRef,
 ): Toolkit {
   const tools = [
-    createSendMessageTool(agentId, runId, channelId, chainDepth, executor, toolOptions?.sendMessage),
+    createSendMessageTool(agentId, runId, channelId, chainDepth, executor, toolOptions?.sendMessage, thinkingRef),
     createReactToMessageTool(agentId, runId),
     createDoNothingTool(runId),
     createUpdateMemoryTool(agentId, runId),

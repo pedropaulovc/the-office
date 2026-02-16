@@ -158,6 +158,7 @@ describe("evaluation harness", () => {
           parentMessageId: null,
           userId: "michael",
           text: "That's what she said!",
+          thinking: null,
           createdAt: new Date("2026-02-10T10:00:00Z"),
         },
         {
@@ -166,6 +167,7 @@ describe("evaluation harness", () => {
           parentMessageId: null,
           userId: "michael",
           text: "I am the world's best boss.",
+          thinking: null,
           createdAt: new Date("2026-02-11T10:00:00Z"),
         },
       ];

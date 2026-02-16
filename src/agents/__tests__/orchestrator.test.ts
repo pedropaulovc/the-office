@@ -89,6 +89,48 @@ function makeEndTurnResponse(text: string) {
   };
 }
 
+function makeEndTurnResponseWithThinking(text: string, thinking: string) {
+  return {
+    id: "msg-1",
+    type: "message" as const,
+    role: "assistant" as const,
+    content: [
+      { type: "thinking" as const, thinking, signature: "sig-1" },
+      { type: "text" as const, text },
+    ],
+    model: "claude-haiku-4-5-20251001",
+    stop_reason: "end_turn" as const,
+    stop_sequence: null,
+    usage: { input_tokens: 100, output_tokens: 50 },
+  };
+}
+
+function makeToolUseResponseWithThinking(
+  text: string,
+  thinking: string,
+  toolUses: { id: string; name: string; input: unknown }[],
+) {
+  return {
+    id: "msg-1",
+    type: "message" as const,
+    role: "assistant" as const,
+    content: [
+      { type: "thinking" as const, thinking, signature: "sig-1" },
+      { type: "text" as const, text },
+      ...toolUses.map((t) => ({
+        type: "tool_use" as const,
+        id: t.id,
+        name: t.name,
+        input: t.input,
+      })),
+    ],
+    model: "claude-haiku-4-5-20251001",
+    stop_reason: "tool_use" as const,
+    stop_sequence: null,
+    usage: { input_tokens: 100, output_tokens: 50 },
+  };
+}
+
 function makeToolUseResponse(
   text: string,
   toolUses: { id: string; name: string; input: unknown }[],
@@ -469,6 +511,7 @@ describe("orchestrator", () => {
           gateConfig: expect.any(Object) as unknown,
         }) as unknown,
       }),
+      { current: null },
     );
   });
 
@@ -553,5 +596,81 @@ describe("orchestrator", () => {
         outputTokens: 50,
       }),
     );
+  });
+
+  it("extracts thinking blocks and stores as thinking_message", async () => {
+    mockCreate.mockResolvedValue(
+      makeEndTurnResponseWithThinking("Hello!", "I should greet them warmly"),
+    );
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: RUN.id,
+        messageType: "thinking_message",
+        content: "I should greet them warmly",
+      }),
+    );
+    // Also records the assistant_message
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: RUN.id,
+        messageType: "assistant_message",
+        content: "Hello!",
+      }),
+    );
+  });
+
+  it("accumulates thinking across turns and records each turn separately", async () => {
+    mockCreate
+      .mockResolvedValueOnce(
+        makeToolUseResponseWithThinking(
+          "Let me send a message",
+          "First I need to think about what to say",
+          [{ id: "tu_1", name: "send_message", input: { text: "Hi!" } }],
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeEndTurnResponseWithThinking("Done", "That went well"),
+      );
+
+    const mockHandler = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"messageId":"msg-1"}' }],
+    });
+    mockGetToolkit.mockReturnValue({
+      definitions: [{ name: "send_message", description: "Send", input_schema: { type: "object" as const, properties: {} } }],
+      handlers: new Map([["send_message", mockHandler]]),
+    });
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    // Both thinking blocks should be recorded
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageType: "thinking_message",
+        content: "First I need to think about what to say",
+      }),
+    );
+    expect(mockCreateRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageType: "thinking_message",
+        content: "That went well",
+      }),
+    );
+  });
+
+  it("does not record thinking_message when response has no thinking blocks", async () => {
+    mockCreate.mockResolvedValue(makeEndTurnResponse("Hello!"));
+
+    const { executeRun } = await import("../orchestrator");
+    await executeRun(RUN);
+
+    const thinkingCalls = mockCreateRunMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as { messageType: string }).messageType === "thinking_message",
+    );
+    expect(thinkingCalls).toHaveLength(0);
   });
 });

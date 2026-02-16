@@ -42,8 +42,12 @@ export async function fetchChannel(channelId: string): Promise<ChannelView> {
   return response.json() as Promise<ChannelView>;
 }
 
-export async function fetchChannelMessages(channelId: string): Promise<Message[]> {
-  const response = await fetch(`/api/channels/${encodeURIComponent(channelId)}/messages`);
+export async function fetchChannelMessages(channelId: string, options?: { debug?: boolean }): Promise<Message[]> {
+  const params = new URLSearchParams();
+  if (options?.debug) params.set("debug", "true");
+  const qs = params.toString();
+  const url = `/api/channels/${encodeURIComponent(channelId)}/messages${qs ? `?${qs}` : ""}`;
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch messages: ${response.status}`);
