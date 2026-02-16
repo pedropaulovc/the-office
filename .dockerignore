@@ -1,0 +1,29 @@
+node_modules
+.next
+.git
+.gitignore
+
+# Test infrastructure
+coverage
+playwright-report
+test-results
+trace-export
+src/tests
+e2e
+
+# Dev files
+logs
+.sentry-logs
+.playwright-cli
+.vercel
+.env*
+*.pem
+npm-debug.log*
+
+# Dev scripts
+scripts
+
+# Spec & docs
+spec
+AGENTS.md
+CLAUDE.md
