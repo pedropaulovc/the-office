@@ -203,6 +203,7 @@ export function DataProvider({
         }
 
         // Top-level message — append to channel (skip if already added optimistically)
+        const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'true';
         const newMessage: Message = {
           id: dbMsg.id as string,
           channelId,
@@ -211,6 +212,7 @@ export function DataProvider({
           timestamp: dbMsg.createdAt as string,
           reactions: [],
           threadReplyCount: 0,
+          ...(debug && dbMsg.thinking ? { thinking: dbMsg.thinking as string } : {}),
         };
 
         setMessages(prev => {

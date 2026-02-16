@@ -208,10 +208,11 @@ async function executeRunInner(run: Run): Promise<RunResult> {
         { name: `agent.turn.${turns}`, op: "ai.agent.turn" },
         () => anthropic.messages.create({
           model: agent.modelId,
-          max_tokens: 4096,
+          max_tokens: 16000,
           system: systemPrompt,
           messages,
           tools: definitions,
+          thinking: { type: "enabled", budget_tokens: 5000 },
         }),
       );
 
