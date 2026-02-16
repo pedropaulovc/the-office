@@ -14,17 +14,20 @@ declare global {
   }
 }
 
-export function useSSE(onEvent: SSEEventHandler): void {
+export function useSSE(onEvent: SSEEventHandler, onReconnect?: () => void): void {
   const handlerRef = useRef(onEvent);
+  const reconnectRef = useRef(onReconnect);
 
   useEffect(() => {
     handlerRef.current = onEvent;
+    reconnectRef.current = onReconnect;
   });
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
+    let hasConnectedOnce = false;
 
     window.__dispatchSSE = (event: SSEEvent) => {
       handlerRef.current(event);
@@ -34,6 +37,13 @@ export function useSSE(onEvent: SSEEventHandler): void {
       if (disposed) return;
 
       eventSource = new EventSource("/api/sse");
+
+      eventSource.onopen = () => {
+        if (hasConnectedOnce) {
+          reconnectRef.current?.();
+        }
+        hasConnectedOnce = true;
+      };
 
       eventSource.onmessage = (e: MessageEvent) => {
         try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
 import { useSSE } from '@/hooks/use-sse';
@@ -363,7 +363,19 @@ export function DataProvider({
     });
   }, []);
 
-  useSSE(handleSSEEvent);
+  // Track loaded channel IDs so onReconnect can refetch without stale closures
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const handleReconnect = useCallback(() => {
+    for (const channelId of Object.keys(messagesRef.current)) {
+      loadMessages(channelId);
+    }
+  }, [loadMessages]);
+
+  useSSE(handleSSEEvent, handleReconnect);
 
   const value = useMemo(
     () => ({

@@ -2,6 +2,7 @@ import { connectionRegistry } from "@/messages/sse-registry";
 import { withSpan, logInfo, countMetric } from "@/lib/telemetry";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const MAX_CONNECTION_MS = 55_000; // Close before Vercel's 60s limit; client auto-reconnects
 const encoder = new TextEncoder();
 
 export function GET(request: Request): Response {
@@ -26,8 +27,21 @@ export function GET(request: Request): Response {
         }
       }, HEARTBEAT_INTERVAL_MS);
 
+      // Gracefully close after 55s so client reconnects before Vercel kills the function
+      const maxLifetime = setTimeout(() => {
+        clearInterval(heartbeat);
+        connectionRegistry.remove(connectionId);
+        logInfo("sse.stream_expired", { connectionId });
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
+      }, MAX_CONNECTION_MS);
+
       // Cleanup on client disconnect
       request.signal.addEventListener("abort", () => {
+        clearTimeout(maxLifetime);
         clearInterval(heartbeat);
         connectionRegistry.remove(connectionId);
         try {
