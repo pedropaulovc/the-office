@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback, type ReactNode } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import type { Agent } from '@/db/schema';
 import type { ChannelView } from '@/db/queries/messages';
 import { useSSE } from '@/hooks/use-sse';
@@ -103,6 +103,9 @@ export function DataProvider({
     return map;
   }, [allChannels]);
 
+  const channelMapRef = useRef(channelMap);
+  useEffect(() => { channelMapRef.current = channelMap; }, [channelMap]);
+
   const getChannel = useMemo(
     () => (id: string): ChannelView | undefined => channelMap.get(id),
     [channelMap],
@@ -179,11 +182,20 @@ export function DataProvider({
     }
   }, [channelMap, agentMap, loadMessages]);
 
+  const loadExperimentChannelRef = useRef(loadExperimentChannel);
+  useEffect(() => { loadExperimentChannelRef.current = loadExperimentChannel; }, [loadExperimentChannel]);
+
   const handleSSEEvent = useCallback((event: SSEEvent) => {
     switch (event.type) {
       case 'message_created': {
         const dbMsg = event.data as Record<string, unknown>;
         const channelId = typeof dbMsg.channelId === 'string' ? dbMsg.channelId : event.channelId;
+
+        // Unknown channel (e.g. experiment channel created after page load) — load it dynamically
+        if (!channelMapRef.current.has(channelId)) {
+          void loadExperimentChannelRef.current(channelId);
+          return;
+        }
 
         // Thread reply — update parent's threadReplyCount
         if (dbMsg.parentMessageId) {
