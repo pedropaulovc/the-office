@@ -9,6 +9,8 @@ RUN npm ci
 # Stage 2: Build the application
 FROM base AS builder
 WORKDIR /app
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG SENTRY_AUTH_TOKEN
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
